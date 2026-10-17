@@ -61,23 +61,41 @@ issuer: https://token.actions.githubusercontent.com
 subject: repo:paul1319/CLIProxyAPI:ref:refs/heads/main
 ```
 
-Merge these entries into the existing tailnet policy, substituting the Mac's
-Tailscale IPv4 and the existing owner identity. Do not replace the policy or
-retag an existing user-owned Mac just to deploy it:
+Tailscale SSH requires a tagged destination when CI uses a tag identity. A
+tagged CI node cannot SSH to a user-owned destination by naming its owner or IP.
+See the [SSH destination constraints](https://tailscale.com/docs/reference/syntax/policy-file#dst-1).
+
+Review and back up the existing tailnet policy before moving the Mac to
+`tag:cliproxy-mac`. Tagging changes its identity for every service, including
+existing SSH and T3 access. First preserve the owner's required network and SSH
+permissions explicitly, then add the CI grant. Merge entries into the existing
+policy rather than replacing it. This example permits the owner and CI to SSH
+as `pavel`; retain any other already-required owner accounts as well:
 
 ```json
 {
-  "tagOwners": {"tag:cliproxy-ci": ["autogroup:admin"]},
-  "hosts": {"cliproxy-mac": "REPLACE_WITH_MAC_TAILSCALE_IPV4"},
-  "grants": [{"src": ["tag:cliproxy-ci"], "dst": ["cliproxy-mac"], "ip": ["tcp:22"]}],
-  "ssh": [{"action": "accept", "src": ["tag:cliproxy-ci"], "dst": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "users": ["pavel"]}]
+  "tagOwners": {
+    "tag:cliproxy-ci": ["autogroup:admin"],
+    "tag:cliproxy-mac": ["autogroup:admin"]
+  },
+  "grants": [
+    {"src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "ip": ["*"]},
+    {"src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "ip": ["tcp:22"]}
+  ],
+  "ssh": [
+    {"action": "accept", "src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]},
+    {"action": "accept", "src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]}
+  ]
 }
 ```
 
-Tailscale SSH rules need the destination user identity or a destination tag;
-the host alias limits the network grant. Check other existing grants/SSH rules
-for broader access. CI SSH runs as the Docker Desktop owner, `pavel`, so trusted
-`main` code has that user's machine access. Protect who can write to `main`.
+Check existing grants and SSH rules for broader access: a pre-existing wildcard
+source can grant CI additional network access. Preserve other devices' required
+permissions when narrowing such rules. After policy validation, assign
+`tag:cliproxy-mac` only to the server Mac, preserving any existing tags. Verify
+the owner's SSH and T3 access from another device before enabling deployment.
+CI SSH runs as the Docker Desktop owner, `pavel`, so trusted `main` code has that
+user's machine access. Protect who can write to `main`.
 
 Configure repository **Actions variables** (not secrets; no long-lived Tailscale
 secret is needed):
