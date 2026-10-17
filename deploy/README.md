@@ -58,7 +58,16 @@ Restrict its GitHub issuer/subject to this repository's `main` branch:
 
 ```text
 issuer: https://token.actions.githubusercontent.com
-subject: repo:paul1319/CLIProxyAPI:ref:refs/heads/main
+subject: repo:paul1319@28653225/CLIProxyAPI@1420830716:ref:refs/heads/main
+```
+
+This fork uses GitHub's immutable subject format, which includes owner and
+repository IDs. Retrieve the exact subject from the repository's OIDC settings
+instead of assuming the older name-only format:
+
+```bash
+gh api repos/paul1319/CLIProxyAPI/actions/oidc/customization/sub \
+  --jq '.sub_claim_prefix + ":ref:refs/heads/main"'
 ```
 
 Tailscale SSH requires a tagged destination when CI uses a tag identity. A
