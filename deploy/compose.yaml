@@ -1,0 +1,43 @@
+services:
+  proxy:
+    image: ${CLI_PROXY_IMAGE:?Set CLI_PROXY_IMAGE to an immutable image reference}
+    platform: linux/arm64
+    init: true
+    restart: unless-stopped
+    command: ["./CLIProxyAPI", "--config", "/config/config.yaml"]
+    environment:
+      TZ: Europe/Vienna
+      MANAGEMENT_STATIC_PATH: /data/static
+    ports:
+      - "127.0.0.1:8317:8317"
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./auths
+        target: /root/.cli-proxy-api
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./logs
+        target: /CLIProxyAPI/logs
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./plugins
+        target: /CLIProxyAPI/plugins
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./static
+        target: /data/static
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
