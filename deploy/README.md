@@ -83,7 +83,7 @@ as `pavel`; retain any other already-required owner accounts as well:
     {"src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "ip": ["tcp:22"]}
   ],
   "ssh": [
-    {"action": "accept", "src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]},
+    {"action": "check", "src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]},
     {"action": "accept", "src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]}
   ]
 }
@@ -91,7 +91,9 @@ as `pavel`; retain any other already-required owner accounts as well:
 
 Check existing grants and SSH rules for broader access: a pre-existing wildcard
 source can grant CI additional network access. Preserve other devices' required
-permissions when narrowing such rules. After policy validation, assign
+permissions when narrowing such rules, including the server Mac's existing
+outbound tailnet access. Preserve existing owner SSH check-mode requirements.
+After policy validation, assign
 `tag:cliproxy-mac` only to the server Mac, preserving any existing tags. Verify
 the owner's SSH and T3 access from another device before enabling deployment.
 CI SSH runs as the Docker Desktop owner, `pavel`, so trusted `main` code has that
