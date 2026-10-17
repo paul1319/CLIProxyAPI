@@ -31,7 +31,8 @@ jobs:
           cache: true
       - name: Validate deployment scripts
         run: |
-          bash -n deploy/deploy.sh deploy/ssh-confirm.sh
+          bash -n deploy/deploy.sh
+          bash -n deploy/ssh-confirm.sh
           python3 -m unittest discover -s deploy -p 'test_*.py' -v
       - name: Test and build (excluding the live LAN multicast probe)
         run: |
