@@ -1,15 +1,16 @@
+import { quotaApi as apiCallApi } from '@/services/api/quota';
 import { afterEach, expect, test } from 'bun:test';
 import i18n from '@/i18n';
 import type { AuthFileItem } from '@/types';
-import { apiCallApi, type ApiCallResult } from '@/services/api';
+import { type ApiCallResult } from '@/services/api';
 import { useQuotaStore } from '@/stores/useQuotaStore';
 import { XAI_CONFIG } from '@/features/quota/providers/xai/data';
 import type { QuotaAdapter } from '@/features/quota/providers';
 import { enrichQuotaInBackground } from '@/features/quota/quotaEnrichment';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
-import { XAI_USER_URL, XAI_SETTINGS_URL, buildXaiBillingSummary } from '@/utils/quota';
+import { buildXaiBillingSummary } from '@/utils/quota';
 
-const originalRequest = apiCallApi.request;
+const originalRequest = apiCallApi.read;
 const file: AuthFileItem = { name: 'fixture.json', type: 'xai', auth_index: 'fixture' };
 const key = getQuotaCacheKey(file);
 const adapter = XAI_CONFIG as unknown as QuotaAdapter;
@@ -38,25 +39,24 @@ const beginEnrichment = () => {
 };
 
 afterEach(() => {
-  apiCallApi.request = originalRequest;
+  apiCallApi.read = originalRequest;
   useQuotaStore.getState().clearQuotaCache();
 });
 
 test('commits quota before requesting optional plan and updates it later', async () => {
   const gate = deferred();
   const urls: string[] = [];
-  apiCallApi.request = async (request, config) => {
-    urls.push(request.url);
-    if (request.url === XAI_USER_URL || request.url === XAI_SETTINGS_URL) {
+  apiCallApi.read = async (_authIndex, resource) => {
+    urls.push(resource);
+    if (resource === 'user' || resource === 'settings') {
       expect(current()?.status).toBe('success');
-      expect(config?.timeout).toBe(8000);
       return gate.promise;
     }
     return result({ config: { monthlyLimit: { val: 15000 }, used: { val: 1500 } } });
   };
   const data = await XAI_CONFIG.fetchQuota(file, i18n.t);
   expect(urls).toHaveLength(2);
-  expect(urls).not.toContain(XAI_USER_URL);
+  expect(urls).not.toContain('user');
   const state = XAI_CONFIG.buildSuccessState(data);
   useQuotaStore.getState().setXaiQuota({ [key]: state });
   const pending = enrichQuotaInBackground(adapter, file, data, state, i18n.t);
@@ -73,7 +73,7 @@ test('commits quota before requesting optional plan and updates it later', async
 
 for (const failure of ['network', 'http', 'malformed'] as const) {
   test(`optional ${failure} failure preserves the exact original quota and fallback`, async () => {
-    apiCallApi.request = async () => {
+    apiCallApi.read = async () => {
       if (failure === 'network') throw new Error('unavailable');
       return failure === 'http' ? result({}, 503) : result('not-json');
     };
@@ -84,8 +84,8 @@ for (const failure of ['network', 'http', 'malformed'] as const) {
 }
 
 test('uses user tier when settings fails', async () => {
-  apiCallApi.request = async ({ url }) => {
-    if (url === XAI_SETTINGS_URL) throw new Error('unavailable');
+  apiCallApi.read = async (_authIndex, resource) => {
+    if (resource === 'settings') throw new Error('unavailable');
     return result({ subscriptionTier: 'SuperGrok' });
   };
   const { pending } = beginEnrichment();
@@ -96,7 +96,7 @@ test('uses user tier when settings fails', async () => {
 for (const change of ['session', 'file', 'new-result', 'refresh'] as const) {
   test(`late subscription cannot overwrite ${change}`, async () => {
     const gate = deferred();
-    apiCallApi.request = async () => gate.promise;
+    apiCallApi.read = async () => gate.promise;
     const { pending } = beginEnrichment();
     if (change === 'session') useQuotaStore.getState().clearQuotaCache();
     if (change === 'file') useQuotaStore.getState().clearQuotaCache([file.name]);
@@ -115,7 +115,7 @@ for (const change of ['session', 'file', 'new-result', 'refresh'] as const) {
 
 test('unrelated file invalidation does not discard a valid subscription', async () => {
   const gate = deferred();
-  apiCallApi.request = async () => gate.promise;
+  apiCallApi.read = async () => gate.promise;
   const { pending } = beginEnrichment();
   useQuotaStore.getState().clearQuotaCache(['other.json']);
   gate.resolve(result({ subscription_tier_display: 'SuperGrok Heavy' }));

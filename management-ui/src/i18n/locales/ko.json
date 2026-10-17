@@ -1576,6 +1576,9 @@
     }
   },
   "quota_management": {
+    "snapshot_updated": "Updated {{time}}",
+    "snapshot_stale": "Last check {{time}} · data may be outdated",
+    "snapshot_save_failed": "Latest data could not be saved on the server",
     "search_label": "계정 검색",
     "search_placeholder": "파일명 또는 이메일로 검색",
     "search_empty_title": "일치하는 계정 없음",

@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
     os.umask(0o077)
     runtime = args.directory.expanduser().resolve()
-    for name in ("", "config", "auths", "logs", "plugins", "static", "releases"):
+    for name in ("", "config", "auths", "logs", "plugins", "static", "state", "releases"):
         (runtime / name).mkdir(mode=0o700, parents=True, exist_ok=True)
     config_path = runtime / "config/config.yaml"
     if not config_path.exists():

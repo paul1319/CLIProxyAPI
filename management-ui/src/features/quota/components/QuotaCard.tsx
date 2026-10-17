@@ -11,6 +11,7 @@ import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { hasClaudeUsageData } from '../providers/claude/data';
+import { QuotaFreshness } from './QuotaFreshness';
 import { buildAccountOverview, nearestResetExpiry } from '../accountCardModel';
 import styles from './QuotaCard.module.scss';
 
@@ -43,7 +44,7 @@ export function QuotaCard({
   const loading = status === 'loading';
   const retained =
     entry.type === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
-  const showData = status === 'success' || retained;
+  const showData = status === 'success' || quota?.hasData || retained;
   const [delay] = useState(entranceDelayMs ?? null);
   const claudeReset = useClaudeResetGrants(
     file,
@@ -153,6 +154,9 @@ export function QuotaCard({
         </div>
       </dl>
       <div className={styles.scheduleBlock}>
+        <div className={styles.muted}>
+          <QuotaFreshness quota={quota} />
+        </div>
         {overview.credits
           .filter((credit) => credit.resetAtMs != null)
           .map((credit) => (

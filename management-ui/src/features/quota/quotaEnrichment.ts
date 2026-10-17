@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { AuthFileItem } from '@/types';
+import type { QuotaReadOptions } from '@/services/api/quota';
 import {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
@@ -14,7 +15,8 @@ export async function enrichQuotaInBackground(
   file: AuthFileItem,
   data: unknown,
   expectedState: QuotaCardState,
-  t: TFunction
+  t: TFunction,
+  options?: QuotaReadOptions
 ): Promise<void> {
   if (!adapter.enrichQuota) return;
   const cacheKey = getQuotaCacheKey(file);
@@ -23,13 +25,24 @@ export async function enrichQuotaInBackground(
   const generation = captureQuotaCacheGeneration(file.name);
 
   try {
-    const enriched = await adapter.enrichQuota(file, data, t);
+    const enriched = await adapter.enrichQuota(file, data, t, options);
     if (enriched === data) return;
     commitIfQuotaCacheCurrent(generation, () => {
       const setQuota = useQuotaStore.getState()[adapter.storeSetter] as QuotaMapUpdater;
       setQuota((prev) => {
         if (prev[cacheKey] !== expectedState) return prev;
-        return { ...prev, [cacheKey]: adapter.buildSuccessState(enriched) };
+        return {
+          ...prev,
+          [cacheKey]: {
+            ...expectedState,
+            ...adapter.buildSuccessState(enriched),
+            status: expectedState.status,
+            error: expectedState.error,
+            errorStatus: expectedState.errorStatus,
+            stale: expectedState.stale,
+            observedAt: expectedState.observedAt,
+          },
+        };
       });
     });
   } catch {

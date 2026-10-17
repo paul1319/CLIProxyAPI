@@ -26,6 +26,8 @@ import {
   resolveQuotaPluginId,
 } from '@/features/quota/providers/plugin/data';
 
+const quotaResponse = (body: unknown) => ({ status_code: 200, body });
+
 const quotaPlugin = (overrides: Partial<PluginListEntry> = {}): PluginListEntry => ({
   id: 'kiro-quota',
   path: '/plugins/kiro-quota',
@@ -100,7 +102,7 @@ describe('generic plugin quota', () => {
   });
 
   test('routes advertised quotas for providers without a built-in card', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({});
+    const post = spyOn(apiClient, 'post').mockResolvedValue(quotaResponse({}));
     try {
       for (const capability of [
         { quota_probe: { url: 'https://quota.example.test/usage' } },
@@ -128,7 +130,12 @@ describe('generic plugin quota', () => {
         const fetched = QUOTA_ADAPTERS[entry.type].fetchQuota(file, i18n.t);
         if (capability.quota_provider) {
           await fetched;
-          expect(post.mock.calls).toEqual([['/plugins/kiro-quota/quota', { auth_index: '7' }]]);
+          expect(post.mock.calls).toEqual([
+            [
+              '/credentials/quota/refresh',
+              { auth_index: '7', resource: 'plugin', plugin_id: 'kiro-quota', force: false },
+            ],
+          ]);
         } else {
           await expect(fetched).rejects.toThrow(i18n.t('plugin_quota.probe_unsupported'));
           expect(post).not.toHaveBeenCalled();
@@ -164,7 +171,7 @@ describe('generic plugin quota', () => {
   });
 
   test('uses the host-selected plugin without discovery or a provider match', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({});
+    const post = spyOn(apiClient, 'post').mockResolvedValue(quotaResponse({}));
     list.mockRejectedValue(new Error('plugin discovery unavailable'));
     try {
       for (const quotaProvider of ['kiro', 'multi-provider-alias', undefined]) {
@@ -185,7 +192,10 @@ describe('generic plugin quota', () => {
       }
       expect(list).not.toHaveBeenCalled();
       expect(post.mock.calls).toEqual(
-        Array(3).fill(['/plugins/Healthy%2FQuota/quota', { auth_index: '7' }])
+        Array(3).fill([
+          '/credentials/quota/refresh',
+          { auth_index: '7', resource: 'plugin', plugin_id: 'Healthy/Quota', force: false },
+        ])
       );
     } finally {
       post.mockRestore();
@@ -238,7 +248,7 @@ describe('generic plugin quota', () => {
         {},
         { subscription: { plan: '  ' }, summary: [{ key: '', label: 'Invalid', value: 42 }] },
       ]) {
-        post.mockResolvedValue(payload);
+        post.mockResolvedValue(quotaResponse(payload));
         const data = await fetchPluginQuota(
           { name: 'quota.json', authIndex: '7', quotaProvider: 'kiro' },
           i18n.t
@@ -258,24 +268,26 @@ describe('generic plugin quota', () => {
   });
 
   test('uses readable bucket labels without changing their distinct cache IDs', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({
-      groups: [
-        {
-          displayName: 'Kiro credits',
-          buckets: [
-            { window: 'monthly', description: ' Base credits ', remainingFraction: 0.8 },
-            { window: 'monthly', description: 'Bonus credits', remainingFraction: 0.2 },
-            { window: 'daily', description: ' ', remainingFraction: 0.5 },
-            {
-              window: 'weekly',
-              displayName: 'Explicit label',
-              description: 'Details',
-              remainingFraction: 0,
-            },
-          ],
-        },
-      ],
-    });
+    const post = spyOn(apiClient, 'post').mockResolvedValue(
+      quotaResponse({
+        groups: [
+          {
+            displayName: 'Kiro credits',
+            buckets: [
+              { window: 'monthly', description: ' Base credits ', remainingFraction: 0.8 },
+              { window: 'monthly', description: 'Bonus credits', remainingFraction: 0.2 },
+              { window: 'daily', description: ' ', remainingFraction: 0.5 },
+              {
+                window: 'weekly',
+                displayName: 'Explicit label',
+                description: 'Details',
+                remainingFraction: 0,
+              },
+            ],
+          },
+        ],
+      })
+    );
     try {
       const data = await fetchPluginQuota(
         { name: 'kiro.json', authIndex: '7', quotaProvider: 'kiro' },
@@ -357,7 +369,7 @@ describe('generic plugin quota', () => {
   });
 
   test('reports probe-only quotas as unsupported without calling removed v0 routes', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({});
+    const post = spyOn(apiClient, 'post').mockResolvedValue(quotaResponse({}));
     try {
       await expect(
         fetchPluginQuota({ name: 'kiro-a.json', supportsQuota: true, authIndex: '7' }, i18n.t)
@@ -388,7 +400,7 @@ describe('generic plugin quota', () => {
   });
 
   test('shares the plugin list across credentials and reports a missing plugin', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({});
+    const post = spyOn(apiClient, 'post').mockResolvedValue(quotaResponse({}));
     try {
       await Promise.all(
         ['1', '2', '3'].map((authIndex) =>
@@ -400,7 +412,7 @@ describe('generic plugin quota', () => {
       );
       expect(list).toHaveBeenCalledTimes(1);
       expect(post.mock.calls.map((call) => call[0])).toEqual(
-        Array(3).fill('/plugins/kiro-quota/quota')
+        Array(3).fill('/credentials/quota/refresh')
       );
 
       resetPluginQuotaRouteCache();
@@ -439,7 +451,7 @@ describe('generic plugin quota', () => {
   });
 
   test('drops a failed plugin list so the next refresh retries', async () => {
-    const post = spyOn(apiClient, 'post').mockResolvedValue({});
+    const post = spyOn(apiClient, 'post').mockResolvedValue(quotaResponse({}));
     try {
       list.mockRejectedValueOnce(new Error('offline'));
       const file = { name: 'kiro.json', authIndex: '7', quotaProvider: 'kiro' };

@@ -104,6 +104,8 @@ retain the corresponding business operation's fields.
 | `/credentials/status` | PATCH | Change credential status. |
 | `/credentials/fields` | PATCH | Change credential fields. |
 | `/credentials/refresh` | POST | Refresh credentials. |
+| `/credentials/quota` | GET | Read one persisted quota resource without contacting its provider. |
+| `/credentials/quota/refresh` | POST | Refresh one quota resource when due, sharing concurrent work. |
 | `/oauth/import?provider=vertex` | POST | Import a Vertex service account using a multipart `file` upload. |
 | `/oauth/auth-url?provider=<provider>` | GET | Start built-in or plugin OAuth. |
 | `/oauth/status?state=<state>` | GET | Get login status. |
@@ -114,6 +116,40 @@ retain the corresponding business operation's fields.
 | `/plugins/store` | GET | List the plugin store. |
 | `/plugins/store/<id>/install` | POST | Install or update a plugin. |
 | `/plugins/<id>/quota` | GET, POST, DELETE | Read, fetch, or reset plugin quota. |
+
+## Quota snapshots
+
+Quota reads use `auth_index` and a provider-specific `resource`. GET accepts query
+parameters; POST accepts JSON, with an optional `force` boolean. Supported resources
+are `usage` for built-in providers, `profile` and `reset_grants` for Claude,
+`subscription` and `reset_credits` for Codex, `weekly`, `monthly`, `user`, and
+`settings` for xAI, `subscription` for Antigravity, and `plugin` with `plugin_id`
+for plugin credentials. URLs, request bodies, and credentials are resolved by the
+server. These operations never run inference or redeem reset credits.
+
+Responses include `status_code`, sanitized `body`, `observed_at`, `stale`,
+`error_status`, `retry_at`, and `persistence_error`. Provider failures are embedded
+in the response, independently of management authentication. Failed refreshes keep
+the last successful body and observation time. GET and expired freshness intervals
+never delete successful data. A changed credential identity cannot restore the
+previous account's observations.
+
+Usage resources are refreshed at most once per 15 seconds across all callers;
+subscription/profile resources use one hour, and reset-grant/credit resources use
+10 minutes. `force` bypasses freshness, but never retry backoff or `Retry-After`.
+Concurrent reads of the same resource share one request; at most three resource
+refreshes run concurrently. The UI restores snapshots on entry and refreshes while
+visible, scheduling the next poll 15 seconds after completion. Plugin quota is
+restored automatically but requires explicit refresh because plugins do not declare
+whether their quota operation is safe for automatic polling.
+
+Snapshots are stored in `CLI_PROXY_STATE_DIR/quota-snapshots.json`, defaulting to a
+`state` directory next to the server configuration file. The file is versioned,
+written with owner-only permissions, and replaced through a temporary file. It
+contains allowlisted quota values and hashed account fingerprints, never OAuth
+tokens or complete upstream responses. This local store supports a single server
+process; multiple browser tabs share that server's cache. In Home mode the local
+management API remains disabled; no Home protocol is changed.
 
 ## OAuth
 

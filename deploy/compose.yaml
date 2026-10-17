@@ -9,9 +9,15 @@ services:
       TZ: Europe/Vienna
       MANAGEMENT_STATIC_PATH: /CLIProxyAPI/static
       MANAGEMENT_DISABLE_AUTO_UPDATE: "true"
+      CLI_PROXY_STATE_DIR: /data/state
     ports:
       - "127.0.0.1:8317:8317"
     volumes:
+      - type: bind
+        source: ./state
+        target: /data/state
+        bind:
+          create_host_path: false
       - type: bind
         source: ./config
         target: /config

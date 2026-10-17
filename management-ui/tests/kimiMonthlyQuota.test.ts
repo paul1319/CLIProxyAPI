@@ -1,7 +1,7 @@
+import { quotaApi } from '@/services/api/quota';
 import { describe, expect, spyOn, test } from 'bun:test';
 import { KIMI_CONFIG } from '@/features/quota/providers/kimi/data';
-import { apiCallApi, authFilesApi } from '@/services/api';
-import { KIMI_AI_USAGE_URL, KIMI_USAGE_URL, buildKimiQuotaRows } from '@/utils/quota';
+import { buildKimiQuotaRows } from '@/utils/quota';
 import type { AuthFileItem } from '@/types';
 
 describe('Kimi monthly quota', () => {
@@ -41,25 +41,25 @@ describe('Kimi International auth files', () => {
     expect(KIMI_CONFIG.filterFn(file)).toBe(true);
   });
 
-  test('kimi-ai credentials query the kimi.ai host', async () => {
-    const urls: string[] = [];
-    const download = spyOn(authFilesApi, 'downloadText').mockResolvedValue('{}');
-    const request = apiCallApi.request;
-    apiCallApi.request = (async ({ url }: { url: string }) => {
-      urls.push(url);
-      return { statusCode: 200, body: { limits: [] } };
-    }) as unknown as typeof apiCallApi.request;
+  test('all Kimi domains use the same credential-scoped snapshot API', async () => {
+    const read = spyOn(quotaApi, 'read').mockResolvedValue({
+      statusCode: 200,
+      body: { limits: [] },
+      bodyText: '',
+      header: {},
+    });
     try {
       for (const provider of ['kimi', 'kimi-ai', 'kimi_ai']) {
         await KIMI_CONFIG.fetchQuota(
-          { name: 'k.json', provider, auth_index: 'a1' } as AuthFileItem,
+          { name: 'k.json', provider, authIndex: 'a1' },
           ((key: string) => key) as never
         );
       }
+      expect(read.mock.calls.map(([authIndex, resource]) => [authIndex, resource])).toEqual(
+        Array(3).fill(['a1', 'usage'])
+      );
     } finally {
-      apiCallApi.request = request;
-      download.mockRestore();
+      read.mockRestore();
     }
-    expect(urls).toEqual([KIMI_USAGE_URL, KIMI_AI_USAGE_URL, KIMI_AI_USAGE_URL]);
   });
 });

@@ -2,6 +2,14 @@
  * Quota management types.
  */
 
+/** Metadata belongs to the last successful server observation, not the current request. */
+export interface QuotaObservation {
+  hasData?: boolean;
+  observedAt?: string | null;
+  stale?: boolean;
+  persistenceError?: boolean;
+}
+
 // Theme types
 export type ThemeColors = { bg: string; text: string; border?: string };
 export type TypeColorSet = { light: ThemeColors; dark?: ThemeColors };
@@ -210,7 +218,7 @@ export interface ClaudeQuotaWindow {
   periodHours?: number | null;
 }
 
-export interface ClaudeQuotaState {
+export interface ClaudeQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: ClaudeQuotaWindow[];
   extraUsage?: ClaudeExtraUsage | null;
@@ -257,7 +265,7 @@ export interface AntigravityQuotaBucket {
   periodHours?: number | null;
 }
 
-export interface AntigravityQuotaState {
+export interface AntigravityQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   groups: AntigravityQuotaGroup[];
   subscription?: AntigravityQuotaSubscription | null;
@@ -293,7 +301,7 @@ export interface CodexQuotaWindow {
   periodHours?: number | null;
 }
 
-export interface CodexQuotaState {
+export interface CodexQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: CodexQuotaWindow[];
   planType?: string | null;
@@ -347,7 +355,7 @@ export interface MetaQuotaData {
   windows: MetaQuotaWindow[];
 }
 
-export interface MetaQuotaState {
+export interface MetaQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   data?: MetaQuotaData;
   error?: string;
@@ -421,7 +429,7 @@ export interface KimiQuotaRow {
   periodHours?: number | null;
 }
 
-export interface KimiQuotaState {
+export interface KimiQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   rows: KimiQuotaRow[];
   error?: string;
@@ -515,7 +523,7 @@ export interface XaiBillingSummary {
   periodHours?: number | null;
 }
 
-export interface XaiQuotaState {
+export interface XaiQuotaState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   billing: XaiBillingSummary | null;
   error?: string;

@@ -19,6 +19,7 @@ examples/plugin/bin/*
 pgstore/*
 gitstore/*
 objectstore/*
+/state/
 
 # Static assets
 static/*

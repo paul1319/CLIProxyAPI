@@ -1,3 +1,4 @@
+import { quotaApi, type QuotaReadOptions } from '@/services/api/quota';
 import type { TFunction } from 'i18next';
 import type {
   AntigravityQuotaSubscription,
@@ -113,7 +114,8 @@ export const resetPluginQuotaRouteCache = () => {
 
 export const fetchPluginQuota = async (
   file: AuthFileItem,
-  t: TFunction
+  t: TFunction,
+  options?: QuotaReadOptions
 ): Promise<PluginQuotaData> => {
   const authIndex = normalizeAuthIndex(file.authIndex ?? file['auth_index']);
   if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
@@ -129,10 +131,9 @@ export const fetchPluginQuota = async (
   }
   if (!pluginId) throw new Error(t('plugin_quota.plugin_not_found', { provider }));
 
-  const payload = await apiClient.post<PluginQuotaPayload>(
-    `/plugins/${encodeURIComponent(pluginId)}/quota`,
-    { auth_index: authIndex }
-  );
+  const result = await quotaApi.read(authIndex, 'plugin', options, pluginId);
+  if (result.statusCode !== 200) throw new Error('Plugin quota read failed');
+  const payload = result.body as PluginQuotaPayload;
   return {
     groups: buildAntigravityQuotaGroups(payload),
     subscription: normalizeSubscription(payload.subscription),

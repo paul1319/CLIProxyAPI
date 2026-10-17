@@ -46,6 +46,44 @@ const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
   return updater;
 };
 
+type ObservedQuota = {
+  status: string;
+  hasData?: boolean;
+  observedAt?: string | null;
+  stale?: boolean;
+  error?: string;
+  errorStatus?: number;
+};
+
+/** Refresh state never replaces the last successful business data. */
+export function retainQuotaData<T extends ObservedQuota>(
+  next: Record<string, T>,
+  previous: Record<string, T>
+): Record<string, T> {
+  let retained = next;
+  for (const [key, value] of Object.entries(next)) {
+    const old = previous[key];
+    if (value === old) continue;
+    if (
+      value.status !== 'success' &&
+      !value.hasData &&
+      old &&
+      (old.hasData || old.status === 'success' || old.observedAt)
+    ) {
+      if (retained === next) retained = { ...next };
+      retained[key] = {
+        ...old,
+        status: value.status,
+        hasData: true,
+        error: value.error,
+        errorStatus: value.errorStatus,
+        stale: value.status === 'error' || old.stale,
+      };
+    }
+  }
+  return retained;
+}
+
 export const useQuotaStore = create<QuotaStoreState>((set) => ({
   cacheGeneration: 0,
   fileGenerations: {},
@@ -59,59 +97,38 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   xaiQuota: {},
   setAntigravityQuota: (updater) =>
     set((state) => ({
-      antigravityQuota: resolveUpdater(updater, state.antigravityQuota),
+      antigravityQuota: retainQuotaData(
+        resolveUpdater(updater, state.antigravityQuota),
+        state.antigravityQuota
+      ),
     })),
   setClaudeQuota: (updater) =>
-    set((state) => {
-      const next = resolveUpdater(updater, state.claudeQuota);
-      let retained = next;
-      for (const [key, quota] of Object.entries(next)) {
-        const previous = state.claudeQuota[key];
-        if (
-          previous &&
-          quota !== previous &&
-          (quota.status === 'loading' || quota.status === 'error') &&
-          !quota.observedAt &&
-          (previous.observedAt ||
-            previous.windows.length ||
-            previous.extraUsage ||
-            previous.dollarWindows?.length)
-        ) {
-          if (retained === next) retained = { ...next };
-          retained[key] = {
-            ...quota,
-            windows: previous.windows,
-            extraUsage: previous.extraUsage,
-            dollarWindows: previous.dollarWindows,
-            observedAt: previous.observedAt,
-            planType: previous.planType,
-            stale: quota.status === 'error' || previous.stale,
-          };
-        }
-      }
-      return { claudeQuota: retained };
-    }),
+    set((state) => ({
+      claudeQuota: retainQuotaData(resolveUpdater(updater, state.claudeQuota), state.claudeQuota),
+    })),
   setCodexQuota: (updater) =>
     set((state) => ({
-      codexQuota: resolveUpdater(updater, state.codexQuota),
+      codexQuota: retainQuotaData(resolveUpdater(updater, state.codexQuota), state.codexQuota),
     })),
   setDevinQuota: (updater) =>
     set((state) => ({
-      devinQuota: resolveUpdater(updater, state.devinQuota),
+      devinQuota: retainQuotaData(resolveUpdater(updater, state.devinQuota), state.devinQuota),
     })),
   setKimiQuota: (updater) =>
     set((state) => ({
-      kimiQuota: resolveUpdater(updater, state.kimiQuota),
+      kimiQuota: retainQuotaData(resolveUpdater(updater, state.kimiQuota), state.kimiQuota),
     })),
   setMetaQuota: (updater) =>
-    set((state) => ({ metaQuota: resolveUpdater(updater, state.metaQuota) })),
+    set((state) => ({
+      metaQuota: retainQuotaData(resolveUpdater(updater, state.metaQuota), state.metaQuota),
+    })),
   setPluginQuota: (updater) =>
     set((state) => ({
-      pluginQuota: resolveUpdater(updater, state.pluginQuota),
+      pluginQuota: retainQuotaData(resolveUpdater(updater, state.pluginQuota), state.pluginQuota),
     })),
   setXaiQuota: (updater) =>
     set((state) => ({
-      xaiQuota: resolveUpdater(updater, state.xaiQuota),
+      xaiQuota: retainQuotaData(resolveUpdater(updater, state.xaiQuota), state.xaiQuota),
     })),
   clearQuotaCache: (names) =>
     set((state) => {

@@ -1,14 +1,12 @@
-/**
- * Kimi 额度数据层。React-free / SCSS-free。
- */
+/** Kimi quota presentation from server-owned credential reads. */
+
+import { quotaApi, type QuotaReadOptions } from '@/services/api/quota';
 
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, KimiQuotaRow, KimiQuotaState } from '@/types';
-import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
-import { resolveKimiQuotaUrl } from '@/services/api/kimiQuota';
+import { getApiCallErrorMessage } from '@/services/api';
 import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent } from '@/stores/useQuotaStore';
 import {
-  KIMI_REQUEST_HEADERS,
   parseKimiUsagePayload,
   buildKimiQuotaRows,
   createStatusError,
@@ -18,7 +16,11 @@ import {
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
 
-const fetchKimiQuota = async (file: AuthFileItem, t: TFunction): Promise<KimiQuotaRow[]> => {
+const fetchKimiQuota = async (
+  file: AuthFileItem,
+  t: TFunction,
+  options: QuotaReadOptions = {}
+): Promise<KimiQuotaRow[]> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {
@@ -31,21 +33,7 @@ const fetchKimiQuota = async (file: AuthFileItem, t: TFunction): Promise<KimiQuo
       throw new Error(t('kimi_quota.stale_request'));
     }
   };
-  let url: string;
-  try {
-    url = await resolveKimiQuotaUrl(file);
-  } catch {
-    assertCurrent();
-    throw new Error(t('kimi_quota.domain_unavailable'));
-  }
-  assertCurrent();
-
-  const result = await apiCallApi.request({
-    authIndex,
-    method: 'GET',
-    url,
-    header: { ...KIMI_REQUEST_HEADERS },
-  });
+  const result = await quotaApi.read(authIndex, 'usage', options);
   assertCurrent();
 
   if (result.statusCode < 200 || result.statusCode >= 300) {

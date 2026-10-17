@@ -1,3 +1,4 @@
+import { quotaApi } from '@/services/api/quota';
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import type { TFunction } from 'i18next';
 import { CODEX_CONFIG } from '@/features/quota/providers/codex/data';
@@ -32,7 +33,11 @@ function setup(body: unknown, statusCode = 200) {
     calls.push('clear');
     return { status: 'ok', auth_index: 'test-index', models: [] };
   });
-  mocks.push(request, clear);
+  const reads = spyOn(quotaApi, 'read').mockImplementation(async () => {
+    calls.push('read');
+    return response({});
+  });
+  mocks.push(request, reads, clear);
   return { calls, request, clear };
 }
 
