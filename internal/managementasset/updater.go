@@ -105,7 +105,14 @@ func runAutoUpdater(ctx context.Context) {
 	}
 }
 
+func managementAutoUpdateDisabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("MANAGEMENT_DISABLE_AUTO_UPDATE")), "true")
+}
+
 func autoUpdateSkipReason(cfg *config.Config) (string, bool) {
+	if managementAutoUpdateDisabled() {
+		return "MANAGEMENT_DISABLE_AUTO_UPDATE is enabled", true
+	}
 	if cfg == nil {
 		return "config not yet available", true
 	}
@@ -200,6 +207,10 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 		return false
 	}
 	localPath := filepath.Join(staticDir, managementAssetName)
+	if managementAutoUpdateDisabled() {
+		info, errStat := os.Stat(localPath)
+		return errStat == nil && !info.IsDir()
+	}
 
 	_, _, _ = sfGroup.Do(localPath, func() (interface{}, error) {
 		lastUpdateCheckMu.Lock()

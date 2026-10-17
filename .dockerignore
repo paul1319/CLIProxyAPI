@@ -39,3 +39,8 @@ bin
 .bmad
 _bmad
 _bmad-output
+
+# Panel dependencies and generated artifacts
+management-ui/node_modules
+management-ui/dist
+!management-ui/LICENSE
