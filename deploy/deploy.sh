@@ -81,9 +81,12 @@ cleanup() {
       compose "$image" "$compose_file" rm --stop --force proxy || true
     fi
   fi
-  [[ -z "$state_tmp" ]] || rm -f "$state_tmp"
-  [[ -z "$registry_config" ]] || rm -rf "$registry_config"
-  rmdir "$deploy_dir/.deploy.lock" || true
+  [[ -z "$state_tmp" ]] || rm -f "$state_tmp" || result=1
+  [[ -z "$registry_config" ]] || rm -rf "$registry_config" || result=1
+  rmdir "$deploy_dir/.deploy.lock" || result=1
+  if [[ "$result" == 0 ]]; then
+    printf 'Deployed %s (bundle %s); HTTP health check passed.\n' "$image" "$release"
+  fi
   exit "$result"
 }
 trap cleanup EXIT
@@ -99,6 +102,8 @@ registry_docker() {
 if [[ "$mode" == --registry-token-stdin ]]; then
   registry_host=${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}
   registry_config=$(mktemp -d "${TMPDIR:-/tmp}/cliproxy-registry.XXXXXX")
+  # A registry entry prevents Docker from auto-selecting the macOS Keychain helper.
+  printf '{"auths":{"ghcr.io":{}}}\n' > "$registry_config/config.json"
   registry_docker login ghcr.io --username "$3" --password-stdin
 fi
 
@@ -127,4 +132,3 @@ compose "$image" "$compose_file" up -d --no-build --pull never
 healthy "$image" "$compose_file" "$expected_image" || die "New image failed the HTTP health check"
 save_state "$image" "$release"
 rollback_needed=false
-printf 'Deployed %s (bundle %s); HTTP health check passed.\n' "$image" "$release"

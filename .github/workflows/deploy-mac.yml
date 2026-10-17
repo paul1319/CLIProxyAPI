@@ -31,7 +31,7 @@ jobs:
           cache: true
       - name: Validate deployment scripts
         run: |
-          bash -n deploy/deploy.sh
+          bash -n deploy/deploy.sh deploy/ssh-confirm.sh
           python3 -m unittest discover -s deploy -p 'test_*.py' -v
       - name: Test and build (excluding the live LAN multicast probe)
         run: |
@@ -101,8 +101,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -C deploy -czf - compose.yaml deploy.sh | tailscale ssh "$DEPLOY_USER@$DEPLOY_HOST" \
-            "umask 077; mkdir -p \"\$HOME/.local/share/cliproxyapi/releases\" && mkdir \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && tar -xzf - -C \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\""
+          tar -C deploy -czf - compose.yaml deploy.sh | bash deploy/ssh-confirm.sh \
+            "Installed deployment bundle $RELEASE" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "umask 077; mkdir -p \"\$HOME/.local/share/cliproxyapi/releases\" && mkdir \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && tar -xzf - -C \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && printf '%s\\n' 'Installed deployment bundle $RELEASE'"
       - name: Deploy and check HTTP health, rolling back on failure
         shell: bash
         env:
@@ -110,5 +111,6 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          printf '%s' "$GHCR_TOKEN" | tailscale ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+          printf '%s' "$GHCR_TOKEN" | bash deploy/ssh-confirm.sh \
+            "Deployed $IMAGE (bundle $RELEASE); HTTP health check passed." "$DEPLOY_USER@$DEPLOY_HOST" \
             "PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin /bin/bash \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE/deploy.sh\" '$IMAGE' --registry-token-stdin '$REGISTRY_USER'"

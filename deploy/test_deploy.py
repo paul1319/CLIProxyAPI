@@ -28,7 +28,13 @@ if args[0] == "info": sys.exit(0)
 if args[0] == "context": print("unix:///fake/docker.sock"); sys.exit(0)
 if args[0] == "login":
     assert sys.stdin.read() == "temporary-token"
-    (pathlib.Path(os.environ["DOCKER_CONFIG"]) / "config.json").write_text("temporary credentials")
+    config = pathlib.Path(os.environ["DOCKER_CONFIG"]) / "config.json"
+    # Docker discovers a native credential helper when no auth configuration exists.
+    if not config.exists() or not json.loads(config.read_text()).get("auths"):
+        print("Native credential helper is unavailable", file=sys.stderr)
+        sys.exit(1)
+    if scenario == "login-fails": sys.exit(1)
+    config.write_text("temporary credentials")
     sys.exit(0)
 if args[0] == "pull": sys.exit(1 if scenario == "pull-fails" else 0)
 if args[:2] == ["image", "inspect"]:
@@ -150,6 +156,56 @@ class DeployTest(unittest.TestCase):
         login = next(call for call in self.calls if call[1][0] == "login")
         self.assertFalse(Path(login[3]).exists())
         self.assertNotIn("temporary-token", result.stdout + result.stderr)
+
+    def test_registry_login_failure_preserves_service_and_cleans_credentials(self):
+        before = self.saved.read_bytes()
+        result = self.run_deploy("login-fails", args=("--registry-token-stdin", "owner"), token="temporary-token")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.state()["image"], "sha256:old")
+        self.assertEqual(self.saved.read_bytes(), before)
+        self.assertFalse(any("up" in call[1] for call in self.calls))
+        login = next(call for call in self.calls if call[1][0] == "login")
+        self.assertFalse(Path(login[3]).exists())
+        self.assertFalse((self.runtime / ".deploy.lock").exists())
+
+
+class SSHConfirmationTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        tool = self.root / "tailscale"
+        tool.write_text("#!" + sys.executable + "\n" + r'''
+import os, pathlib, sys
+pathlib.Path(os.environ["SSH_INPUT"]).write_text(sys.stdin.read())
+print(os.environ.get("SSH_OUTPUT", ""), end="")
+sys.exit(int(os.environ.get("SSH_STATUS", "0")))
+''')
+        tool.chmod(0o700)
+        self.receipt = "Deployed registry/image:new (bundle new); HTTP health check passed."
+
+    def run_ssh(self, output, status=0):
+        env = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ["PATH"],
+                   SSH_INPUT=str(self.root / "input"), SSH_OUTPUT=output, SSH_STATUS=str(status))
+        return subprocess.run(["bash", str(SOURCE / "ssh-confirm.sh"), self.receipt, "pavel@mac", "deploy"],
+                              env=env, input="temporary-token", text=True, capture_output=True)
+
+    def test_confirmed_completion_preserves_stdin_without_logging_it(self):
+        result = self.run_ssh("progress\n" + self.receipt + "\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / "input").read_text(), "temporary-token")
+        self.assertNotIn("temporary-token", result.stdout + result.stderr)
+
+    def test_missing_receipt_fails_even_when_ssh_reports_success(self):
+        for output in ("", "Keychain Error\n", "prefix " + self.receipt + "\n"):
+            with self.subTest(output=output):
+                result = self.run_ssh(output)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("did not confirm completion", result.stderr)
+
+    def test_transport_failure_is_not_hidden_by_a_receipt(self):
+        result = self.run_ssh(self.receipt + "\n", status=255)
+        self.assertNotEqual(result.returncode, 0)
 
 
 class BootstrapTest(unittest.TestCase):

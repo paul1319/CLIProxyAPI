@@ -125,6 +125,12 @@ Desktop socket, and deletes the credentials after the operation. Images can
 remain private in GHCR. The Docker image source label links the package to the
 repository for Actions package permissions.
 
+The temporary Docker configuration explicitly uses file credentials so headless
+SSH does not invoke the macOS Keychain helper. CI also requires an exact completion
+receipt from each remote operation: macOS `login` can return zero even when the
+child command fails. Deployment emits its receipt only after image and HTTP
+health verification, a successful deployment-state write, and credential cleanup.
+
 Until `CLI_PROXY_DEPLOY_ENABLED=true`, CI tests and publishes images while the
 deploy job is explicitly skipped. Run `deploy-mac` manually on `main` to verify
 the full path after enabling it. Test access from another tailnet device too;
