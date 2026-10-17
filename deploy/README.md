@@ -58,7 +58,16 @@ Restrict its GitHub issuer/subject to this repository's `main` branch:
 
 ```text
 issuer: https://token.actions.githubusercontent.com
-subject: repo:paul1319/CLIProxyAPI:ref:refs/heads/main
+subject: repo:paul1319@28653225/CLIProxyAPI@1420830716:ref:refs/heads/main
+```
+
+This fork uses GitHub's immutable subject format, which includes owner and
+repository IDs. Retrieve the exact subject from the repository's OIDC settings
+instead of assuming the older name-only format:
+
+```bash
+gh api repos/paul1319/CLIProxyAPI/actions/oidc/customization/sub \
+  --jq '.sub_claim_prefix + ":ref:refs/heads/main"'
 ```
 
 Tailscale SSH requires a tagged destination when CI uses a tag identity. A
@@ -115,6 +124,12 @@ stdin. The Mac uses a disposable Docker credential directory, retains the
 Desktop socket, and deletes the credentials after the operation. Images can
 remain private in GHCR. The Docker image source label links the package to the
 repository for Actions package permissions.
+
+The temporary Docker configuration explicitly uses file credentials so headless
+SSH does not invoke the macOS Keychain helper. CI also requires an exact completion
+receipt from each remote operation: macOS `login` can return zero even when the
+child command fails. Deployment emits its receipt only after image and HTTP
+health verification, a successful deployment-state write, and credential cleanup.
 
 Until `CLI_PROXY_DEPLOY_ENABLED=true`, CI tests and publishes images while the
 deploy job is explicitly skipped. Run `deploy-mac` manually on `main` to verify
