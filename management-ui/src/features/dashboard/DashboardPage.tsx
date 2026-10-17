@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  IconBot,
   IconFileText,
   IconSidebarConfig,
   IconSidebarLogs,
@@ -23,7 +22,7 @@ import styles from './dashboard.module.scss';
 
 const DASH = '—';
 
-/** KPI 卡左上角色签：有语义色调的卡用状态色，其余保持中性 */
+/** Use status colors for semantic KPI accents and neutral colors otherwise. */
 const TILE_ACCENTS: Record<MeterTone, string> = {
   good: 'var(--viz-success)',
   warning: 'var(--amber-color)',
@@ -31,7 +30,7 @@ const TILE_ACCENTS: Record<MeterTone, string> = {
   idle: 'var(--text-quaternary)',
 };
 
-/** 大数字：六位以内用千分位，再往上压缩，避免撑破排版 */
+/** Group smaller numbers and compact larger values to keep them within the layout. */
 const formatHeadline = (value: number): string =>
   value < 100_000 ? value.toLocaleString() : formatCompactNumber(value);
 
@@ -45,7 +44,7 @@ export function DashboardPage() {
 
   useHeaderRefresh(refresh, connected);
 
-  /* Hero 与静态网格走分组级联；异步内容区（图表/供应商）保持整块 reveal */
+  /* Stagger the hero and static grids; reveal charts and provider data as whole sections. */
   const heroRef = useRevealGroup<HTMLElement>();
   const statsRef = useRevealGroup<HTMLElement>(0.12);
   const trafficRef = useRevealOnScroll<HTMLElement>();
@@ -82,7 +81,7 @@ export function DashboardPage() {
   const unknownProviderLabel = t('dashboard.provider_unknown');
   const successRateTone = toneForSuccessRate(traffic.successRate);
 
-  /** 标题是算出来的判词，不是写死的口号；句尾句号充当状态灯 */
+  /** Derive the headline from live status and use its final period as a status light. */
   const verdict = useMemo(() => {
     if (!connected) {
       return connectionStatus === 'connecting'
@@ -101,7 +100,7 @@ export function DashboardPage() {
     return { key: keyByTone[successRateTone], accent: TILE_ACCENTS[successRateTone] };
   }, [connected, connectionStatus, traffic.total, traffic.successRate, successRateTone]);
 
-  /* 句号状态灯只在「有活着的流量」时呼吸；离线/静默时保持安静 */
+  /* Animate the status light only while connected with active traffic. */
   const heroAlive = connected && traffic.total > 0;
 
   const connectionLabel = t(
@@ -184,12 +183,6 @@ export function DashboardPage() {
 
   const ctaCards = [
     {
-      to: '/ai-providers',
-      icon: <IconBot size={20} />,
-      title: t('nav.ai_providers'),
-      description: t('dashboard.cta_providers_desc'),
-    },
-    {
       to: '/auth-files',
       icon: <IconFileText size={20} />,
       title: t('nav.auth_files'),
@@ -244,8 +237,8 @@ export function DashboardPage() {
             {heroMetaLine}
           </p>
           <div className={styles.heroActions} data-reveal>
-            <Link to="/ai-providers" className={styles.primaryAction}>
-              {t('dashboard.cta_manage_providers')}
+            <Link to="/auth-files" className={styles.primaryAction}>
+              {t('nav.auth_files')}
             </Link>
             <Link to="/logs" className={styles.ghostAction}>
               {t('dashboard.cta_inspect_logs')}{' '}

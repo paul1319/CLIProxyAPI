@@ -24,7 +24,6 @@ import {
   IconSidebarLogs,
   IconSidebarOauth,
   IconSidebarPlugins,
-  IconSidebarProviders,
   IconSidebarQuickStart,
   IconSidebarQuota,
   IconSidebarStore,
@@ -56,7 +55,6 @@ import type { Theme } from '@/types';
 const sidebarIcons: Record<string, ReactNode> = {
   dashboard: <IconSidebarDashboard size={18} />,
   quickStart: <IconSidebarQuickStart size={18} />,
-  aiProviders: <IconSidebarProviders size={18} />,
   authFiles: <IconSidebarAuthFiles size={18} />,
   oauth: <IconSidebarOauth size={18} />,
   quota: <IconSidebarQuota size={18} />,
@@ -102,7 +100,7 @@ interface SidebarNavGroup {
 const flattenNavItems = (items: SidebarNavItem[]): SidebarNavLinkItem[] =>
   items.flatMap((item) => (item.kind === 'drawer' ? item.children : [item]));
 
-/** 点击菜单外或按下 Escape 时关闭弹出菜单 */
+/** Close the menu when clicking outside it or pressing Escape. */
 function useMenuDismiss(
   open: boolean,
   menuRef: RefObject<HTMLDivElement | null>,
@@ -610,12 +608,6 @@ export function MainLayout() {
       id: 'gateway',
       labelKey: 'nav_groups.gateway',
       items: [
-        {
-          path: '/ai-providers',
-          labelKey: 'nav.ai_providers',
-          metaKey: 'nav_meta.ai_providers',
-          icon: sidebarIcons.aiProviders,
-        },
         {
           path: '/auth-files',
           labelKey: 'nav.auth_files',
