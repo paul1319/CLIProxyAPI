@@ -1576,6 +1576,9 @@
     }
   },
   "quota_management": {
+    "snapshot_updated": "Updated {{time}}",
+    "snapshot_stale": "Last check {{time}} · data may be outdated",
+    "snapshot_save_failed": "Latest data could not be saved on the server",
     "search_label": "Search accounts",
     "search_placeholder": "Search by filename or email",
     "search_empty_title": "No matching accounts",

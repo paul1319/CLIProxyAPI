@@ -26,6 +26,9 @@ Runtime state is under `~/.local/share/cliproxyapi`, independently of Git checko
 - `config/config.yaml`: editable v8 configuration, mounted as a directory so
   management API atomic writes remain visible to the container.
 - `auths`, `plugins`, `logs`, and `static`: persistent credentials and runtime data.
+- `state/quota-snapshots.json`: persisted, sanitized account quota observations;
+  deployments and rollbacks preserve this directory. Compose mounts it at
+  `/data/state` and sets `CLI_PROXY_STATE_DIR` accordingly.
 - `initial-credentials.json`: initial client API key and management password,
   created with owner-only permissions and never printed by bootstrap or CI.
   This is an initial handoff record; it does not track subsequent key rotation.

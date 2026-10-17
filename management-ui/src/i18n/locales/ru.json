@@ -1579,6 +1579,9 @@
     }
   },
   "quota_management": {
+    "snapshot_updated": "Обновлено {{time}}",
+    "snapshot_stale": "Последняя проверка {{time}} · данные могли устареть",
+    "snapshot_save_failed": "Не удалось сохранить последние данные на сервере",
     "search_label": "Поиск аккаунтов",
     "search_placeholder": "Поиск по имени файла или электронной почте",
     "search_empty_title": "Аккаунты не найдены",

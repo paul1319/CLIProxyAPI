@@ -108,6 +108,17 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(self.state()["image"], "sha256:new")
         self.assertFalse((self.runtime / ".deploy.lock").exists())
 
+    def test_upgrade_creates_persistent_quota_state_without_overwriting_snapshots(self):
+        result = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        directory = self.runtime / "state"
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+        snapshot = directory / "quota-snapshots.json"
+        snapshot.write_text('{"version":1,"records":{}}')
+        result = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(snapshot.read_text(), '{"version":1,"records":{}}')
+
     def test_pull_failure_preserves_running_service(self):
         before = self.saved.read_bytes()
         result = self.run_deploy("pull-fails")

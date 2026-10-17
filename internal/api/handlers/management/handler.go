@@ -18,6 +18,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginstore"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/quota"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
@@ -61,6 +62,8 @@ type Handler struct {
 	pluginStoreHTTPClient   pluginstore.HTTPDoer
 	pluginStoreRateLimiter  *pluginstore.GitHubRateLimiter
 	pluginReleases          pluginReleaseCache
+	quotaMu                 sync.Mutex
+	quotaObservations       *quota.Service
 }
 
 type configReloadSnapshot struct {

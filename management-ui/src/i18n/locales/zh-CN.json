@@ -1575,6 +1575,9 @@
     }
   },
   "quota_management": {
+    "snapshot_updated": "Updated {{time}}",
+    "snapshot_stale": "Last check {{time}} · data may be outdated",
+    "snapshot_save_failed": "Latest data could not be saved on the server",
     "search_label": "搜索账号",
     "search_placeholder": "按文件名或邮箱搜索",
     "search_empty_title": "没有匹配的账号",

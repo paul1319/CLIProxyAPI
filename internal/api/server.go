@@ -446,6 +446,9 @@ func (s *Server) Stop(ctx context.Context) error {
 			errCloseServer = nil
 		}
 	}
+	if s.mgmt != nil {
+		s.mgmt.CloseQuotaObservations()
+	}
 	if s.codexLiveHandler != nil {
 		s.codexLiveHandler.Close()
 	}

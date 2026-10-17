@@ -3,6 +3,8 @@
  * React-free and SCSS-free so fixture tests can consume the data layer directly.
  */
 
+import { quotaApi, type QuotaReadOptions } from '@/services/api/quota';
+
 import type { TFunction } from 'i18next';
 import type {
   AuthFileItem,
@@ -14,12 +16,9 @@ import type {
   ClaudeUsageWindow,
   ClaudeUsagePayload,
 } from '@/types';
-import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
+import { getApiCallErrorMessage } from '@/services/api';
 import { normalizeClaudeUsageSnapshot } from '@/services/api/claudeUsage';
 import {
-  CLAUDE_PROFILE_URL,
-  CLAUDE_USAGE_URL,
-  CLAUDE_REQUEST_HEADERS,
   CLAUDE_USAGE_WINDOW_KEYS,
   claudePeriodHours,
   normalizeNumberValue,
@@ -182,7 +181,11 @@ export const resolveClaudePlanType = (profile: ClaudeProfileResponse | null): st
   return null;
 };
 
-const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
+const fetchClaudeQuota = async (
+  file: AuthFileItem,
+  t: TFunction,
+  options: QuotaReadOptions = {}
+): Promise<ClaudeQuotaData> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {
@@ -190,18 +193,8 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
   }
 
   const [usageResult, profileResult] = await Promise.allSettled([
-    apiCallApi.request({
-      authIndex,
-      method: 'GET',
-      url: CLAUDE_USAGE_URL,
-      header: { ...CLAUDE_REQUEST_HEADERS, Accept: 'application/json' },
-    }),
-    apiCallApi.request({
-      authIndex,
-      method: 'GET',
-      url: CLAUDE_PROFILE_URL,
-      header: { ...CLAUDE_REQUEST_HEADERS },
-    }),
+    quotaApi.read(authIndex, 'usage', options),
+    quotaApi.read(authIndex, 'profile', options),
   ]);
 
   if (usageResult.status === 'rejected') {
@@ -243,7 +236,7 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
     windows,
     extraUsage: snapshot.extraUsage,
     dollarWindows,
-    observedAt: new Date().toISOString(),
+    observedAt: options.observedAt ?? new Date().toISOString(),
     planType,
   };
 };

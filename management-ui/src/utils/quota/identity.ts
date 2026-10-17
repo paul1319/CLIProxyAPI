@@ -9,6 +9,10 @@ const QUOTA_IDENTITY_SEPARATOR = '\0';
  * from one physical file, distinguished by auth_index.
  */
 export function getQuotaCacheKey(file: AuthFileItem): string {
+  const identity = file.quota_identity;
+  if (typeof identity === 'string' && identity) {
+    return `${file.name}${QUOTA_IDENTITY_SEPARATOR}${normalizeRecentRequestAuthIndex(file.authIndex) ?? ''}${QUOTA_IDENTITY_SEPARATOR}${identity}${QUOTA_IDENTITY_SEPARATOR}${isPluginQuotaFile(file) ? (file.quotaPluginId ?? '') : ''}`;
+  }
   if (!isDevinFile(file) && !isPluginQuotaFile(file)) return file.name;
   const authIndex = normalizeRecentRequestAuthIndex(file.authIndex);
   return `${file.name}${QUOTA_IDENTITY_SEPARATOR}${authIndex ?? ''}`;

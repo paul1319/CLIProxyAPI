@@ -1,18 +1,10 @@
 import type { TFunction } from 'i18next';
 import type { DevinQuotaData, DevinQuotaState } from '@/types';
-import { apiCallApi } from '@/services/api/apiCall';
-import { useQuotaStore } from '@/stores/useQuotaStore';
-import { isDevinFile, isDisabledAuthFile } from '@/utils/quota';
+import { quotaApi } from '@/services/api/quota';
+import { readDevinQuotaResponse, hasDevinQuotaObservation } from '@/services/api/devinQuota';
+import { normalizeAuthIndex } from '@/utils/authIndex';
+import { isDevinFile, isDisabledAuthFile, createStatusError } from '@/utils/quota';
 import type { QuotaProviderData } from '../types';
-import { createDevinQuotaFetcher, DevinQuotaError } from './requests';
-
-const fetchSnapshot = createDevinQuotaFetcher({
-  request: (payload) => apiCallApi.request(payload),
-  generation: (name) => {
-    const state = useQuotaStore.getState();
-    return { session: state.cacheGeneration, file: state.fileGenerations[name] ?? 0 };
-  },
-});
 
 const withLabels = (quota: DevinQuotaData, t: TFunction): DevinQuotaData => ({
   ...quota,
@@ -34,15 +26,18 @@ export const DEVIN_CONFIG: QuotaProviderData<DevinQuotaState, DevinQuotaData> = 
   type: 'devin',
   i18nPrefix: 'devin_quota',
   filterFn: (file) => isDevinFile(file) && !isDisabledAuthFile(file),
-  fetchQuota: async (file, t) => {
-    try {
-      return withLabels(await fetchSnapshot(file), t);
-    } catch (error: unknown) {
-      if (error instanceof DevinQuotaError) {
-        error.message = t(`devin_quota.${error.code}`);
-      }
-      throw error;
-    }
+  fetchQuota: async (file, t, options) => {
+    const authIndex = normalizeAuthIndex(file.authIndex ?? file.auth_index);
+    if (!authIndex) throw new Error(t('devin_quota.missing_identity'));
+    const response = await quotaApi.read(authIndex, 'usage', options);
+    if (response.statusCode !== 200)
+      throw createStatusError('Quota read failed', response.statusCode);
+    const quota = readDevinQuotaResponse(
+      response.body,
+      options?.observedAt ? Date.parse(options.observedAt) : Date.now()
+    );
+    if (!hasDevinQuotaObservation(quota)) throw new Error(t('devin_quota.empty_data'));
+    return withLabels(quota, t);
   },
   storeSelector: (state) => state.devinQuota,
   storeSetter: 'setDevinQuota',

@@ -38,15 +38,29 @@ export function useClaudeResetGrants(
   const [reload, setReload] = useState(0);
   const lock = useRef(false);
   const generation = useRef(0);
+  const forceRead = useRef(false);
+  useEffect(() => {
+    setStatus(null);
+  }, [key, session]);
   useEffect(() => {
     const version = ++generation.current;
-    setStatus(null);
     if (!enabled || disabled || !sessionActive || !authIndex) return;
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
+    void readResetGrantsForCard(authIndex, { mode: 'cached' }).then(
+      (result) => {
+        if (current()) setStatus(result);
+      },
+      () => {}
+    );
     const cancelRead = scheduleResetGrantRead(() => {
-      void readResetGrantsForCard(authIndex).then(
+      const force = forceRead.current;
+      forceRead.current = false;
+      void readResetGrantsForCard(authIndex, {
+        mode: force ? 'force' : 'refresh',
+        forceDetails: force,
+      }).then(
         (result) => {
           if (current()) {
             setStatus(result);
@@ -114,6 +128,7 @@ export function useClaudeResetGrants(
           // A concurrent page-wide refresh can invalidate this read generation.
           // Release the local lock regardless, but never refresh a replacement account.
           setBusy(false);
+          forceRead.current = true;
           setReload((value) => value + 1);
           if (current()) onRefresh();
         }

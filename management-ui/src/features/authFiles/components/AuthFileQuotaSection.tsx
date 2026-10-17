@@ -1,4 +1,7 @@
 import { useCallback, useState } from 'react';
+import { loadQuotaEntry } from '@/features/quota/quotaRequests';
+import { useQuotaAutoRefresh } from '@/features/quota/hooks/useQuotaAutoRefresh';
+import { useQuotaBatchLoader } from '@/features/quota/hooks/useQuotaBatchLoader';
 import { useTranslation } from 'react-i18next';
 import {
   captureQuotaCacheGeneration,
@@ -7,7 +10,7 @@ import {
   useQuotaStore,
 } from '@/stores';
 import type { AuthFileItem, ClaudeQuotaState } from '@/types';
-import { getStatusFromError, resolveQuotaErrorMessage } from '@/utils/quota';
+import { resolveQuotaErrorMessage } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { isRuntimeOnlyAuthFile, type QuotaProviderType } from '@/features/authFiles/constants';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +18,7 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import { bindQuotaClasses } from '@/features/quota/types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '@/features/quota/providers';
 import { hasClaudeUsageData } from '@/features/quota/providers/claude/data';
+import { QuotaFreshness } from '@/features/quota/components/QuotaFreshness';
 import styles from './AuthFileQuota.module.scss';
 
 /** Bind the auth-file host's compact styles to the quota rendering contract. */
@@ -42,6 +46,12 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
   const [resettingQuota, setResettingQuota] = useState(false);
   const adapter = QUOTA_ADAPTERS[quotaType];
   const cacheKey = getQuotaCacheKey(file);
+  const { loadQuota } = useQuotaBatchLoader();
+  useQuotaAutoRefresh(
+    [{ file, type: quotaType }],
+    disableControls || Boolean(file.disabled),
+    loadQuota
+  );
 
   const quota = useQuotaStore((state) => {
     if (quotaType === 'antigravity')
@@ -56,7 +66,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     return assertNever(quotaType);
   });
   const retainedClaudeUsage =
-    quotaType === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
+    Boolean(quota?.hasData) ||
+    (quotaType === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined));
 
   const updateQuotaState = useQuotaStore(
     (state) => state[adapter.storeSetter] as unknown as QuotaMapUpdater
@@ -70,45 +81,21 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
 
     const cacheGeneration = captureQuotaCacheGeneration(file.name);
 
-    updateQuotaState((prev) => ({
-      ...prev,
-      [cacheKey]: adapter.buildLoadingState(),
-    }));
-
     try {
-      const data = await adapter.fetchQuota(file, t);
+      await loadQuotaEntry(file, adapter, t, { mode: 'force' });
       commitIfQuotaCacheCurrent(cacheGeneration, () => {
-        updateQuotaState((prev) => ({
-          ...prev,
-          [cacheKey]: adapter.buildSuccessState(data),
-        }));
         showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('common.unknown_error');
-      const status = getStatusFromError(err);
       commitIfQuotaCacheCurrent(cacheGeneration, () => {
-        updateQuotaState((prev) => ({
-          ...prev,
-          [cacheKey]: adapter.buildErrorState(message, status),
-        }));
         showNotification(
           t('auth_files.quota_refresh_failed', { name: file.name, message }),
           'error'
         );
       });
     }
-  }, [
-    adapter,
-    cacheKey,
-    disableControls,
-    file,
-    quota?.status,
-    resettingQuota,
-    showNotification,
-    t,
-    updateQuotaState,
-  ]);
+  }, [adapter, disableControls, file, quota?.status, resettingQuota, showNotification, t]);
 
   const resetQuotaForFile = useCallback(() => {
     if (disableControls) return;
@@ -192,6 +179,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
 
   return (
     <div className={styles.quotaSection}>
+      <QuotaFreshness quota={quota} />
       {quotaStatus === 'loading' ? (
         <div className={styles.quotaMessage}>{t(`${adapter.i18nPrefix}.loading`)}</div>
       ) : quotaStatus === 'idle' ? (

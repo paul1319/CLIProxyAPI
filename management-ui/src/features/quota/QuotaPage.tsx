@@ -38,7 +38,7 @@ import {
 import { nextRecoveryMs } from './resetSchedule';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
-import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
+import { useQuotaAutoRefresh } from './hooks/useQuotaAutoRefresh';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
@@ -204,9 +204,9 @@ export function QuotaPage() {
     let loaded = 0;
     let attention = 0;
     entries.forEach((entry) => {
-      const status = quotaByType[entry.type][getQuotaCacheKey(entry.file)]?.status;
-      if (status === 'success') loaded += 1;
-      else if (status === 'error') attention += 1;
+      const quota = quotaByType[entry.type][getQuotaCacheKey(entry.file)];
+      if (quota?.status === 'success' || quota?.hasData) loaded += 1;
+      if (quota?.status === 'error' || quota?.errorStatus) attention += 1;
     });
     return { loadedCount: loaded, attentionCount: attention };
   }, [entries, quotaByType]);
@@ -273,13 +273,9 @@ export function QuotaPage() {
     }
   }, [disableControls, error, filesGeneration, loading, loadQuota, pageItems, sessionGeneration]);
 
-  useDevinQuotaAutoLoad(
+  const restoringQuota = useQuotaAutoRefresh(
     pageItems,
-    disableControls ||
-      loading ||
-      batchLoading ||
-      Boolean(error) ||
-      filesGeneration !== sessionGeneration,
+    disableControls || loading || Boolean(error) || filesGeneration !== sessionGeneration,
     loadQuota
   );
 
@@ -303,6 +299,10 @@ export function QuotaPage() {
   /* Account quota workspace. */
 
   const isEmpty = !loading && filteredEntries.length === 0;
+  const hasPageData = pageItems.some((entry) => {
+    const quota = getQuota(entry);
+    return quota?.hasData || quota?.status === 'success';
+  });
 
   return (
     <div className={styles.page} ref={revealRef}>
@@ -371,7 +371,7 @@ export function QuotaPage() {
           </div>
         )}
 
-        {loading ? (
+        {(loading && files.length === 0) || (restoringQuota && !hasPageData) ? (
           <div className={styles.grid} aria-hidden="true">
             {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
               <Skeleton key={index} height={168} rounded={14} />

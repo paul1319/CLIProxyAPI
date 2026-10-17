@@ -1603,6 +1603,9 @@
     }
   },
   "quota_management": {
+    "snapshot_updated": "Updated {{time}}",
+    "snapshot_stale": "Last check {{time}} · data may be outdated",
+    "snapshot_save_failed": "Latest data could not be saved on the server",
     "search_label": "搜尋帳號",
     "search_placeholder": "依檔案名稱或電子郵件搜尋",
     "search_empty_title": "沒有符合的帳號",
