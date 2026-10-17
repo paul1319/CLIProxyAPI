@@ -1,6 +1,6 @@
 @use '../../../styles/mixins' as *;
 
-/* Each card follows its own content without stretching neighboring cards. */
+/* Cards stretch to the tallest content-sized card in their grid row. */
 .card {
   width: 100%;
   max-width: 420px;
