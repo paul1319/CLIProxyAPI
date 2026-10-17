@@ -32,6 +32,14 @@ Runtime state is under `~/.local/share/cliproxyapi`, independently of Git checko
 - `releases`: versioned deployment scripts and Compose definitions.
 - `.env`: the last successfully deployed image and bundle.
 
+The Docker image includes the customized account quota panel built directly from
+the TypeScript and SCSS sources in `management-ui/`. The Compose bundle serves
+`/CLIProxyAPI/static`
+and disables management asset downloads with `MANAGEMENT_DISABLE_AUTO_UPDATE=true`,
+so panel changes are versioned and rolled back together with the image. The old
+`static` runtime directory is retained for older release bundles. See
+[`management-ui/README.md`](../management-ui/README.md) for local panel builds.
+
 Bootstrap preserves existing configuration and credentials. The local API is
 `http://127.0.0.1:8317/v1`; the control panel is
 `http://127.0.0.1:8317/management.html`. Use the generated management password to

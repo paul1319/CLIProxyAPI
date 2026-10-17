@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,39 @@ import (
 type githubAssetTransport func(*http.Request) (*http.Response, error)
 
 func (f githubAssetTransport) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestPinnedManagementAssetSkipsDownloads(t *testing.T) {
+	t.Setenv("MANAGEMENT_DISABLE_AUTO_UPDATE", "true")
+	requests := 0
+	transport := http.DefaultTransport
+	http.DefaultTransport = githubAssetTransport(func(req *http.Request) (*http.Response, error) {
+		requests++
+		return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: http.NoBody}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = transport })
+	if reason, skip := autoUpdateSkipReason(&config.Config{}); !skip || reason != "MANAGEMENT_DISABLE_AUTO_UPDATE is enabled" {
+		t.Fatalf("bundled panel updater was not disabled: %q, %t", reason, skip)
+	}
+	directory := t.TempDir()
+	if EnsureLatestManagementHTML(t.Context(), directory, "", "") {
+		t.Fatal("missing bundled panel reported as present")
+	}
+	path := filepath.Join(directory, ManagementFileName)
+	const content = "<html>custom account quota cards</html>"
+	if errWrite := os.WriteFile(path, []byte(content), 0o600); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+	if !EnsureLatestManagementHTML(t.Context(), directory, "", "") {
+		t.Fatal("existing bundled panel was not found")
+	}
+	data, errRead := os.ReadFile(path)
+	if errRead != nil || string(data) != content {
+		t.Fatalf("bundled panel was changed: %q, %v", data, errRead)
+	}
+	if requests != 0 {
+		t.Fatalf("bundled panel triggered %d download requests", requests)
+	}
+}
 
 func TestFetchLatestAssetSetsGitHubAuthorization(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "asset-token")
