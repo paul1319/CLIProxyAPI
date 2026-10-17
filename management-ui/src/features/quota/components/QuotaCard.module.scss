@@ -1,15 +1,15 @@
 @use '../../../styles/mixins' as *;
 
-/* Cards in the same grid row share content-sized section tracks. */
+/* Each card follows its own content without stretching neighboring cards. */
 .card {
+  width: 100%;
+  max-width: 420px;
   min-width: 0;
-  display: grid;
-  grid-template-rows: subgrid;
-  grid-row: span 9;
-  row-gap: 0;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
@@ -29,23 +29,23 @@
 .head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 12px;
   min-width: 0;
 }
 .iconWrap {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   background: var(--bg-secondary);
 }
 .icon {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 .identity {
@@ -58,7 +58,7 @@
 }
 .fileName {
   margin: 2px 0 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.45;
   font-weight: 650;
   overflow-wrap: anywhere;
@@ -68,8 +68,8 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -83,9 +83,9 @@
 .overview {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  gap: 16px;
-  margin: 0 0 18px;
-  padding: 14px;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--bg-secondary);
@@ -96,21 +96,21 @@
 .overview dt {
   color: var(--text-secondary);
   font-size: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .overview dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
 .plan {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 650;
 }
 .balance {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
@@ -130,7 +130,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 6px 12px;
-  padding-bottom: 14px;
+  padding-bottom: 10px;
 }
 .date {
   display: flex;
@@ -144,14 +144,14 @@
   color: var(--text-secondary);
 }
 .limits {
-  padding: 14px 0 18px;
+  padding: 10px 0 12px;
   border-top: 1px solid var(--border-color);
 }
 .sectionHead {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .card h3 {
   margin: 0;
@@ -163,14 +163,14 @@
   color: var(--text-secondary);
 }
 .limit + .limit {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .limitHead {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .limitHead > span {
   min-width: 0;
@@ -186,7 +186,7 @@
   border-radius: 4px;
   overflow: hidden;
   background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-  margin-bottom: 9px;
+  margin-bottom: 6px;
 }
 .meter > span {
   display: block;
@@ -213,8 +213,8 @@
   color: var(--text-primary);
 }
 .notes {
-  margin: 0 0 18px;
-  padding: 10px 12px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: var(--bg-secondary);
   font-size: 12px;
@@ -233,26 +233,20 @@
   background: transparent;
 }
 .resets {
-  grid-row: span 4;
-  grid-template-rows: subgrid;
-  padding-top: 18px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-color);
-  display: grid;
-  row-gap: 0;
+  display: flex;
+  flex-direction: column;
 }
 .resetHeading,
 .expiry,
 .resetFeedback:not(:empty) {
-  padding-bottom: 12px;
-}
-.resetFeedback {
-  grid-row: 3;
+  padding-bottom: 10px;
 }
 .resetAction {
-  grid-row: 4;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 .resetHeading {
   display: flex;
@@ -272,14 +266,14 @@
 .expiry {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .expiry .date {
   justify-content: flex-start;
 }
 .resetButton {
   width: 100%;
-  min-height: 40px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -347,11 +341,15 @@
     border-radius: 16px;
   }
   .overview {
-    padding: 14px;
+    padding: 12px;
     gap: 12px;
   }
-  .fileName {
-    font-size: 14px;
+  .refresh {
+    width: 40px;
+    height: 40px;
+  }
+  .resetButton {
+    min-height: 40px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
