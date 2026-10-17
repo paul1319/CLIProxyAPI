@@ -14,6 +14,7 @@
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
   box-shadow: var(--shadow);
 }
 .cardEnter {
@@ -53,15 +54,17 @@
   min-width: 0;
 }
 .provider {
+  display: block;
   color: var(--text-secondary);
   font-size: 12px;
+  @include text-ellipsis;
 }
 .fileName {
   margin: 2px 0 0;
   font-size: 14px;
   line-height: 1.45;
   font-weight: 650;
-  overflow-wrap: anywhere;
+  @include text-ellipsis;
   letter-spacing: -0.02em;
 }
 .refresh {
@@ -82,7 +85,7 @@
 }
 .overview {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: 12px;
   margin: 0 0 12px;
   padding: 12px;
@@ -319,6 +322,7 @@
   overflow-wrap: anywhere;
 }
 .idleBody {
+  max-width: 100%;
   padding: 12px;
   margin-bottom: 16px;
   border: 1px dashed var(--border-color);

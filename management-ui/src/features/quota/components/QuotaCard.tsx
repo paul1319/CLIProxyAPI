@@ -112,8 +112,10 @@ export function QuotaCard({
           {icon ? <img src={icon} alt="" className={styles.icon} /> : typeLabel.slice(0, 1)}
         </span>
         <div className={styles.identity}>
-          <span className={styles.provider}>{typeLabel}</span>
-          <h2 className={styles.fileName} title={file.name}>
+          <span className={styles.provider} title={typeLabel}>
+            {typeLabel}
+          </span>
+          <h2 className={styles.fileName} title={displayName}>
             {displayName}
           </h2>
         </div>
