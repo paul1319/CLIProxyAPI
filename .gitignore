@@ -42,7 +42,8 @@ AGENTS.override.md
 .worktrees/
 .codex/*
 .claude/*
-.claude
+!.claude/skills/
+.taste-skill/
 .gemini/*
 .serena/*
 .agent/*
