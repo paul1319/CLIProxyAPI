@@ -1,0 +1,268 @@
+@use '../../../styles/mixins' as *;
+
+/*
+ * One panel; columns wrap and are separated by hairlines drawn as outward
+ * shadows, so the strip's clipped edges never show a doubled border.
+ */
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+}
+
+.column {
+  position: relative;
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px 12px;
+  box-shadow:
+    -1px 0 0 var(--rule),
+    0 -1px 0 var(--rule);
+  transition: background-color var(--dur-hover) var(--ease-out-strong);
+
+  &[data-selected] {
+    box-shadow:
+      -1px 0 0 var(--rule),
+      0 -1px 0 var(--rule),
+      inset 0 -2px 0 var(--ink);
+  }
+}
+
+/* The whole column filters the table; the focal menu sits above this layer. */
+.select {
+  @include button-reset;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name {
+  min-width: 0;
+  color: var(--ink);
+  font-size: $text-lg;
+  font-weight: 600;
+  @include text-ellipsis;
+}
+
+.count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+.focal {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 22px;
+  margin: -2px -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: $text-sm;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong);
+
+  &[aria-expanded='true'] {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.focalLabel {
+  min-width: 0;
+  @include text-ellipsis;
+}
+
+.focalIcon {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+}
+
+.focalStatic {
+  min-height: 18px;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  @include text-ellipsis;
+}
+
+.figure {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.figureValue {
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+
+  &[data-empty] {
+    color: var(--ink-4);
+  }
+}
+
+.figureTotal {
+  color: var(--ink-3);
+  font-size: $text-md;
+}
+
+/* One mini meter per credential, same tones as the shared Meter. */
+.segments {
+  display: flex;
+  gap: 4px;
+  min-height: 4px;
+}
+
+.segment {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 4px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--well-strong);
+
+  &[data-tone='fault'] {
+    background: var(--signal-fault-soft);
+  }
+}
+
+.segmentFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+  transition: transform 240ms var(--ease-out-strong);
+
+  [data-tone='ok'] > & {
+    background: var(--signal-ok);
+  }
+
+  [data-tone='warn'] > & {
+    background: var(--signal-warn);
+  }
+
+  [data-tone='fault'] > & {
+    background: var(--signal-fault);
+  }
+}
+
+.when {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
+
+  &[data-quiet] {
+    color: var(--ink-4);
+  }
+}
+
+.clock {
+  color: var(--ink-3);
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+
+  strong {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+}
+
+.factLabel {
+  min-width: 0;
+  max-width: 160px;
+  @include text-ellipsis;
+}
+
+.attention {
+  display: inline-flex;
+  gap: 4px 12px;
+  margin-left: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .column:has(.select:hover) {
+    background: var(--panel-hover);
+  }
+
+  .focal:hover {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .column,
+  .focal,
+  .segmentFill {
+    transition: none;
+  }
+}
+
+@include mobile {
+  .column {
+    flex-basis: 100%;
+  }
+}

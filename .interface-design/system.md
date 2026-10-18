@@ -83,8 +83,9 @@ Radius: 4px badges/pills · 6px controls/buttons/inputs · 8px panels/cards · 1
 - **Status lamp** (`<StatusLamp>` from `@/components/ui/StatusLamp`): 8px dot, `ok|warn|fault|idle`,
   optional pulse for live. Use instead of colored pills for state.
 - **Meter** (`<Meter>` from `@/components/ui/Meter`): 4px track on `--well-strong`. ONE tone rule
-  everywhere — `toneForRemaining()` in `@/components/ui/meterTone`: healthy = neutral (`--ink-3`),
-  <25% = warn, 0 = fault, unknown = idle. Never color healthy capacity green.
+  everywhere — `toneForRemaining()` in `@/components/ui/meterTone`: ≥60% = ok (green),
+  25–60% = warn (yellow), <25% = fault (red), unknown = idle. The meter carries the color; the
+  figure next to it stays ink and only turns `--signal-fault-ink` below 25%.
 - **Lamp state** of a credential comes only from `getCredentialLampState()` (`components/layout/poolRail.ts`):
   ok = serving, warn = routing cooldown, fault = failing/unavailable, idle = disabled. Same lamp on every
   page; capacity is shown by meters/figures, not by changing the lamp. Lamp rows order ok → warn → fault → idle.
@@ -121,9 +122,14 @@ repeated in every field.
 - **Data table** (Credentials, Overview providers) — 44px rows (36 compact), lamp · glyph · primary
   text + one secondary status line in signal ink · numeric cells tabular · switch · ⋯ row menu.
   Selection turns the toolbar into a contextual bar ("N selected · Select all M matching · Clear | actions").
-- **Quota card** — status lamp + account + freshness; hero = remaining % of the tightest gating window
-  (28px), subline "window · resets in"; one-line window rows (label · 4px meter · % · countdown);
-  footer only when it has content. Healthy meters are neutral; warn <25%, fault at 0.
+- **Quota page** — header meta carries pool counts (serving / low / exhausted / cooling / failing).
+  Provider strip: one column per provider, focal window summed across credentials ("409% of 500%",
+  28px), one mini meter per credential, "back in · clock", other windows in a footer; the focal
+  window defaults to the smallest share left (model-scoped windows included) and can be pinned;
+  the column filters the tables. Provider tables: rows subgrid into one grid — lamp + name
+  (blurred until clicked) + plan facts · up to 3 window cells (label + %, meter, "in 2h · 19:40"
+  or "No reset pending") + manual resets · actions (stale/error age, Use reset, +N, refresh).
+  Extra windows, spend caps and notes open under the row; rows without data show one status line.
 - **Settings row** (Configuration) — label 13/500 + YAML key 11px mono ink-4 + description ≤60ch on
   the left, control on the right at fixed widths; unsaved = 2px warn left edge, error = fault edge.
   Sticky section index on the left; sticky save bar only when dirty (Discard · Review & save ⌘S).

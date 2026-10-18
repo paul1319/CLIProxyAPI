@@ -1,13 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { QUOTA_PAGE_SIZE } from '@/features/quota/constants';
 import {
   buildTabCounts,
   canRefreshQuotaAfterList,
   classifyQuotaFiles,
   filterEntriesByTab,
-  filterEntriesBySearch,
   isQuotaRefreshDisabled,
-  paginate,
   resolveQuotaProviderType,
   sortQuotaEntries,
   type QuotaFileEntry,
@@ -101,88 +98,10 @@ describe('filterEntriesByTab', () => {
   });
 });
 
-describe('filterEntriesBySearch', () => {
-  const entries = classifyQuotaFiles([
-    ...FILES,
-    file('personal.json', 'codex', { email: 'Alice@Example.com' }),
-    file('work.json', 'claude', { email: 'Alice@Example.com' }),
-    file('private.json', 'codex', { account: 'secret-api-key' }),
-  ]);
-
-  test('ignores case and surrounding whitespace when matching filenames or emails', () => {
-    expect(filterEntriesBySearch(entries, ' CODEX-A ').map(({ file }) => file.name)).toEqual([
-      'codex-a.json',
-    ]);
-    expect(filterEntriesBySearch(entries, ' ALICE@example ').map(({ file }) => file.name)).toEqual([
-      'work.json',
-      'personal.json',
-    ]);
-  });
-
-  test('keeps all entries for empty searches and returns none for missing accounts', () => {
-    expect(filterEntriesBySearch(entries, '')).toBe(entries);
-    expect(filterEntriesBySearch(entries, '   ')).toBe(entries);
-    expect(filterEntriesBySearch(entries, 'missing')).toEqual([]);
-    expect(filterEntriesBySearch(entries, 'secret-api-key')).toEqual([]);
-  });
-
-  test('combines with provider tabs without changing the original entries', () => {
-    const before = [...entries];
-    const matches = filterEntriesBySearch(filterEntriesByTab(entries, 'codex'), 'alice');
-    expect(matches.map(({ file }) => file.name)).toEqual(['personal.json']);
-    expect(entries).toEqual(before);
-  });
-
-  test('filters before pagination so refresh targets include matches beyond the first page', () => {
-    const all = classifyQuotaFiles(
-      Array.from({ length: QUOTA_PAGE_SIZE + 2 }, (_, index) =>
-        file(`codex-${index}.json`, 'codex', {
-          email: index >= QUOTA_PAGE_SIZE ? 'target@example.com' : 'other@example.com',
-        })
-      )
-    );
-    const filtered = filterEntriesBySearch(filterEntriesByTab(all, 'codex'), 'target@');
-    const sorted = sortQuotaEntries(filtered, 'name');
-    const { pageItems, totalPages } = paginate(sorted, 1, QUOTA_PAGE_SIZE);
-    expect(pageItems.map(({ file }) => file.name)).toEqual(['codex-20.json', 'codex-21.json']);
-    expect(totalPages).toBe(1);
-    expect(paginate(filterEntriesBySearch(all, 'missing'), 1, QUOTA_PAGE_SIZE).pageItems).toEqual(
-      []
-    );
-  });
-});
-
 describe('isQuotaRefreshDisabled', () => {
   test('blocks a single-card refresh while the same quota is resetting', () => {
     expect(isQuotaRefreshDisabled(true, false, true)).toBe(true);
     expect(isQuotaRefreshDisabled(true, false, false)).toBe(false);
-  });
-});
-
-describe('paginate', () => {
-  const items = Array.from({ length: 45 }, (_, index) => index);
-
-  test('uses the configured 20-item page size', () => {
-    expect(QUOTA_PAGE_SIZE).toBe(20);
-    expect(paginate(items, 2, QUOTA_PAGE_SIZE)).toEqual({
-      pageItems: items.slice(20, 40),
-      currentPage: 2,
-      totalPages: 3,
-    });
-  });
-
-  test('clamps an out-of-range page instead of returning an empty slice', () => {
-    expect(paginate(items, 9, QUOTA_PAGE_SIZE).currentPage).toBe(3);
-    expect(paginate(items, 9, QUOTA_PAGE_SIZE).pageItems).toEqual(items.slice(40));
-    expect(paginate(items, 0, QUOTA_PAGE_SIZE).currentPage).toBe(1);
-  });
-
-  test('keeps at least one page when the list is empty', () => {
-    expect(paginate([], 1, QUOTA_PAGE_SIZE)).toEqual({
-      pageItems: [],
-      currentPage: 1,
-      totalPages: 1,
-    });
   });
 });
 
@@ -279,10 +198,10 @@ describe('sortQuotaEntries', () => {
     expect(input).toEqual(entries);
   });
 
-  test('sorts before paginating, so the globally soonest lands on page one', () => {
+  test('puts the globally soonest first, ahead of the default order', () => {
     // Last in the default order, first to recover.
     const last = entries[entries.length - 1].file.name;
     const sorted = sortQuotaEntries(entries, 'soonest', resolver({ [last]: 1 }));
-    expect(paginate(sorted, 1, 2).pageItems[0].file.name).toBe(last);
+    expect(sorted[0].file.name).toBe(last);
   });
 });

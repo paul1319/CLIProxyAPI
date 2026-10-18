@@ -1,3 +1,4 @@
+import type { QuotaProviderType } from './providers/types';
 import {
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
@@ -9,6 +10,8 @@ import {
 export type QuotaUiState = {
   tab?: QuotaTabId;
   sortMode?: QuotaSortMode;
+  /** Window pinned as each provider's overview figure; unset follows the tightest one. */
+  focal?: Partial<Record<QuotaProviderType, string>>;
 };
 
 const QUOTA_UI_STATE_KEY = 'quotaPage.uiState';
@@ -22,6 +25,14 @@ export const isQuotaTabId = (value: unknown): value is QuotaTabId =>
 export const isQuotaSortMode = (value: unknown): value is QuotaSortMode =>
   typeof value === 'string' && QUOTA_SORT_MODE_SET.has(value);
 
+const readFocal = (value: unknown): QuotaUiState['focal'] => {
+  if (!value || typeof value !== 'object') return undefined;
+  const entries = Object.entries(value).filter(
+    ([type, id]) => QUOTA_TAB_ORDER.includes(type as QuotaProviderType) && typeof id === 'string'
+  );
+  return entries.length ? Object.fromEntries(entries) : undefined;
+};
+
 export const readQuotaUiState = (): QuotaUiState | null => {
   if (typeof window === 'undefined') return null;
   try {
@@ -32,6 +43,7 @@ export const readQuotaUiState = (): QuotaUiState | null => {
     return {
       tab: isQuotaTabId(parsed.tab) ? parsed.tab : undefined,
       sortMode: isQuotaSortMode(parsed.sortMode) ? parsed.sortMode : undefined,
+      focal: readFocal(parsed.focal),
     };
   } catch {
     return null;

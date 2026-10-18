@@ -1,0 +1,18 @@
+.glyph {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: $radius-sm;
+  color: var(--ink-2);
+  font-size: $text-xs;
+  font-weight: 600;
+
+  img {
+    display: block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+}

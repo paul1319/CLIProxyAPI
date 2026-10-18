@@ -1,0 +1,553 @@
+@use '../../../styles/mixins' as *;
+
+/* Section: provider header line over one bordered table. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sectionTitle {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--ink);
+  font-size: $text-lg;
+  font-weight: 600;
+}
+
+.sectionCount {
+  color: var(--ink-3);
+  font-family: $font-mono;
+  font-size: $text-sm;
+}
+
+.sectionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  margin: 0 0 0 6px;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+
+  > span + span::before {
+    content: '·';
+    margin-right: 6px;
+    color: var(--ink-4);
+  }
+}
+
+/* The frame is the size container; narrow frames stack each row. */
+.frame {
+  container: quota-table / inline-size;
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+}
+
+/*
+ * Rows subgrid into one table grid so cells line up down the section:
+ * identity · one track per slot (window columns, then manual resets) · actions.
+ */
+.table {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 240px)
+    repeat(var(--quota-slots), minmax(0, 1fr))
+    auto;
+  column-gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: start;
+  row-gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  transition: background-color var(--dur-hover) var(--ease-out-strong);
+
+  & + & {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* Identity: lamp · name (blurred until revealed) · plan and facts */
+
+.identity {
+  display: flex;
+  grid-column: 1;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lamp {
+  flex: 0 0 auto;
+  margin-top: 6px;
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.name {
+  @include button-reset;
+  max-width: 100%;
+  border-radius: $radius-sm;
+  color: var(--ink);
+  font-family: $font-mono;
+  font-size: $text-md;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.nameText {
+  display: block;
+  @include text-ellipsis;
+  transition: filter 160ms var(--ease-out-strong);
+
+  [data-hidden] > & {
+    filter: blur(5px);
+    user-select: none;
+  }
+}
+
+.facts {
+  /* Gap-separated, so a wrapped line never starts on a dangling dot. */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+
+  > * {
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+}
+
+.plan {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.cooldown {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: $radius-sm;
+  background: var(--signal-warn-soft);
+  color: var(--signal-warn-ink);
+  font-size: $text-xs;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+/* Cells: label and percent · meter · reset */
+
+.cells {
+  display: contents;
+}
+
+.cell {
+  container: quota-cell / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cellHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cellLabel {
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  @include text-ellipsis;
+
+  [data-empty] & {
+    color: var(--ink-4);
+  }
+}
+
+.cellValue {
+  flex: 0 0 auto;
+  color: var(--ink);
+  font-size: $text-md;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  [data-empty] & {
+    color: var(--ink-4);
+    font-weight: 500;
+  }
+}
+
+.cellReset {
+  min-height: 16px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: $text-sm;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  &[data-quiet] {
+    color: var(--ink-4);
+  }
+}
+
+.clock {
+  color: var(--ink-3);
+}
+
+.resetsValue {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+
+  strong {
+    color: var(--ink);
+    font-size: $text-lg;
+    font-weight: 600;
+  }
+}
+
+/* Status: spans every cell track while the row has nothing observed. */
+
+.status {
+  display: flex;
+  grid-column: 2 / -2;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: center;
+  gap: 4px 16px;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: $radius-md;
+  color: var(--ink-3);
+  font-size: $text-sm;
+
+  &[data-tone='fault'] {
+    background: var(--signal-fault-soft);
+    color: var(--signal-fault-ink);
+  }
+}
+
+.statusText {
+  min-width: 0;
+  font-weight: 500;
+}
+
+.statusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-left: auto;
+}
+
+.textAction {
+  @include button-reset;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--focus);
+  font-size: $text-sm;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:disabled {
+    color: var(--ink-4);
+    cursor: default;
+  }
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+/* Actions: freshness · manual reset · more · refresh */
+
+.actions {
+  display: flex;
+  grid-column: -2 / -1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: $control-sm;
+}
+
+.fresh {
+  margin-right: 4px;
+  color: var(--ink-4);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &[data-tone='warn'] {
+    color: var(--signal-warn-ink);
+  }
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+}
+
+.more {
+  @include button-reset;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: $radius-sm;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong);
+
+  &[aria-expanded='true'] {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.refresh {
+  @include button-reset;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: $control-sm;
+  height: $control-sm;
+  margin-right: -6px;
+  border-radius: $radius-md;
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong);
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+.spinning {
+  animation: quota-row-spin 0.9s linear infinite;
+}
+
+@keyframes quota-row-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Detail: windows past the section columns, spend caps and notes */
+
+.detail {
+  display: flex;
+  grid-column: 2 / -2;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.detailCells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px 24px;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+}
+
+.feedback {
+  grid-column: 2 / -1;
+
+  p {
+    margin: 0;
+    color: var(--signal-fault-ink);
+    font-size: $text-sm;
+  }
+}
+
+/* A narrow cell keeps the countdown; the wall clock stays in the tooltip. */
+@container quota-cell (max-width: 150px) {
+  .clock {
+    display: none;
+  }
+}
+
+@container quota-table (max-width: 720px) {
+  .table {
+    display: block;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+  }
+
+  .identity {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .actions {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .cells {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px 20px;
+  }
+
+  .status,
+  .detail,
+  .feedback {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row:hover {
+    background: var(--panel-hover);
+  }
+
+  .refresh:hover:not(:disabled) {
+    background: var(--well-strong);
+    color: var(--ink);
+  }
+
+  .more:hover {
+    color: var(--ink);
+  }
+
+  .textAction:hover:not(:disabled) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+
+  .row,
+  .nameText,
+  .more,
+  .refresh {
+    transition: none;
+  }
+
+  .refresh:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@include mobile {
+  .row {
+    padding: 12px;
+  }
+
+  .refresh {
+    width: 40px;
+    height: 40px;
+    margin: -6px -10px -6px 0;
+  }
+
+  .more,
+  .textAction {
+    min-height: 36px;
+  }
+}

@@ -75,12 +75,10 @@ describe('credential row contract', () => {
     expect(row).not.toMatch(/lowQuota|headline[^;\n]*'warn'/);
   });
 
-  test('the quota cell follows the one capacity rule (neutral, warn <25%, fault at 0)', () => {
+  test('the quota cell follows the one capacity rule; only a low figure turns red', () => {
     expect(quotaCell).toContain('const tone = toneForRemaining(headline.remaining);');
     expect(quotaCell).toContain('data-tone={tone}');
-    expect(table).toMatch(
-      /\.quota\[data-tone='warn'\] \.quotaPercent\s*\{\s*color: var\(--signal-warn-ink\)/
-    );
+    expect(table).not.toMatch(/\.quota\[data-tone='warn'\]/);
     expect(table).toMatch(
       /\.quota\[data-tone='fault'\]\s*\{\s*\.quotaPercent\s*\{\s*color: var\(--signal-fault-ink\)/
     );

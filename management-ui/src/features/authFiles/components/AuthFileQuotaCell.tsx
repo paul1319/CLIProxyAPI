@@ -22,7 +22,7 @@ export type AuthFileQuotaCellProps = {
 
 /**
  * Tightest quota window as one meter + "62% · 3h". Tone follows the console-wide
- * `toneForRemaining` rule (neutral, warn <25%, fault at 0). Unknown states render an
+ * `toneForRemaining` rule (green ≥60%, yellow 25–60%, red <25%). Unknown states render an
  * em dash; the refresh affordance appears on row hover/focus.
  */
 export function AuthFileQuotaCell({

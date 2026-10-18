@@ -14,12 +14,12 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
 
 export type QuotaTabId = 'all' | QuotaProviderType;
 
-/** Fixed page size of 20, which also caps "Refresh all" upstream concurrency at 20. */
-export const QUOTA_PAGE_SIZE = 20;
+/** Quota reads in flight at once; the page lists every credential, so batches are throttled. */
+export const QUOTA_LOAD_CONCURRENCY = 6;
 
 /**
- * Card order inside each provider section: name (stable default), least
- * remaining capacity first, or soonest capacity return first.
+ * Row order inside each provider section: name (stable default), least
+ * remaining in the provider's focal window first, or soonest return first.
  */
 export const QUOTA_SORT_MODES = ['name', 'remaining', 'soonest'] as const;
 
