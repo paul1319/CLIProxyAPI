@@ -1781,7 +1781,6 @@
     "page_title": "Quota",
     "accounts_one": "{{count}} tài khoản",
     "accounts_other": "{{count}} tài khoản",
-    "meta_auto_refresh": "Tự làm mới mỗi {{seconds}} giây",
     "refresh_all": "Làm mới tất cả",
     "summary_label": "Dung lượng nhóm",
     "summary_available": "Khả dụng",

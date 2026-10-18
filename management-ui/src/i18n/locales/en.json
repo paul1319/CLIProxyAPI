@@ -1825,7 +1825,6 @@
     "page_title": "Quota",
     "accounts_one": "{{count}} account",
     "accounts_other": "{{count}} accounts",
-    "meta_auto_refresh": "Auto-refresh every {{seconds}}s",
     "refresh_all": "Refresh all",
     "summary_label": "Pool capacity",
     "summary_available": "Available now",

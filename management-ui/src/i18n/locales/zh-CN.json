@@ -1819,7 +1819,6 @@
     "weekday_sat": "六",
     "page_title": "配额",
     "accounts": "{{count}} 个账号",
-    "meta_auto_refresh": "每 {{seconds}} 秒自动刷新",
     "refresh_all": "全部刷新",
     "summary_label": "账号池容量",
     "summary_available": "当前可用",

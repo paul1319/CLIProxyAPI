@@ -1825,7 +1825,6 @@
     "page_title": "할당량",
     "accounts_one": "계정 {{count}}개",
     "accounts_other": "계정 {{count}}개",
-    "meta_auto_refresh": "{{seconds}}초마다 자동 새로고침",
     "refresh_all": "모두 새로고침",
     "summary_label": "풀 용량",
     "summary_available": "현재 사용 가능",

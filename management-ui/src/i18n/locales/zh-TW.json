@@ -1847,7 +1847,6 @@
     "weekday_sat": "六",
     "page_title": "配額",
     "accounts": "{{count}} 個帳號",
-    "meta_auto_refresh": "每 {{seconds}} 秒自動重新整理",
     "refresh_all": "全部重新整理",
     "summary_label": "帳號池容量",
     "summary_available": "目前可用",
