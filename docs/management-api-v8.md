@@ -143,6 +143,13 @@ visible, scheduling the next poll 300 seconds after completion. Plugin quota is
 restored automatically but requires explicit refresh because plugins do not declare
 whether their quota operation is safe for automatic polling.
 
+When `routing.strategy` is `reset-first`, the server also refreshes `usage` for
+enabled Claude and Codex OAuth credentials in the background, independently of the
+UI, through the same shared cache and freshness rules. Usage snapshots read by the
+UI or the background poller are normalized into per-credential quota windows (five
+hour, weekly, and Claude Fable weekly) that routing reads from memory. A snapshot is
+only applied while the credential still has the identity it was observed for.
+
 Snapshots are stored in `CLI_PROXY_STATE_DIR/quota-snapshots.json`, defaulting to a
 `state` directory next to the server configuration file. The file is versioned,
 written with owner-only permissions, and replaced through a temporary file. It

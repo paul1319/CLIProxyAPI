@@ -46,6 +46,7 @@ func (h *Handler) quotaService() *quota.Service {
 
 // CloseQuotaObservations cancels shared requests when the owning API server stops.
 func (h *Handler) CloseQuotaObservations() {
+	h.stopQuotaPolling()
 	h.quotaMu.Lock()
 	if h.quotaObservations == nil {
 		h.quotaObservations, _ = quota.New(nil, nil)
@@ -216,6 +217,9 @@ func (h *Handler) CredentialQuotaObservation(c *gin.Context) {
 	if errObserve != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": http.StatusConflict, "error": "quota request no longer current"})
 		return
+	}
+	if input.Resource == "usage" {
+		h.applyQuotaWindows(auth.ID, auth.Provider, identity, snapshot)
 	}
 	status := snapshot.Status
 	if len(snapshot.Body) > 0 {
