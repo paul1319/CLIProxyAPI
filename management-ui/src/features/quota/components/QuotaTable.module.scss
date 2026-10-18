@@ -1,16 +1,40 @@
 @use '../../../styles/mixins' as *;
 
-/* Section: provider header line over one bordered table. */
+/* Sections: a provider header line over one bordered table each. */
+
+/* The wrapper is the size container; narrow pages stack each row. */
+.sections {
+  container: quota-table / inline-size;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+/*
+ * One grid for the whole page, so a column lines up across providers:
+ * identity · window slots · manual resets (when any section has them) · actions.
+ * Sections, frames, tables and rows all subgrid into it; the row padding and
+ * frame border count toward the first and last tracks.
+ */
+.grid {
+  display: grid;
+  grid-template-columns:
+    minmax(176px, 256px)
+    repeat(var(--quota-slots), minmax(0, 1fr))
+    auto;
+  gap: 24px;
+}
 
 .section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: 10px;
   min-width: 0;
 }
 
 .sectionHead {
   display: flex;
+  grid-column: 1 / -1;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -47,9 +71,10 @@
   }
 }
 
-/* The frame is the size container; narrow frames stack each row. */
 .frame {
-  container: quota-table / inline-size;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   min-width: 0;
   overflow: clip;
   border: 1px solid var(--rule);
@@ -57,17 +82,10 @@
   background: var(--panel);
 }
 
-/*
- * Rows subgrid into one table grid so cells line up down the section:
- * identity · one track per slot (window columns, then manual resets) · actions.
- */
 .table {
   display: grid;
-  grid-template-columns:
-    minmax(160px, 240px)
-    repeat(var(--quota-slots), minmax(0, 1fr))
-    auto;
-  column-gap: 24px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -250,7 +268,18 @@
   color: var(--ink-3);
 }
 
+/* Manual resets always take the last slot, wherever a section's windows end. */
+.cell[data-slot='resets'] {
+  grid-column: -3 / -2;
+}
+
+/* Count on the left, its action on the right (still right-aligned when it wraps). */
 .resetsValue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   margin: 0;
   color: var(--ink-3);
   font-size: $text-sm;
@@ -262,6 +291,13 @@
     font-size: $text-lg;
     font-weight: 600;
   }
+}
+
+/* The button overhangs the line so the cell keeps the height of its neighbours. */
+.resetAction {
+  flex: 0 0 auto;
+  margin-block: -5px;
+  margin-left: auto;
 }
 
 /* Status: spans every cell track while the row has nothing observed. */
@@ -465,6 +501,13 @@
 }
 
 @container quota-table (max-width: 720px) {
+  .grid,
+  .section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .frame,
   .table {
     display: block;
   }
@@ -489,6 +532,10 @@
     grid-column: 1 / -1;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 12px 20px;
+  }
+
+  .cell[data-slot='resets'] {
+    grid-column: auto;
   }
 
   .status,
@@ -536,6 +583,10 @@
 }
 
 @include mobile {
+  .grid {
+    gap: 20px;
+  }
+
   .row {
     padding: 12px;
   }

@@ -126,9 +126,10 @@ repeated in every field.
   Provider strip: one column per provider, focal window summed across credentials ("409% of 500%",
   28px), one mini meter per credential, "back in · clock", other windows in a footer; the focal
   window defaults to the smallest share left (model-scoped windows included) and can be pinned;
-  the column filters the tables. Provider tables: rows subgrid into one grid — lamp + name
-  (blurred until clicked) + plan facts · up to 3 window cells (label + %, meter, "in 2h · 19:40"
-  or "No reset pending") + manual resets · actions (stale/error age, Use reset, +N, refresh).
+  the column filters the tables. Provider tables: every section, frame and row subgrids into one
+  page grid, so columns line up across providers — lamp + name (blurred until clicked) + plan facts ·
+  up to 3 window cells (label + %, meter, "in 2h · 19:40" or "No reset pending") · manual resets
+  (count + Use reset) always in the last slot · actions (stale/error age, +N, refresh).
   Extra windows, spend caps and notes open under the row; rows without data show one status line.
 - **Settings row** (Configuration) — label 13/500 + YAML key 11px mono ink-4 + description ≤60ch on
   the left, control on the right at fixed widths; unsaved = 2px warn left edge, error = fault edge.

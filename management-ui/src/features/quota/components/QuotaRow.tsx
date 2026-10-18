@@ -1,10 +1,11 @@
 /**
  * One credential in a provider section of the quota table.
  *
- * Identity · one cell per section column · actions. Cells line up across the
- * section through subgrid; a row without observed data replaces its cells with
- * one status line. Windows past the section's columns, spend caps and notes
- * open below the row.
+ * Identity · one cell per section column · manual resets · actions. Cells line
+ * up down the whole page through subgrid, and manual resets always take the
+ * last slot; a row without observed data replaces its cells with one status
+ * line. Windows past the section's columns, spend caps and notes open below
+ * the row.
  */
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
@@ -149,6 +150,29 @@ export function QuotaRow({
       t('codex_quota.reset_credits_expiry_failed', { message: codex.rateLimitResetCreditsError })
     );
 
+  /* Cells, or one status line while nothing is observed. */
+  const rateLimitCount = overview?.limits.filter((limit) => limit.scope !== 'spend').length ?? 0;
+  const showCells = Boolean(overview && rateLimitCount > 0);
+  // The reset action sits next to its count; without a resets cell it stays with the actions.
+  const resetInCell = showCells && showResets;
+  const resetButton = showResetAction ? (
+    <Button
+      variant={overview?.available === false ? 'secondary' : 'ghost'}
+      size="sm"
+      className={resetInCell ? styles.resetAction : undefined}
+      disabled={resetBlocked}
+      onClick={entry.type === 'claude' ? claudeReset.confirm : onReset}
+      title={
+        resetBlocked && entry.type === 'claude' && !claudeRetry
+          ? t('quota_management.reset_needs_limit')
+          : undefined
+      }
+    >
+      <IconRefreshCw size={13} className={resetBusy ? styles.spinning : undefined} />
+      {claudeRetry ? t('claude_reset.retry') : t('quota_management.use_reset')}
+    </Button>
+  ) : null;
+
   /* Identity line: plan · renewal · credits · cooldown. */
   const facts: ReactNode[] = [];
   if (overview?.plan) {
@@ -199,8 +223,6 @@ export function QuotaRow({
     );
   }
 
-  /* Cells, or one status line while nothing is observed. */
-  const rateLimitCount = overview?.limits.filter((limit) => limit.scope !== 'spend').length ?? 0;
   const hidden = overview ? hiddenLimits(columns, overview) : [];
   const notes = overview?.notes ?? [];
   const moreCount = hidden.length + notes.length;
@@ -233,7 +255,7 @@ export function QuotaRow({
       </div>
 
       <div className={styles.cells}>
-        {overview && rateLimitCount > 0 ? (
+        {overview && showCells ? (
           <>
             {columns.map((column) => {
               const limit = pickColumnLimit(column, overview);
@@ -244,13 +266,16 @@ export function QuotaRow({
               );
             })}
             {showResets && (
-              <div className={styles.cell}>
+              <div className={styles.cell} data-slot="resets">
                 <div className={styles.cellHead}>
                   <span className={styles.cellLabel}>{t('quota_management.manual_resets')}</span>
                 </div>
                 <p className={styles.resetsValue}>
-                  <strong>{resetCount ?? '—'}</strong>
-                  {resetCount !== null && ` ${t('quota_management.resets_available')}`}
+                  <span>
+                    <strong>{resetCount ?? '—'}</strong>
+                    {resetCount !== null && ` ${t('quota_management.resets_available')}`}
+                  </span>
+                  {resetButton}
                 </p>
                 <p
                   className={styles.cellReset}
@@ -280,22 +305,7 @@ export function QuotaRow({
 
       <div className={styles.actions}>
         <Freshness quota={quota} now={now} />
-        {showResetAction && (
-          <Button
-            variant={overview?.available === false ? 'secondary' : 'ghost'}
-            size="sm"
-            disabled={resetBlocked}
-            onClick={entry.type === 'claude' ? claudeReset.confirm : onReset}
-            title={
-              resetBlocked && entry.type === 'claude' && !claudeRetry
-                ? t('quota_management.reset_needs_limit')
-                : undefined
-            }
-          >
-            <IconRefreshCw size={13} className={resetBusy ? styles.spinning : undefined} />
-            {claudeRetry ? t('claude_reset.retry') : t('quota_management.use_reset')}
-          </Button>
-        )}
+        {!resetInCell && resetButton}
         {moreCount > 0 && (
           <button
             type="button"

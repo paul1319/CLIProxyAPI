@@ -19,9 +19,6 @@ import { orderWindowRows } from './windowRows';
 
 export const MAX_WINDOW_COLUMNS = 3;
 
-/** Window columns plus the manual-resets column never exceed this many slots. */
-export const MAX_TABLE_SLOTS = MAX_WINDOW_COLUMNS + 1;
-
 export interface WindowColumn {
   id: string;
   /** Shown in cells of rows that do not report this window. */

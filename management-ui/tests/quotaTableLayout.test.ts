@@ -171,6 +171,21 @@ describe('credential row', () => {
     expect(html).not.toContain('Code review');
   });
 
+  test('the reset action sits next to its count in the resets cell', () => {
+    const quota = {
+      status: 'success',
+      rateLimitResetCreditsAvailableCount: 2,
+    } as unknown as QuotaCardState;
+    const html = renderRow({ overview, columns, quota, showResets: true });
+    expect(html).toContain('data-slot="resets"');
+    expect(html).toMatch(/<strong>2<\/strong> available<\/span><button[^>]*>[\s\S]*?Use reset/);
+
+    // A section without a resets column keeps the action with the row actions.
+    const bare = renderRow({ overview, columns, quota, showResets: false });
+    expect(bare).not.toContain('data-slot="resets"');
+    expect(bare).toContain('Use reset');
+  });
+
   test('without data the cells give way to one status line with recovery actions', () => {
     const html = renderRow({
       quota: { status: 'error', errorStatus: 401 } as unknown as QuotaCardState,
@@ -195,12 +210,15 @@ describe('page and stylesheet contracts', () => {
     );
   });
 
-  test('rows share the table grid through subgrid and pin actions to the last track', async () => {
+  test('every section subgrids into one page grid; resets and actions keep their tracks', async () => {
     const css = await read('src/features/quota/components/QuotaTable.module.scss');
     const block = (selector: string) =>
       css.match(new RegExp(`\\n\\.${selector}\\s*\\{([^}]+)\\}`))?.[1] ?? '';
-    expect(block('table')).toContain('repeat(var(--quota-slots), minmax(0, 1fr))');
-    expect(block('row')).toContain('grid-template-columns: subgrid;');
+    expect(block('grid')).toContain('repeat(var(--quota-slots), minmax(0, 1fr))');
+    for (const selector of ['section', 'frame', 'table', 'row']) {
+      expect(block(selector)).toContain('grid-template-columns: subgrid;');
+    }
+    expect(css).toMatch(/\n\.cell\[data-slot='resets'\]\s*\{\s*grid-column: -3 \/ -2;/);
     expect(block('actions')).toContain('grid-column: -2 / -1;');
     expect(block('status')).toContain('grid-column: 2 / -2;');
     expect(css).toMatch(/\[data-hidden\] > &\s*\{\s*filter: blur\(5px\);/);

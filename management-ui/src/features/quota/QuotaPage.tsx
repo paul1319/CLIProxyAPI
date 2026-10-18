@@ -19,7 +19,7 @@ import { ActionMenu, type ActionMenuItem } from '@/features/authFiles/components
 import { cooldownRemainingSeconds, summarizeCooldowns } from '@/features/authFiles/cooldowns';
 import { ProviderOverview } from './components/ProviderOverview';
 import { QuotaRow } from './components/QuotaRow';
-import { QuotaSection } from './components/QuotaSection';
+import { QuotaSection, QuotaSections } from './components/QuotaSection';
 import {
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
@@ -41,7 +41,7 @@ import {
   type AccountSnapshot,
 } from './poolSummary';
 import { buildProviderSummary, findLimit } from './providerSummary';
-import { MAX_TABLE_SLOTS, buildWindowColumns } from './tableColumns';
+import { buildWindowColumns } from './tableColumns';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import { hasClaudeUsageData } from './providers/claude/data';
 import type { QuotaProviderType } from './providers/types';
@@ -328,11 +328,10 @@ export function QuotaPage() {
     });
   }, [activeTab, focalByType, overviews, resetCounts, sortedEntries]);
 
-  // Every section shares one slot count, so cells line up down the page.
-  const slots = Math.min(
-    MAX_TABLE_SLOTS,
-    Math.max(1, ...groups.map((group) => group.columns.length + (group.showResets ? 1 : 0)))
-  );
+  // One page grid: the widest window set, then a manual-resets slot when any section has one.
+  const slots =
+    Math.max(1, ...groups.map((group) => group.columns.length)) +
+    (groups.some((group) => group.showResets) ? 1 : 0);
 
   // Polling targets in a stable order, so a live re-sort never restarts the refresh loop.
   const pollItems = useMemo(
@@ -560,7 +559,7 @@ export function QuotaPage() {
             onFocalChange={handleFocalChange}
           />
 
-          <div className={styles.groups}>
+          <QuotaSections slots={slots}>
             {groups.map((group) => {
               const groupSnapshots = group.entries
                 .map((entry) => snapshots.get(entryKey(entry)))
@@ -570,7 +569,6 @@ export function QuotaPage() {
                   key={group.type}
                   type={group.type}
                   summary={buildGroupSummary(groupSnapshots, now)}
-                  slots={slots}
                   now={now}
                 >
                   {group.entries.map((entry) => {
@@ -597,7 +595,7 @@ export function QuotaPage() {
                 </QuotaSection>
               );
             })}
-          </div>
+          </QuotaSections>
         </>
       )}
     </div>
