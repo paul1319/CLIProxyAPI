@@ -910,6 +910,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 		}
 		now = time.Now()
 		responseHeaders := internallogging.GetResponseHeaders(ctx)
+		headerTimes := internallogging.GetResponseHeaderTimes(ctx)
 		modelState := existingModelState(auth, modelKey)
 		var cooldownRecordsBefore []CooldownStateRecord
 		trackCooldownState := m.cooldownStore != nil
@@ -1304,6 +1305,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 			if modelState != nil {
 				modelState.Quota.ObserveResponseHeadersForProvider(result.Provider, responseHeaders, now)
 			}
+			auth.QuotaWindows = auth.QuotaWindows.Merge(quotaWindowsFromHeaders(result.Provider, responseHeaders, headerTimes, now))
 		}
 
 		_ = m.persistLocked(ctx, auth)

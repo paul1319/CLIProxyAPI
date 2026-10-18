@@ -341,6 +341,10 @@ func (s *Server) Start() error {
 	s.muxHTTPListener = httpListener
 	s.listenerMu.Unlock()
 
+	if s.mgmt != nil {
+		s.mgmt.StartQuotaPolling()
+	}
+
 	httpErrCh := make(chan error, 1)
 	acceptErrCh := make(chan error, 1)
 

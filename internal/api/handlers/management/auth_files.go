@@ -684,6 +684,11 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 	entry["recent_requests"] = auth.RecentRequestsSnapshot(time.Now())
 	if quota.v8 {
 		entry["quota_identity"] = quotaCredentialIdentity(auth).Fingerprint
+		// Quota reads and reset-credit redemption must act for the workspace
+		// the server queries, which can differ from the ID token claim.
+		if accountID := coreauth.CodexQuotaAccountID(auth); accountID != "" {
+			entry["chatgpt_account_id"] = accountID
+		}
 	}
 	entry["quota"] = quotaObservationPayloadForProvider(auth.Provider, auth.Quota)
 	if modelQuotas := modelQuotaObservationPayload(auth.Provider, auth.ModelStates); len(modelQuotas) > 0 {

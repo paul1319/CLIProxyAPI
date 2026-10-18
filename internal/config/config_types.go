@@ -448,6 +448,20 @@ type RoutingConfig struct {
 	SessionAffinityRebindOn string `yaml:"session-affinity-rebind-on,omitempty" json:"session-affinity-rebind-on,omitempty"`
 }
 
+// RoutingStrategyResetFirst routes new sessions to the credential whose weekly
+// quota resets soonest, so expiring quota is used before it is lost.
+const RoutingStrategyResetFirst = "reset-first"
+
+// UsesResetFirst reports whether the configured strategy is reset-first.
+func (r RoutingConfig) UsesResetFirst() bool {
+	switch strings.ToLower(strings.TrimSpace(r.Strategy)) {
+	case RoutingStrategyResetFirst, "resetfirst", "rf":
+		return true
+	default:
+		return false
+	}
+}
+
 // OAuthModelAlias defines a model ID alias for a specific channel.
 // It maps the upstream model name (Name) to the client-visible alias (Alias).
 // When Fork is true, the alias is added as an additional model in listings while

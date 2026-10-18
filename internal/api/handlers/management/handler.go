@@ -64,6 +64,10 @@ type Handler struct {
 	pluginReleases          pluginReleaseCache
 	quotaMu                 sync.Mutex
 	quotaObservations       *quota.Service
+	quotaPollCancel         context.CancelFunc
+	quotaPollDone           chan struct{}
+	quotaPollWorkers        sync.WaitGroup
+	quotaPollInFlight       map[string]struct{}
 }
 
 type configReloadSnapshot struct {

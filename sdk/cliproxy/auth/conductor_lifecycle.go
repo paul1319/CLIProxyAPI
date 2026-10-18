@@ -346,7 +346,11 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 		existingVersion = 1
 	}
 	credChanged := CredentialsChanged(existing, auth)
-	if credChanged {
+	// A Codex workspace switch with unchanged tokens is a replacement too: the
+	// executor sends the account to the upstream, so results of requests sent
+	// for the previous workspace become stale.
+	accountChanged := CodexQuotaAccountID(existing) != CodexQuotaAccountID(auth)
+	if credChanged || accountChanged {
 		auth.CredentialVersion = max(auth.CredentialVersion, existingVersion) + 1
 	} else {
 		auth.CredentialVersion = existingVersion
@@ -430,6 +434,7 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 	if existing.Generation >= auth.Generation {
 		auth.Generation = existing.Generation + 1
 	}
+	auth.QuotaWindows = carryQuotaWindows(existing, auth)
 	authClone := auth.Clone()
 	m.auths[auth.ID] = authClone
 	m.notifyAuthChangeLocked(auth.ID)
