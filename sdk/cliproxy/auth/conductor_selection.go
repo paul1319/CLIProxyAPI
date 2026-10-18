@@ -1606,7 +1606,7 @@ func (m *Manager) UpdateIfRegistrationCurrent(ctx context.Context, base *Auth, u
 	if !matches {
 		return nil, false, nil
 	}
-	committedAuth, didCommit, persistCooldown, errUpdate := m.updateInternalLocked(ctx, nil, updated, updateModeReplace)
+	committedAuth, didCommit, persistCooldown, errUpdate := m.updateInternalLocked(ctx, nil, updated, updateModeReplace, nil)
 	releaseMutation()
 	if errUpdate == nil && didCommit && committedAuth != nil {
 		m.finishAuthUpdate(ctx, committedAuth, persistCooldown)

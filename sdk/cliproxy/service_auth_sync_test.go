@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1915,5 +1916,246 @@ func TestEndToEndAuthFilePatch_RestoresModelsInV1ModelsWithoutRestart(t *testing
 	resp, errExec := service.coreManager.Execute(context.Background(), []string{"codex"}, cliproxyexecutor.Request{Model: "gpt-6-astra"}, cliproxyexecutor.Options{})
 	if errExec != nil || string(resp.Payload) != "token-fresh" {
 		t.Fatalf("expected inference execution to use fresh token after PATCH, got resp=%q err=%v", string(resp.Payload), errExec)
+	}
+}
+
+// A config-reload scan can read an auth file just before a Management API PATCH
+// persists it. When that older-revision disk snapshot is applied after the PATCH
+// committed, the PATCH's own persisted update (newer revision, older generation)
+// must still win; otherwise the runtime keeps the stale state while disk is current.
+func TestHandleAuthUpdates_PersistedUpdateSupersedesOlderRevisionSnapshot(t *testing.T) {
+	type fixture struct {
+		manager  *coreauth.Manager
+		service  *Service
+		base     *coreauth.Auth
+		patched8 *coreauth.Auth
+		patched9 *coreauth.Auth
+		rev      uint64
+	}
+	const authID = "codex-snapshot-supersede-auth"
+	reg := internalregistry.GetGlobalRegistry()
+	withPrefix := func(base *coreauth.Auth, prefix string) *coreauth.Auth {
+		next := base.Clone()
+		next.Prefix = prefix
+		return next
+	}
+	snapshotOf := func(f *fixture, prefix string) *coreauth.Auth {
+		snapshot := withPrefix(f.base, prefix)
+		snapshot.Generation = 0
+		return snapshot
+	}
+	deliver := func(f *fixture, a *coreauth.Auth) {
+		f.rev++
+		update := watcher.AuthUpdate{Action: watcher.AuthUpdateActionModify, ID: authID, Auth: a}
+		update.SetRevision(f.rev)
+		f.service.handleAuthUpdate(context.Background(), update)
+	}
+	prefixOf := func(f *fixture) string {
+		current, ok := f.manager.GetByID(authID)
+		if !ok || current == nil {
+			t.Fatal("auth missing from manager")
+		}
+		return current.Prefix
+	}
+	hasPrefixedModel := func(prefix string) bool {
+		for _, model := range reg.GetModelsForClient(authID) {
+			if model != nil && strings.HasPrefix(model.ID, prefix+"/") {
+				return true
+			}
+		}
+		return false
+	}
+	// setup commits PATCH 8 through the watcher pipeline, then commits PATCH 9
+	// directly, as the Management API does before its post-persist hook runs.
+	setup := func(t *testing.T) *fixture {
+		reg.UnregisterClient(authID)
+		t.Cleanup(func() {
+			reg.UnregisterClient(authID)
+		})
+		manager := coreauth.NewManager(nil, nil, nil)
+		manager.RegisterExecutor(&syncTestExecutor{})
+		base := &coreauth.Auth{
+			ID:       authID,
+			Provider: "codex",
+			Status:   coreauth.StatusActive,
+			Attributes: map[string]string{
+				"plan_type": "pro",
+				"path":      "/path/to/codex-snapshot-supersede.json",
+			},
+		}
+		if _, errRegister := manager.Register(context.Background(), base); errRegister != nil {
+			t.Fatalf("register auth: %v", errRegister)
+		}
+		f := &fixture{manager: manager, service: &Service{cfg: &config.Config{}, coreManager: manager}, base: base}
+		var errPatch error
+		if f.patched8, errPatch = manager.Update(context.Background(), withPrefix(base, "pfx-8")); errPatch != nil {
+			t.Fatalf("patch 8: %v", errPatch)
+		}
+		deliver(f, f.patched8)
+		if f.patched9, errPatch = manager.Update(context.Background(), withPrefix(f.patched8, "pfx-9")); errPatch != nil {
+			t.Fatalf("patch 9: %v", errPatch)
+		}
+		return f
+	}
+
+	t.Run("persisted update wins over a scan read before it", func(t *testing.T) {
+		f := setup(t)
+		deliver(f, snapshotOf(f, "pfx-8"))
+		deliver(f, f.patched9)
+		if got := prefixOf(f); got != "pfx-9" {
+			t.Fatalf("prefix = %q, want persisted pfx-9", got)
+		}
+		if !hasPrefixedModel("pfx-9") || hasPrefixedModel("pfx-8") {
+			t.Fatalf("expected models registered under pfx-9 only, got %v", reg.GetModelsForClient(authID))
+		}
+	})
+
+	t.Run("consecutive stale scans keep the replaced boundary", func(t *testing.T) {
+		f := setup(t)
+		deliver(f, snapshotOf(f, "pfx-8"))
+		deliver(f, snapshotOf(f, "pfx-8"))
+		deliver(f, f.patched9)
+		if got := prefixOf(f); got != "pfx-9" {
+			t.Fatalf("prefix = %q, want persisted pfx-9 after two stale scans", got)
+		}
+	})
+
+	t.Run("a write after the scan keeps the generation guard", func(t *testing.T) {
+		f := setup(t)
+		deliver(f, snapshotOf(f, "pfx-8"))
+		current, _ := f.manager.GetByID(authID)
+		if _, errRefresh := f.manager.Update(context.Background(), withPrefix(current, "pfx-refresh")); errRefresh != nil {
+			t.Fatalf("direct write: %v", errRefresh)
+		}
+		deliver(f, f.patched9)
+		if got := prefixOf(f); got != "pfx-refresh" {
+			t.Fatalf("prefix = %q, want the newer direct write kept", got)
+		}
+	})
+
+	t.Run("an update older than the replaced commit stays stale", func(t *testing.T) {
+		f := setup(t)
+		deliver(f, snapshotOf(f, "pfx-10"))
+		deliver(f, f.patched8)
+		if got := prefixOf(f); got != "pfx-10" {
+			t.Fatalf("prefix = %q, want the snapshot kept over an update older than the replaced commit", got)
+		}
+	})
+}
+
+// oneShotBlockingStore blocks the next Save after arm until the returned release
+// channel is closed; every other Save returns immediately.
+type oneShotBlockingStore struct {
+	mu      sync.Mutex
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *oneShotBlockingStore) arm() (entered, release chan struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.entered, s.release = make(chan struct{}), make(chan struct{})
+	return s.entered, s.release
+}
+
+func (s *oneShotBlockingStore) Save(_ context.Context, auth *coreauth.Auth) (string, error) {
+	s.mu.Lock()
+	entered, release := s.entered, s.release
+	s.entered, s.release = nil, nil
+	s.mu.Unlock()
+	if entered != nil {
+		close(entered)
+		<-release
+	}
+	return auth.ID + ".json", nil
+}
+
+func (*oneShotBlockingStore) List(context.Context) ([]*coreauth.Auth, error) { return nil, nil }
+func (*oneShotBlockingStore) Delete(context.Context, string) error           { return nil }
+
+type failingRefreshExecutor struct{ syncTestExecutor }
+
+func (*failingRefreshExecutor) Refresh(context.Context, *coreauth.Auth) (*coreauth.Auth, error) {
+	return nil, fmt.Errorf("refresh upstream unavailable")
+}
+
+// A refresh failure can land while a stale scan's commit is persisting. The commit
+// merges that failure, so the PATCH's delayed persisted update, which predates the
+// failure, must stay stale instead of wiping the failure state.
+func TestHandleAuthUpdates_PersistedUpdateKeepsFailureMergedIntoSnapshot(t *testing.T) {
+	const authID = "codex-snapshot-merged-failure-auth"
+	reg := internalregistry.GetGlobalRegistry()
+	reg.UnregisterClient(authID)
+	t.Cleanup(func() {
+		reg.UnregisterClient(authID)
+	})
+
+	store := &oneShotBlockingStore{}
+	manager := coreauth.NewManager(store, nil, nil)
+	manager.RegisterExecutor(&syncTestExecutor{})
+	// Metadata makes commits persist, which releases the manager lock during Save.
+	base := &coreauth.Auth{
+		ID:       authID,
+		Provider: "codex",
+		Status:   coreauth.StatusActive,
+		Metadata: map[string]any{"type": "codex"},
+		Attributes: map[string]string{
+			"plan_type": "pro",
+			"path":      "/path/to/codex-snapshot-merged-failure.json",
+		},
+	}
+	if _, errRegister := manager.Register(context.Background(), base); errRegister != nil {
+		t.Fatalf("register auth: %v", errRegister)
+	}
+	service := &Service{cfg: &config.Config{}, coreManager: manager}
+	withPrefix := func(a *coreauth.Auth, prefix string) *coreauth.Auth {
+		next := a.Clone()
+		next.Prefix = prefix
+		return next
+	}
+	deliver := func(rev uint64, a *coreauth.Auth) {
+		update := watcher.AuthUpdate{Action: watcher.AuthUpdateActionModify, ID: authID, Auth: a}
+		update.SetRevision(rev)
+		service.handleAuthUpdate(context.Background(), update)
+	}
+
+	patched8, errPatch8 := manager.Update(context.Background(), withPrefix(base, "pfx-8"))
+	if errPatch8 != nil {
+		t.Fatalf("patch 8: %v", errPatch8)
+	}
+	deliver(1, patched8)
+	patched9, errPatch9 := manager.Update(context.Background(), withPrefix(patched8, "pfx-9"))
+	if errPatch9 != nil {
+		t.Fatalf("patch 9: %v", errPatch9)
+	}
+
+	// The stale scan's commit blocks in Save while a refresh failure lands.
+	entered, release := store.arm()
+	snapshot := withPrefix(base, "pfx-8")
+	snapshot.Generation = 0
+	scanDone := make(chan struct{})
+	go func() {
+		defer close(scanDone)
+		deliver(2, snapshot)
+	}()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("snapshot commit did not reach the store")
+	}
+	manager.RegisterExecutor(&failingRefreshExecutor{})
+	if _, errRefresh := manager.ForceRefreshAuth(context.Background(), authID); errRefresh == nil {
+		t.Fatal("expected the forced refresh to fail")
+	}
+	close(release)
+	<-scanDone
+
+	deliver(3, patched9)
+	current, ok := manager.GetByID(authID)
+	if !ok || current == nil {
+		t.Fatal("auth missing from manager")
+	}
+	if current.LastError == nil || !current.Unavailable {
+		t.Fatalf("got prefix=%q lastError=%v unavailable=%t, want the merged refresh failure kept", current.Prefix, current.LastError, current.Unavailable)
 	}
 }
