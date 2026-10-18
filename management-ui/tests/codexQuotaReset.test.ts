@@ -53,9 +53,13 @@ describe('Codex reset gateway cooldown', () => {
     }
   );
 
-  test.each(['no_credit', 'nothing_to_reset', 'unknown'])('does not clear for %s', async (code) => {
+  test.each([
+    ['no_credit', 'codex_quota.reset_no_credit'],
+    ['nothing_to_reset', 'codex_quota.reset_nothing_to_reset'],
+    ['unknown', 'codex_quota.reset_not_confirmed'],
+  ])('does not clear for %s', async (code, message) => {
     const { calls } = setup({ code });
-    await expect(reset()).rejects.toThrow('codex_quota.reset_not_confirmed');
+    await expect(reset()).rejects.toThrow(message);
     expect(calls).toEqual(['consume']);
   });
 
