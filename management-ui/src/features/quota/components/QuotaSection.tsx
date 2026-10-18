@@ -1,4 +1,4 @@
-/** A provider section: one header line over the credential table. */
+/** Provider sections: one header line over each credential table, all on one page grid. */
 
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,16 +9,31 @@ import { formatCompactDuration } from '../format';
 import { ProviderGlyph } from './ProviderGlyph';
 import styles from './QuotaTable.module.scss';
 
+interface QuotaSectionsProps {
+  /** Cell slots shared by every section: window columns, then manual resets. */
+  slots: number;
+  children: ReactNode;
+}
+
+/** Every section subgrids into one grid, so each column lines up down the page. */
+export function QuotaSections({ slots, children }: QuotaSectionsProps) {
+  return (
+    <div className={styles.sections}>
+      <div className={styles.grid} style={{ '--quota-slots': slots } as CSSProperties}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 interface QuotaSectionProps {
   type: QuotaProviderType;
   summary: GroupSummary;
-  /** Cell columns shared by every section, so tables line up down the page. */
-  slots: number;
   now: number;
   children: ReactNode;
 }
 
-export function QuotaSection({ type, summary, slots, now, children }: QuotaSectionProps) {
+export function QuotaSection({ type, summary, now, children }: QuotaSectionProps) {
   const { t } = useTranslation();
   const headingId = `quota-group-${type}`;
   return (
@@ -41,9 +56,7 @@ export function QuotaSection({ type, summary, slots, now, children }: QuotaSecti
         </p>
       </header>
       <div className={styles.frame}>
-        <ul className={styles.table} style={{ '--quota-slots': slots } as CSSProperties}>
-          {children}
-        </ul>
+        <ul className={styles.table}>{children}</ul>
       </div>
     </section>
   );
