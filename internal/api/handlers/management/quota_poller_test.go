@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -191,5 +192,40 @@ func TestQuotaPollingStopsWhileUsageRequestIsInFlight(t *testing.T) {
 	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatal("closing quota observations hung on an in-flight usage request")
+	}
+}
+
+func TestQuotaPollingAsksForTheWorkspaceTheExecutorUses(t *testing.T) {
+	manager := coreauth.NewManager(nil, nil, nil)
+	payload, _ := json.Marshal(map[string]any{"https://api.openai.com/auth": map[string]any{"chatgpt_account_id": "acct-a"}})
+	idToken := "e30." + base64.RawURLEncoding.EncodeToString(payload) + ".sig"
+	codex := func(accountID string) *coreauth.Auth {
+		return &coreauth.Auth{ID: "codex-poll", Provider: "codex", Metadata: map[string]any{"email": "shared@example.invalid", "account_id": accountID, "id_token": idToken, "access_token": "same"}}
+	}
+	auth := codex("acct-a")
+	if _, errRegister := manager.Register(t.Context(), auth); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	h := &Handler{cfg: &config.Config{}, authManager: manager}
+	oldIdentity := quotaCredentialIdentity(auth)
+
+	// Switch the workspace without touching the tokens: the ID token still
+	// names acct-a, but requests now go to acct-b.
+	if _, errUpdate := manager.Update(t.Context(), codex("acct-b")); errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	current, _ := manager.GetByID("codex-poll")
+	if got := h.quotaCredential(current, "").AccountID; got != "acct-b" {
+		t.Fatalf("usage request account = %q, want acct-b", got)
+	}
+	if quotaCredentialIdentity(current) == oldIdentity {
+		t.Fatal("the workspace switch kept the quota identity")
+	}
+	h.applyQuotaWindows("codex-poll", "codex", oldIdentity, quota.Snapshot{Record: quota.Record{
+		Body:       json.RawMessage(`{"rate_limit":{"primary_window":{"used_percent":10,"limit_window_seconds":604800,"reset_at":1793000000}}}`),
+		ObservedAt: time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC),
+	}})
+	if stored, _ := manager.GetByID("codex-poll"); !stored.QuotaWindows.IsZero() {
+		t.Fatalf("acct-a usage was applied to acct-b: %+v", stored.QuotaWindows)
 	}
 }

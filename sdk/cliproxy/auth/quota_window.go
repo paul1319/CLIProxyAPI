@@ -127,8 +127,11 @@ func finishQuotaWindow(w QuotaWindow) QuotaWindow {
 // carryQuotaWindows keeps observed windows across ordinary updates such as
 // token refreshes, and drops them when the credential now belongs to another
 // account, so one account's quota can never rank another.
-func carryQuotaWindows(existing, updated *Auth, accountChanged bool) QuotaWindows {
-	if existing == nil || updated == nil || accountChanged {
+func carryQuotaWindows(existing, updated *Auth) QuotaWindows {
+	if existing == nil || updated == nil || (existing.QuotaWindows.IsZero() && updated.QuotaWindows.IsZero()) {
+		return QuotaWindows{}
+	}
+	if QuotaAccountFingerprint(existing) != QuotaAccountFingerprint(updated) {
 		return QuotaWindows{}
 	}
 	return existing.QuotaWindows.Merge(updated.QuotaWindows)

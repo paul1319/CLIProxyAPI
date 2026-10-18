@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"maps"
 	"strings"
+
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 )
 
 // QuotaAccountFingerprint identifies the account behind a credential for quota
@@ -20,14 +22,11 @@ func QuotaAccountFingerprint(auth *Auth) string {
 	kind, account := auth.AccountInfo()
 	seed["kind"], seed["account"] = kind, account
 	stableIdentity := account != ""
-	// chatgpt_account_id selects the Codex workspace when the ID token has no
-	// account claim. It joins the seed only when present, so fingerprints of
-	// credentials without it are unchanged.
-	for _, name := range []string{"account_id", "email", "sub", "subject", "user_id", "device_id", "project_id", "domain", "base_url", "chatgpt_account_id"} {
+	for _, name := range []string{"account_id", "email", "sub", "subject", "user_id", "device_id", "project_id", "domain", "base_url"} {
 		if value, ok := metadata[name].(string); ok && strings.TrimSpace(value) != "" {
 			seed[name] = value
 			switch name {
-			case "account_id", "email", "sub", "subject", "user_id", "device_id", "chatgpt_account_id":
+			case "account_id", "email", "sub", "subject", "user_id", "device_id":
 				stableIdentity = true
 			}
 		}
@@ -62,6 +61,12 @@ func QuotaAccountFingerprint(auth *Auth) string {
 			}
 		}
 	}
+	// The workspace a Codex poll asks for is part of the identity, so a
+	// snapshot is never applied to a credential that now acts for another one.
+	if accountID := CodexQuotaAccountID(auth); accountID != "" {
+		seed["quota_account_id"] = accountID
+		stableIdentity = true
+	}
 	if !stableIdentity {
 		// Opaque credentials without a stable account identifier cannot safely reuse
 		// another token's observations at the same filename.
@@ -75,6 +80,28 @@ func QuotaAccountFingerprint(auth *Auth) string {
 	data, _ := json.Marshal(seed)
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])
+}
+
+// CodexQuotaAccountID returns the ChatGPT account a Codex credential acts for.
+// It follows the executor, which sends metadata account_id as
+// Chatgpt-Account-Id, and falls back to the ID token's account claim and then
+// metadata chatgpt_account_id for credentials without one.
+func CodexQuotaAccountID(auth *Auth) string {
+	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+		return ""
+	}
+	if accountID, _ := auth.Metadata["account_id"].(string); strings.TrimSpace(accountID) != "" {
+		return accountID
+	}
+	if idToken, _ := auth.Metadata["id_token"].(string); strings.TrimSpace(idToken) != "" {
+		if claims, errParse := codex.ParseJWTToken(strings.TrimSpace(idToken)); errParse == nil && claims != nil {
+			if accountID := strings.TrimSpace(claims.CodexAuthInfo.ChatgptAccountID); accountID != "" {
+				return accountID
+			}
+		}
+	}
+	accountID, _ := QuotaCredentialMetadata(auth)["chatgpt_account_id"].(string)
+	return accountID
 }
 
 // QuotaCredentialMetadata merges token storage fields with runtime metadata,

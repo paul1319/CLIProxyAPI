@@ -83,15 +83,8 @@ func (h *Handler) quotaCredential(auth *coreauth.Auth, pluginID string) quota.Cr
 		KimiDomain: kimi.ResolveKimiDomainFromAuth(auth), Transport: transport,
 		Token: func(ctx context.Context) (string, error) { return h.resolveTokenForAuth(ctx, auth.Clone(), "") },
 	}
-	if claims := extractCodexIDTokenClaims(auth); claims != nil {
-		credential.AccountID, _ = claims["chatgpt_account_id"].(string)
-	}
-	if credential.AccountID == "" {
-		credential.AccountID, _ = metadata["account_id"].(string)
-		if credential.AccountID == "" {
-			credential.AccountID, _ = metadata["chatgpt_account_id"].(string)
-		}
-	}
+	// Ask for the workspace the executor bills requests to.
+	credential.AccountID = coreauth.CodexQuotaAccountID(auth)
 	if pluginID != "" && host != nil && host.HasQuotaProviderForPlugin(pluginID) {
 		credential.Plugin = func(ctx context.Context) (json.RawMessage, error) {
 			result, handled, errFetch := host.FetchQuotaByPlugin(ctx, pluginID, pluginapi.QuotaFetchRequest{

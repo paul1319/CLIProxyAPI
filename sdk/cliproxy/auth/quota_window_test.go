@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"testing"
@@ -372,6 +374,75 @@ func TestCodexHeaderResetUsesTheNewestResetForm(t *testing.T) {
 	}, quotaTestNow)
 	if !windows.Weekly.ResetAt.Equal(earlier.Add(2*time.Hour)) || !windows.Weekly.ObservedAt.Equal(later) {
 		t.Fatalf("Weekly = %+v", windows.Weekly)
+	}
+}
+
+func unsignedJWT(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	payload, errMarshal := json.Marshal(claims)
+	if errMarshal != nil {
+		t.Fatal(errMarshal)
+	}
+	return "e30." + base64.RawURLEncoding.EncodeToString(payload) + ".sig"
+}
+
+func TestCodexQuotaAccountIDFollowsTheExecutor(t *testing.T) {
+	idToken := unsignedJWT(t, map[string]any{"https://api.openai.com/auth": map[string]any{"chatgpt_account_id": "claim-acct"}})
+	auth := &Auth{Provider: "codex", Metadata: map[string]any{"account_id": "file-acct", "id_token": idToken, "chatgpt_account_id": "meta-acct"}}
+	if got := CodexQuotaAccountID(auth); got != "file-acct" {
+		t.Fatalf("account = %q, want the account_id the executor sends", got)
+	}
+	delete(auth.Metadata, "account_id")
+	if got := CodexQuotaAccountID(auth); got != "claim-acct" {
+		t.Fatalf("account = %q, want the ID token claim", got)
+	}
+	auth.Metadata["id_token"] = unsignedJWT(t, map[string]any{"https://api.openai.com/auth": map[string]any{}})
+	if got := CodexQuotaAccountID(auth); got != "meta-acct" {
+		t.Fatalf("account = %q, want metadata chatgpt_account_id", got)
+	}
+}
+
+func TestQuotaAccountFingerprintTracksTheRequestedWorkspace(t *testing.T) {
+	// An ID token without an account claim must not hide the workspace that
+	// the usage request falls back to.
+	auth := &Auth{Provider: "codex", Metadata: map[string]any{
+		"email": "shared@example.invalid", "chatgpt_account_id": "workspace-a",
+		"id_token": unsignedJWT(t, map[string]any{"https://api.openai.com/auth": map[string]any{}}),
+	}}
+	first := QuotaAccountFingerprint(auth)
+	auth.Metadata["chatgpt_account_id"] = "workspace-b"
+	if QuotaAccountFingerprint(auth) == first {
+		t.Fatal("switching the requested workspace kept the account fingerprint")
+	}
+}
+
+func TestManagerUpdateBumpsCredentialVersionOnlyForAccountSwitches(t *testing.T) {
+	manager := NewManager(nil, nil, nil)
+	ctx := context.Background()
+	codex := func(accountID, baseURL string) *Auth {
+		return &Auth{ID: "codex-version", Provider: "codex", Metadata: map[string]any{"email": "a@example.invalid", "account_id": accountID, "base_url": baseURL, "access_token": "same"}}
+	}
+	if _, errRegister := manager.Register(ctx, codex("acct-1", "https://one.invalid")); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	// The first update normalizes an unset version.
+	base, errBase := manager.Update(ctx, codex("acct-1", "https://one.invalid"))
+	if errBase != nil {
+		t.Fatal(errBase)
+	}
+	updated, errUpdate := manager.Update(ctx, codex("acct-1", "https://two.invalid"))
+	if errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	if updated.CredentialVersion != base.CredentialVersion {
+		t.Fatalf("metadata edit bumped the credential version: %d -> %d", base.CredentialVersion, updated.CredentialVersion)
+	}
+	switched, errSwitch := manager.Update(ctx, codex("acct-2", "https://two.invalid"))
+	if errSwitch != nil {
+		t.Fatal(errSwitch)
+	}
+	if switched.CredentialVersion <= updated.CredentialVersion {
+		t.Fatalf("workspace switch kept the credential version: %d -> %d", updated.CredentialVersion, switched.CredentialVersion)
 	}
 }
 
