@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
-import { MetaDot, PageHeader } from '@/components/common/PageHeader';
+import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
@@ -16,7 +16,6 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNow } from '@/hooks/useNow';
-import { QUOTA_REFRESH_INTERVAL_MS } from '@/services/api/quota';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ClaudeQuotaState, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey, getQuotaCardTitle } from '@/utils/quota/identity';
@@ -408,17 +407,7 @@ export function QuotaPage() {
     <div className={styles.page}>
       <PageHeader
         title={t('quota_management.page_title')}
-        meta={
-          <>
-            <span>{t('quota_management.accounts', { count: entries.length })}</span>
-            <MetaDot />
-            <span>
-              {t('quota_management.meta_auto_refresh', {
-                seconds: Math.round(QUOTA_REFRESH_INTERVAL_MS / 1000),
-              })}
-            </span>
-          </>
-        }
+        meta={<span>{t('quota_management.accounts', { count: entries.length })}</span>}
         actions={
           <Button
             variant="ghost"

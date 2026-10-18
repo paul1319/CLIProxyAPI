@@ -1846,7 +1846,6 @@
     "accounts_few": "{{count}} аккаунта",
     "accounts_many": "{{count}} аккаунтов",
     "accounts_other": "{{count}} аккаунта",
-    "meta_auto_refresh": "Автообновление каждые {{seconds}} с",
     "refresh_all": "Обновить все",
     "summary_label": "Ёмкость пула",
     "summary_available": "Доступно сейчас",
