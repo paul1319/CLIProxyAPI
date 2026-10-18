@@ -229,7 +229,8 @@
     "ws_auth_enable": "Require auth for /ws/*",
     "routing_strategy_round_robin": "round-robin (cycle)",
     "routing_strategy_weighted_round_robin": "weighted-round-robin (weighted cycle)",
-    "routing_strategy_fill_first": "fill-first (prioritize)"
+    "routing_strategy_fill_first": "fill-first (prioritize)",
+    "routing_strategy_reset_first": "reset-first (soonest reset)"
   },
   "credentials": {
     "title": "Credentials",
@@ -1628,6 +1629,9 @@
           "strategy_round_robin": "Round robin",
           "strategy_weighted_round_robin": "Weighted round robin",
           "strategy_fill_first": "Fill first",
+          "strategy_reset_first": "Soonest quota reset",
+          "reset_first_max_five_hour": "New-session 5h limit, %",
+          "reset_first_max_five_hour_hint": "New sessions go to the Claude/Codex account whose weekly quota resets soonest. An account whose five-hour usage reaches this percentage stops receiving new sessions while another has headroom; bound sessions stay put. Default 85.",
           "session_affinity_ttl": "Session affinity TTL",
           "force_model_prefix": "Force model prefix",
           "force_model_prefix_desc": "Unprefixed model requests only use credentials without prefix",
@@ -1759,6 +1763,7 @@
         "integer": "Enter a whole number",
         "non_negative_integer": "Enter a non-negative whole number",
         "integer_range_1_3600": "Enter a whole number between 1 and 3600",
+        "integer_range_1_100": "Enter a whole number between 1 and 100",
         "payload_invalid_number": "Enter a valid number",
         "payload_invalid_boolean": "Choose true or false",
         "payload_invalid_json": "Enter valid JSON"

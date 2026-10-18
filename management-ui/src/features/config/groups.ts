@@ -62,6 +62,7 @@ export const CONFIG_SECTION_GROUPS: Record<ConfigTabId, readonly ConfigGroupDef[
       titleKey: G('routing'),
       fields: [
         'routingStrategy',
+        'routingResetFirstMaxFiveHour',
         'forceModelPrefix',
         'routingSessionAffinity',
         'routingSessionAffinityTTL',

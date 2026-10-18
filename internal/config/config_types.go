@@ -416,8 +416,11 @@ type QuotaExceeded struct {
 // RoutingConfig configures how credentials are selected for requests.
 type RoutingConfig struct {
 	// Strategy selects the credential selection strategy.
-	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first".
+	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first", "reset-first".
 	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+
+	// ResetFirst tunes the reset-first strategy. Ignored by other strategies.
+	ResetFirst ResetFirstRoutingConfig `yaml:"reset-first,omitempty" json:"reset-first,omitzero"`
 
 	// SessionAffinity enables universal session-sticky routing for all clients.
 	// Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,
@@ -451,6 +454,14 @@ type RoutingConfig struct {
 // RoutingStrategyResetFirst routes new sessions to the credential whose weekly
 // quota resets soonest, so expiring quota is used before it is lost.
 const RoutingStrategyResetFirst = "reset-first"
+
+// ResetFirstRoutingConfig tunes the reset-first strategy.
+type ResetFirstRoutingConfig struct {
+	// MaxFiveHourUtilization is the five-hour window usage, in percent, at which a
+	// credential stops receiving new sessions while others still have headroom.
+	// Sessions already bound to the credential stay on it. Default: 85. Range: 1-100.
+	MaxFiveHourUtilization int `yaml:"max-five-hour-utilization,omitempty" json:"max-five-hour-utilization,omitempty"`
+}
 
 // UsesResetFirst reports whether the configured strategy is reset-first.
 func (r RoutingConfig) UsesResetFirst() bool {
