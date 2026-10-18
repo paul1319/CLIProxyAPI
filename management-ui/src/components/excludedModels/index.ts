@@ -11,7 +11,6 @@ export {
   type ExcludedModelRuleChipProps,
 } from './ExcludedModelRuleChip';
 export {
-  DISABLE_ALL_RULE,
   formatExcludedRulesText,
   getModelExclusionState,
   hasExcludedRule,

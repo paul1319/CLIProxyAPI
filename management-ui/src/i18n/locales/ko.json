@@ -1099,12 +1099,9 @@
     "copied": "복사됨"
   },
   "stats": {
-    "success": "성공",
-    "failure": "실패"
+    "success": "성공"
   },
   "status_bar": {
-    "success_short": "✓",
-    "failure_short": "✗",
     "no_requests": "요청 없음"
   },
   "logs": {
@@ -2138,20 +2135,6 @@
     "version": "관리 UI 버전"
   },
   "providersPage": {
-    "behavior": {
-      "title": "공급자 전용 동작",
-      "alphaSearch": "Alpha Search 활성화",
-      "alphaSearchHint": "이 Codex 키가 Alpha Search를 처리하도록 허용합니다. 업스트림에서 이를 지원해야 합니다.",
-      "codexCloaking": "Codex 요청 위장",
-      "codexCloakingHint": "이 API 키에 대한 공식 Codex 식별 헤더를 재정의합니다. 기본값은 자격 증명 재정의를 제거하며, OAuth 전용 설정은 여기에 적용되지 않습니다.",
-      "useDefault": "백엔드 기본값 사용",
-      "cloakingEnabled": "위장 활성화",
-      "cloakingDisabled": "위장 비활성화",
-      "rebuildMidSystemMessage": "시스템 메시지 재구성",
-      "rebuildMidSystemMessageHint": "role이 system인 Claude 메시지를 최상위 system 필드로 이동합니다.",
-      "supportPromptCacheKey": "프롬프트 캐시 키 주입",
-      "supportPromptCacheKeyHint": "호환되는 요청에 대해 prompt_cache_key를 파생하고 주입합니다. 업스트림에서 이 필드를 지원하는 경우에만 활성화하세요."
-    },
     "modelOptions": {
       "displayName": "표시 이름",
       "maxContextLength": "컨텍스트 길이",
@@ -2178,20 +2161,6 @@
       "removeModel": "모델 삭제",
       "modelName": "모델 이름",
       "modelAlias": "별칭(선택 사항)"
-    },
-    "runtimePolicy": {
-      "title": "고급 런타임 정책",
-      "description": "상속은 상위 그룹 정책을 따르고, 그 후 백엔드 기본값을 사용합니다. 재정의는 이 항목에만 적용됩니다.",
-      "cooling": "쿨다운",
-      "inherit": "상속",
-      "coolingEnabled": "쿨다운 활성화",
-      "coolingDisabled": "쿨다운 비활성화",
-      "retry": "요청 재시도",
-      "retryHint": "비워 두면 그룹 설정을 상속합니다. 정수를 입력하세요. 0은 재시도를 비활성화하고, 음수는 그룹 정책 대신 전역 재시도 정책을 사용합니다.",
-      "errorsMode": "요청 오류 규칙",
-      "override": "재정의",
-      "errorsHint": "상속은 상위 정책을 따릅니다. 재정의는 전체 목록을 대체하며 빈 목록일 수도 있습니다. 모드를 전환해도 작성 중인 규칙 초안은 유지됩니다.",
-      "invalidRetry": "재시도 횟수는 안전한 정수이거나 상속을 위해 비어 있어야 합니다."
     },
     "errorRules": {
       "hint": "순서대로 첫 번째 일치하는 규칙을 적용합니다. 상태 코드가 같으면 어느 조건이라도 일치하면 적용됩니다.",
@@ -2222,202 +2191,14 @@
         "continue-and-cooldown": "계속 및 쿨다운"
       }
     },
-    "header": {
-      "title": "AI 공급자",
-      "activeResources": "활성 리소스 {{active}}/{{total}}개",
-      "providerFamilies": "공급자 제품군 {{count}}개",
-      "updatedAt": "{{time}} 업데이트됨"
-    },
-    "actions": {
-      "refresh": "새로 고침",
-      "syncing": "동기화 중",
-      "new": "새로 만들기",
-      "edit": "편집",
-      "view": "보기",
-      "delete": "삭제",
-      "cancel": "취소",
-      "save": "저장",
-      "create": "생성",
-      "enable": "활성화",
-      "disable": "비활성화"
-    },
-    "categories": {
-      "title": "공급자",
-      "quickFill": "빠른 입력",
-      "activeCount": "활성 {{active}}/{{total}}"
-    },
-    "providerNames": {
-      "meta": "Muse (Meta)",
-      "gemini": "Gemini",
-      "interactions": "Interactions API",
-      "codex": "Codex",
-      "xai": "xAI",
-      "claude": "Claude",
-      "vertex": "Vertex",
-      "openaiCompatibility": "OpenAI 호환",
-      "apikeyFun": "APIKEY.FUN",
-      "fennoAI": "FennoAI",
-      "qiniuCloud": "Qiniu Cloud",
-      "kimi": "Kimi"
-    },
-    "table": {
-      "key": "키",
-      "baseUrl": "기본 URL",
-      "prefix": "접두사",
-      "models": "모델/헤더",
-      "status": "상태",
-      "actions": "작업",
-      "metrics": {
-        "models": "모델",
-        "keys": "키",
-        "headers": "헤더"
-      },
-      "websocketsTag": "WebSockets",
-      "cloakTag": "Cloak",
-      "cliProfileTag": "CLI 프로필",
-      "empty": "아직 리소스가 없습니다. \"새로 만들기\"를 클릭하여 추가하세요.",
-      "filterPlaceholder": "키, URL, 접두사 검색…",
-      "description": "{{route}}의 리소스를 관리합니다."
-    },
-    "sponsor": {
-      "protocolSummary": "Anthropic / OpenAI / Gemini / Codex API (Responses)",
-      "detailHint": "{{provider}} 공급자는 프로토콜별로 일치하는 API 키 설정에 저장되며, 이 화면에서 통합 관리합니다.",
-      "registerLink": "여기서 등록",
-      "registerNow": "지금 등록",
-      "kimiPromo": "신규 사용자는 첫 충전 성공 시 충전 금액의 10%에 해당하는 API 크레딧(최대 ¥1000)을 받을 수 있습니다. 혜택은 9월 30일에 종료됩니다.",
-      "dashboardLink": "대시보드",
-      "emptyRegisterHint": "아직 설정이 없습니다.",
-      "apiKeyHint": "이 키는 선택한 그룹/프로토콜 설정에만 저장됩니다.",
-      "usageCheck": "사용량 확인",
-      "usageChecking": "확인 중",
-      "usageRemaining": "남은 사용량: {{amount}} {{unit}}",
-      "usageBreakdown": "사용 {{used}} / 한도 {{limit}}",
-      "usageStatus": "상태: {{status}}",
-      "usageInvalid": "유효하지 않은 키",
-      "usageEmpty": "엔드포인트에서 사용량 데이터를 반환하지 않았습니다.",
-      "usageApiKeyRequired": "API 키가 필요합니다.",
-      "aggregationConflict": "이 그룹화된 공급자에는 여러 백엔드 설정 또는 OpenAI 키가 포함되어 있습니다. 데이터 손실을 방지하려면 소스 설정에서 편집하세요.",
-      "partialMutationWarning": "하나 이상의 프로토콜이 업데이트된 후 작업이 실패했을 수 있습니다. 최신 설정을 다시 불러왔으니 다시 시도하기 전에 검토하세요.",
-      "groupedKeysTitle": "그룹 키",
-      "groupedKeysHint": "플랫폼 키 생성 시 특정 그룹에 바인딩될 수 있습니다. 여기의 각 그룹 키는 하나의 프로토콜만 관리하며, 모델 검색은 해당 프로토콜만 사용합니다.",
-      "groupedKey": "그룹 키 #{{index}}",
-      "addGroupedKey": "그룹 키 추가",
-      "removeGroupedKey": "그룹 키 삭제",
-      "protocol": "그룹/프로토콜",
-      "protocolHint": "이 키에 해당하는 그룹/프로토콜을 선택하세요.",
-      "protocolEndpoint": "현재 프로토콜 엔드포인트",
-      "urlMode": "{{provider}} URL",
-      "urlHint": "모든 URL은 동일한 API 규칙을 사용합니다. 저장 시 현재 그룹화된 프로토콜의 엔드포인트만 기록됩니다.",
-      "urlOptions": {
-        "standard": "표준 URL",
-        "direct": "직접 연결 URL",
-        "domestic": "중국 본토 경로",
-        "overseas": "해외 경로",
-        "mainlandChina": "중국 본토 (권장)",
-        "global": "글로벌"
-      },
-      "urlOptionDescriptions": {
-        "domestic": "중국 본토의 사용자 및 워크로드용입니다. 본토 네트워크에서 일반적으로 대기 시간이 더 짧습니다.",
-        "overseas": "해외 배포, 국경 간 액세스 또는 해외 모델이 필요한 워크로드용입니다.",
-        "mainlandChinaRecommended": "중국 본토 네트워크의 사용자 및 워크로드에 권장됩니다.",
-        "global": "기타 모든 지역의 사용자 및 워크로드용입니다."
-      },
-      "modelsTitle": "프로토콜 모델 설정",
-      "modelsHint": "Codex API, Anthropic, Gemini 및 OpenAI 호환 경로에 대한 모델 허용 목록 또는 별칭을 개별적으로 설정하세요.",
-      "protocolModels": {
-        "codex": "Codex API 모델",
-        "anthropic": "Anthropic 모델",
-        "gemini": "Gemini 모델",
-        "openai": "OpenAI 호환 모델"
-      },
-      "protocolModelHints": {
-        "codex": "Codex API 설정의 models에 저장됩니다. /v1/models에서 가져온 후 필요한 경우 별칭을 설정하세요.",
-        "anthropic": "Anthropic 설정의 models에 저장됩니다. /v1/models에서 가져온 후 필요한 경우 별칭을 설정하세요.",
-        "gemini": "Gemini 설정의 models에 저장됩니다. /v1beta/models에서 가져온 후 필요한 경우 별칭을 설정하세요.",
-        "openai": "OpenAI 호환 설정의 models에 저장됩니다. /models에서 가져온 후 필요한 경우 별칭을 설정하세요."
-      },
-      "validation": {
-        "keyRequired": "모든 그룹 키에 API 키를 입력하세요.",
-        "protocolDuplicate": "각 프로토콜에는 그룹 키를 하나만 지정할 수 있습니다."
-      },
-      "openaiEntries": "OpenAI 호환 키",
-      "codexEntries": "Codex API 키",
-      "anthropicEntries": "Anthropic 키",
-      "geminiEntries": "Gemini 키",
-      "protocols": {
-        "anthropic": "Anthropic",
-        "openai": "OpenAI 호환",
-        "gemini": "Gemini",
-        "codexResponses": "Codex API (Responses)"
-      }
-    },
-    "status": {
-      "active": "활성",
-      "disabled": "비활성화됨",
-      "notSet": "설정되지 않음",
-      "none": "없음",
-      "notConfigured": "구성되지 않음",
-      "defaultSuffix": "(기본값)"
-    },
-    "detail": {
-      "title": "상세 정보",
-      "metadataTitle": "메타데이터",
-      "fields": {
-        "identifier": "식별자",
-        "baseUrl": "기본 URL",
-        "proxyUrl": "프록시 URL",
-        "prefix": "접두사",
-        "models": "모델",
-        "headers": "헤더",
-        "authIndex": "Auth Index",
-        "excludedModels": "제외 모델",
-        "apiKeyEntries": "API 키 항목"
-      }
-    },
     "form": {
-      "createEyebrow": "새로 만들기",
-      "editEyebrow": "편집",
-      "name": "이름",
-      "apiKey": "API 키",
-      "apiKeyCreatePlaceholder": "API 키를 입력하세요",
-      "apiKeyEditPlaceholder": "변경하지 않으려면 비워 두세요",
-      "baseUrl": "기본 URL",
-      "baseUrlRequiredHint": "이 공급자에는 필수 항목입니다.",
-      "proxyUrl": "프록시 URL",
-      "prefix": "접두사",
-      "priority": "우선순위",
-      "weight": "스케줄링 가중치",
-      "weightHint": "기본값 1 · ≤ 0인 경우 제외 · 최대 1,000,000",
-      "disabled": "이 항목 비활성화",
-      "disabledHint": "비활성화된 항목은 게이트웨이에서 사용되지 않습니다.",
-      "websockets": "WebSockets 활성화",
-      "testModel": "테스트 모델",
-      "testModelHint": "연결 테스트용으로만 사용되며 저장되지 않습니다.",
-      "testModelAutoWith": "자동 · {{name}}",
-      "testModelAutoEmpty": "자동 (아직 추가된 모델 없음)",
-      "testModelCustom": "{{name}} (사용자 정의)",
-      "modelsSection": "사용자 정의 모델",
       "addModel": "모델 추가",
-      "headersSection": "요청 헤더",
-      "addHeader": "헤더 추가",
-      "excludedSection": "제외 모델",
-      "excludedDisabledNote": "“*”는 전체 공급자가 비활성화됨을 의미합니다. 대신 위의 비활성화 스위치를 사용하세요.",
-      "cloakSection": "Cloak 설정",
-      "cloakMode": "모드",
-      "cloakStrict": "엄격 모드",
-      "cloakSensitiveWords": "민감한 단어 (한 줄에 하나씩)",
-      "apiKeyEntriesSection": "API 키 항목",
-      "apiKeyEntry": "키 #{{index}}",
-      "addApiKeyEntry": "키 항목 추가",
-      "showApiKey": "API 키 표시",
-      "hideApiKey": "API 키 숨기기",
       "disableCooling": "쿨다운 비활성화",
       "disableCoolingHint": "이 자격 증명 또는 공급자에 대해서만 실패 쿨다운 대기 시간을 비활성화합니다.",
       "modelImage": "이미지 엔드포인트 허용",
       "modelImageHint": "이 모델을 /v1/images/generations 및 /v1/images/edits에서 허용합니다.",
       "showAllEntries": "전체 표시 ({{count}})",
       "showFewerEntries": "간략히 표시",
-      "proxyBadge": "프록시",
       "modelBadgeImage": "이미지",
       "modelBadgeThinking": "사고",
       "thinkingConfig": "사고 기능",
@@ -2431,83 +2212,13 @@
         "xhigh": "매우 높음",
         "max": "최대",
         "auto": "자동"
-      },
-      "cloakCacheUserId": "user_id 캐시",
-      "cloakCacheUserIdHint": "API 키별로 Claude cloak user_id를 재사용합니다.",
-      "fingerprintProfile": "요청 지문",
-      "fingerprintProfileDefault": "기본값(호출자 제어)",
-      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "기본적으로 호출자의 프롬프트와 헤더를 유지하거나, Claude Code CLI 요청 지문을 사용하도록 선택합니다.",
-      "validation": {
-        "nameRequired": "이름은 필수입니다.",
-        "apiKeyRequired": "API 키를 하나 이상 입력해야 합니다.",
-        "baseUrlRequired": "기본 URL은 필수입니다.",
-        "weightInteger": "스케줄링 가중치는 정수여야 합니다.",
-        "weightMax": "스케줄링 가중치는 {{max}}을(를) 초과할 수 없습니다."
       }
-    },
-    "delete": {
-      "title": "리소스 삭제",
-      "confirm": "{{name}}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
-    },
-    "toast": {
-      "created": "생성됨",
-      "updated": "업데이트됨",
-      "deleted": "삭제됨",
-      "enabled": "활성화됨",
-      "disabled": "비활성화됨",
-      "toggleFailed": "상태 업데이트에 실패했습니다."
     },
     "unsavedChanges": {
       "title": "저장되지 않은 변경 사항을 취소하시겠습니까?",
       "message": "이 양식에 저장되지 않은 수정 사항이 있습니다. 닫으면 변경 사항이 취소됩니다.",
       "discard": "변경 사항 취소",
       "keepEditing": "계속 편집"
-    },
-    "connectivity": {
-      "test": "테스트",
-      "testAll": "모두 테스트",
-      "success": "연결 가능",
-      "baseUrlRequired": "기본 URL은 필수입니다.",
-      "endpointInvalid": "엔드포인트 URL이 올바르지 않습니다.",
-      "apiKeyRequired": "API 키는 필수입니다.",
-      "modelRequired": "테스트 모델은 필수입니다.",
-      "timeout": "{{seconds}}초 후 시간 초과되었습니다.",
-      "requestFailed": "요청에 실패했습니다."
-    },
-    "discovery": {
-      "openButton": "엔드포인트에서 가져오기",
-      "searchPlaceholder": "모델 검색",
-      "reload": "다시 로드",
-      "loading": "모델을 로드하는 중…",
-      "empty": "엔드포인트에서 반환된 모델이 없습니다.",
-      "notLoaded": "모델을 가져오려면 다시 로드를 클릭하세요.",
-      "selectAll": "모두 선택",
-      "clearAll": "선택 해제",
-      "selectedCount": "{{selected}} / {{total}}",
-      "alreadyAdded": "이미 추가됨",
-      "close": "닫기",
-      "apply": "적용 ({{count}})"
-    },
-    "toolbar": {
-      "sortBy": "정렬 기준",
-      "sort": {
-        "name": "이름",
-        "priority": "우선순위",
-        "recentSuccess": "최근 성공",
-        "directionAsc": "오름차순",
-        "directionDesc": "내림차순"
-      },
-      "filter": {
-        "allModels": "모든 모델",
-        "selectedModels": "{{selected}}/{{total}}개 모델",
-        "selectAll": "모두 선택",
-        "clear": "선택 해제",
-        "empty": "아직 설정된 모델이 없습니다."
-      }
-    },
-    "modelCatalog": {
-      "notLoaded": "로드되지 않음"
     }
   },
   "claude_reset": {

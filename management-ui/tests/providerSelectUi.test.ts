@@ -5,12 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Select } from '@/components/ui/Select';
 
 test('Provider advanced editors consistently use the shared Select instead of native menus', () => {
-  for (const file of [
-    'RuntimePolicyEditor',
-    'ProviderBehaviorEditor',
-    'ModelAdvancedFields',
-    'ErrorRulesEditor',
-  ]) {
+  for (const file of ['ModelAdvancedFields', 'ErrorRulesEditor']) {
     const source = readFileSync(
       new URL(`../src/features/providers/sheets/forms/${file}.tsx`, import.meta.url),
       'utf8'

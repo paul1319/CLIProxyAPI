@@ -1099,12 +1099,9 @@
     "copied": "Copied"
   },
   "stats": {
-    "success": "Success",
-    "failure": "Failure"
+    "success": "Success"
   },
   "status_bar": {
-    "success_short": "✓",
-    "failure_short": "✗",
     "no_requests": "No requests"
   },
   "logs": {
@@ -2138,20 +2135,6 @@
     "version": "Management UI version"
   },
   "providersPage": {
-    "behavior": {
-      "title": "Provider-specific behavior",
-      "alphaSearch": "Enable Alpha Search",
-      "alphaSearchHint": "Allow this Codex key to serve Alpha Search. The upstream must support it.",
-      "codexCloaking": "Codex request cloaking",
-      "codexCloakingHint": "Override official Codex identity headers for this API key. Default removes the credential override; OAuth-only settings do not apply here.",
-      "useDefault": "Use backend default",
-      "cloakingEnabled": "Enable cloaking",
-      "cloakingDisabled": "Disable cloaking",
-      "rebuildMidSystemMessage": "Rebuild system messages",
-      "rebuildMidSystemMessageHint": "Move Claude messages with role system into the top-level system field.",
-      "supportPromptCacheKey": "Inject prompt cache key",
-      "supportPromptCacheKeyHint": "Derive and inject prompt_cache_key for compatible requests. Enable only when the upstream supports this field."
-    },
     "modelOptions": {
       "displayName": "Display name",
       "maxContextLength": "Context length",
@@ -2178,20 +2161,6 @@
       "removeModel": "Remove model",
       "modelName": "Model name",
       "modelAlias": "Alias (optional)"
-    },
-    "runtimePolicy": {
-      "title": "Advanced runtime policy",
-      "description": "Inherit uses the parent group policy, then backend defaults. Overrides apply only to this entry.",
-      "cooling": "Cooling",
-      "inherit": "Inherit",
-      "coolingEnabled": "Enable cooling",
-      "coolingDisabled": "Disable cooling",
-      "retry": "Request retries",
-      "retryHint": "Blank inherits the group setting. Use an integer: 0 disables retries; a negative value uses the global retry policy instead of the group policy.",
-      "errorsMode": "Request error rules",
-      "override": "Override",
-      "errorsHint": "Inherit follows the parent policy. Override replaces the entire list, which may be empty. Switching modes keeps your rule draft.",
-      "invalidRetry": "Retries must be a safe integer, or blank to inherit."
     },
     "errorRules": {
       "hint": "Use the first matching rule in order; for the same status code, any condition may match.",
@@ -2222,202 +2191,14 @@
         "continue-and-cooldown": "Continue and cool down"
       }
     },
-    "header": {
-      "title": "AI Providers",
-      "activeResources": "{{active}}/{{total}} active resources",
-      "providerFamilies": "{{count}} provider families",
-      "updatedAt": "Updated {{time}}"
-    },
-    "actions": {
-      "refresh": "Refresh",
-      "syncing": "Syncing",
-      "new": "New",
-      "edit": "Edit",
-      "view": "View",
-      "delete": "Delete",
-      "cancel": "Cancel",
-      "save": "Save",
-      "create": "Create",
-      "enable": "Enable",
-      "disable": "Disable"
-    },
-    "categories": {
-      "title": "Providers",
-      "quickFill": "Quick Fill",
-      "activeCount": "{{active}}/{{total}} active"
-    },
-    "providerNames": {
-      "meta": "Muse (Meta)",
-      "gemini": "Gemini",
-      "interactions": "Interactions API",
-      "codex": "Codex",
-      "xai": "xAI",
-      "claude": "Claude",
-      "vertex": "Vertex",
-      "openaiCompatibility": "OpenAI Compatible",
-      "apikeyFun": "APIKEY.FUN",
-      "fennoAI": "FennoAI",
-      "qiniuCloud": "Qiniu Cloud",
-      "kimi": "Kimi"
-    },
-    "table": {
-      "key": "Key",
-      "baseUrl": "Base URL",
-      "prefix": "Prefix",
-      "models": "Models/Headers",
-      "status": "Status",
-      "actions": "Actions",
-      "metrics": {
-        "models": "Models",
-        "keys": "Keys",
-        "headers": "Headers"
-      },
-      "websocketsTag": "WebSockets",
-      "cloakTag": "Cloak",
-      "cliProfileTag": "CLI Profile",
-      "empty": "No resources yet, click \"New\" to add.",
-      "filterPlaceholder": "Search keys, URLs, prefixes…",
-      "description": "Manage resources under {{route}}"
-    },
-    "sponsor": {
-      "protocolSummary": "Anthropic / OpenAI / Gemini / Codex API (Responses)",
-      "detailHint": "{{provider}} is persisted into the matching API key configs by protocol; this view manages them together.",
-      "registerLink": "Register here",
-      "registerNow": "Register now",
-      "kimiPromo": "New users get API credit worth 10% of their first successful top-up, up to ¥1000. Offer ends September 30.",
-      "dashboardLink": "Dashboard",
-      "emptyRegisterHint": "No configuration yet.",
-      "apiKeyHint": "This key is only written to the selected group/protocol config.",
-      "usageCheck": "Check usage",
-      "usageChecking": "Checking",
-      "usageRemaining": "Remaining: {{amount}} {{unit}}",
-      "usageBreakdown": "Used {{used}} / Limit {{limit}}",
-      "usageStatus": "Status: {{status}}",
-      "usageInvalid": "Invalid key",
-      "usageEmpty": "The endpoint returned no usage data.",
-      "usageApiKeyRequired": "API key is required",
-      "aggregationConflict": "This grouped provider contains multiple backend configs or OpenAI keys. Edit it in the source configuration to avoid data loss.",
-      "partialMutationWarning": "The operation failed after one or more protocols may have been updated. The latest configuration was reloaded; review it before retrying.",
-      "groupedKeysTitle": "Grouped keys",
-      "groupedKeysHint": "Platform keys may be bound to a group when created. Each grouped key here manages one protocol, and model discovery only uses that protocol.",
-      "groupedKey": "Grouped key #{{index}}",
-      "addGroupedKey": "Add grouped key",
-      "removeGroupedKey": "Remove grouped key",
-      "protocol": "Group/protocol",
-      "protocolHint": "Select the group/protocol for this key.",
-      "protocolEndpoint": "Current protocol endpoint",
-      "urlMode": "{{provider}} URL",
-      "urlHint": "All URLs use the same API conventions. Saving writes only the endpoint for the current grouped protocol.",
-      "urlOptions": {
-        "standard": "Standard URL",
-        "direct": "Direct URL",
-        "domestic": "China mainland route",
-        "overseas": "Overseas route",
-        "mainlandChina": "Mainland China (recommended)",
-        "global": "Global"
-      },
-      "urlOptionDescriptions": {
-        "domestic": "For users and workloads in mainland China; usually lower latency in mainland networks.",
-        "overseas": "For overseas deployments, cross-border access, or workloads that need overseas models.",
-        "mainlandChinaRecommended": "Recommended for users and workloads on mainland China networks.",
-        "global": "For users and workloads in all other regions."
-      },
-      "modelsTitle": "Protocol model settings",
-      "modelsHint": "Configure model allowlists or aliases separately for Codex API, Anthropic, Gemini, and OpenAI-compatible routes.",
-      "protocolModels": {
-        "codex": "Codex API models",
-        "anthropic": "Anthropic models",
-        "gemini": "Gemini models",
-        "openai": "OpenAI-compatible models"
-      },
-      "protocolModelHints": {
-        "codex": "Writes to the Codex API config models. Fetch from /v1/models and set aliases if needed.",
-        "anthropic": "Writes to the Anthropic config models. Fetch from /v1/models and set aliases if needed.",
-        "gemini": "Writes to the Gemini config models. Fetch from /v1beta/models and set aliases if needed.",
-        "openai": "Writes to the OpenAI-compatible config models. Fetch from /models and set aliases if needed."
-      },
-      "validation": {
-        "keyRequired": "Enter an API key for every grouped key.",
-        "protocolDuplicate": "Each protocol can only have one grouped key."
-      },
-      "openaiEntries": "OpenAI-compatible keys",
-      "codexEntries": "Codex API keys",
-      "anthropicEntries": "Anthropic keys",
-      "geminiEntries": "Gemini keys",
-      "protocols": {
-        "anthropic": "Anthropic",
-        "openai": "OpenAI Compatible",
-        "gemini": "Gemini",
-        "codexResponses": "Codex API (Responses)"
-      }
-    },
-    "status": {
-      "active": "Active",
-      "disabled": "Disabled",
-      "notSet": "Not set",
-      "none": "None",
-      "notConfigured": "Not configured",
-      "defaultSuffix": "(default)"
-    },
-    "detail": {
-      "title": "Details",
-      "metadataTitle": "Metadata",
-      "fields": {
-        "identifier": "Identifier",
-        "baseUrl": "Base URL",
-        "proxyUrl": "Proxy URL",
-        "prefix": "Prefix",
-        "models": "Models",
-        "headers": "Headers",
-        "authIndex": "Auth Index",
-        "excludedModels": "Excluded models",
-        "apiKeyEntries": "API key entries"
-      }
-    },
     "form": {
-      "createEyebrow": "New",
-      "editEyebrow": "Edit",
-      "name": "Name",
-      "apiKey": "API key",
-      "apiKeyCreatePlaceholder": "Enter API key",
-      "apiKeyEditPlaceholder": "Leave empty to keep unchanged",
-      "baseUrl": "Base URL",
-      "baseUrlRequiredHint": "Required for this provider",
-      "proxyUrl": "Proxy URL",
-      "prefix": "Prefix",
-      "priority": "Priority",
-      "weight": "Scheduling weight",
-      "weightHint": "Default 1 · ≤ 0 is excluded · maximum 1,000,000",
-      "disabled": "Disable this entry",
-      "disabledHint": "Disabled entries won't be used by the gateway",
-      "websockets": "Enable WebSockets",
-      "testModel": "Test model",
-      "testModelHint": "Used for connectivity testing only; not saved",
-      "testModelAutoWith": "Auto · {{name}}",
-      "testModelAutoEmpty": "Auto (no models added yet)",
-      "testModelCustom": "{{name}} (custom)",
-      "modelsSection": "Custom models",
       "addModel": "Add model",
-      "headersSection": "Request headers",
-      "addHeader": "Add header",
-      "excludedSection": "Excluded models",
-      "excludedDisabledNote": "“*” means the whole provider is disabled — use the Disabled switch above instead.",
-      "cloakSection": "Cloak settings",
-      "cloakMode": "Mode",
-      "cloakStrict": "Strict mode",
-      "cloakSensitiveWords": "Sensitive words (one per line)",
-      "apiKeyEntriesSection": "API key entries",
-      "apiKeyEntry": "Key #{{index}}",
-      "addApiKeyEntry": "Add key entry",
-      "showApiKey": "Show API key",
-      "hideApiKey": "Hide API key",
       "disableCooling": "Disable cooling",
       "disableCoolingHint": "Disable failure cooldown windows only for this credential or provider",
       "modelImage": "Allow image endpoints",
       "modelImageHint": "Allow this model on /v1/images/generations and /v1/images/edits",
       "showAllEntries": "Show all ({{count}})",
       "showFewerEntries": "Show fewer",
-      "proxyBadge": "Proxy",
       "modelBadgeImage": "Image",
       "modelBadgeThinking": "Thinking",
       "thinkingConfig": "Thinking capabilities",
@@ -2431,83 +2212,13 @@
         "xhigh": "Extra high",
         "max": "Maximum",
         "auto": "Automatic"
-      },
-      "cloakCacheUserId": "Cache user_id",
-      "cloakCacheUserIdHint": "Reuse the Claude cloak user_id per API key",
-      "fingerprintProfile": "Request fingerprint",
-      "fingerprintProfileDefault": "Default (caller-owned)",
-      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "Keep the caller's prompt and headers by default, or opt in to the Claude Code CLI request fingerprint.",
-      "validation": {
-        "nameRequired": "Name is required",
-        "apiKeyRequired": "At least one API key is required",
-        "baseUrlRequired": "Base URL is required",
-        "weightInteger": "Scheduling weight must be an integer",
-        "weightMax": "Scheduling weight cannot exceed {{max}}"
       }
-    },
-    "delete": {
-      "title": "Delete resource",
-      "confirm": "Delete {{name}}? This action cannot be undone."
-    },
-    "toast": {
-      "created": "Created",
-      "updated": "Updated",
-      "deleted": "Deleted",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "toggleFailed": "Failed to update status"
     },
     "unsavedChanges": {
       "title": "Discard unsaved changes?",
       "message": "You have unsaved edits in this form. Closing will discard them.",
       "discard": "Discard changes",
       "keepEditing": "Keep editing"
-    },
-    "connectivity": {
-      "test": "Test",
-      "testAll": "Test all",
-      "success": "Reachable",
-      "baseUrlRequired": "Base URL is required",
-      "endpointInvalid": "Endpoint URL is invalid",
-      "apiKeyRequired": "API key is required",
-      "modelRequired": "Test model is required",
-      "timeout": "Timed out after {{seconds}}s",
-      "requestFailed": "Request failed"
-    },
-    "discovery": {
-      "openButton": "Fetch from endpoint",
-      "searchPlaceholder": "Search models",
-      "reload": "Reload",
-      "loading": "Loading models…",
-      "empty": "No models returned by the endpoint",
-      "notLoaded": "Click Reload to fetch models",
-      "selectAll": "Select all",
-      "clearAll": "Clear selection",
-      "selectedCount": "{{selected}} / {{total}}",
-      "alreadyAdded": "Already added",
-      "close": "Close",
-      "apply": "Apply ({{count}})"
-    },
-    "toolbar": {
-      "sortBy": "Sort by",
-      "sort": {
-        "name": "Name",
-        "priority": "Priority",
-        "recentSuccess": "Recent success",
-        "directionAsc": "Ascending",
-        "directionDesc": "Descending"
-      },
-      "filter": {
-        "allModels": "All models",
-        "selectedModels": "{{selected}}/{{total}} models",
-        "selectAll": "Select all",
-        "clear": "Clear",
-        "empty": "No models configured yet"
-      }
-    },
-    "modelCatalog": {
-      "notLoaded": "Not loaded"
     }
   },
   "claude_reset": {

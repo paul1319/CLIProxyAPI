@@ -21,10 +21,6 @@ import {
   countCredentialsByProvider,
   credentialProviderKey,
 } from '@/features/oauth/connectedCounts';
-import {
-  KIMI_CHINESE_AFFILIATE_URL,
-  KIMI_INTERNATIONAL_AFFILIATE_URL,
-} from '@/features/providers/kimi';
 import type { PluginListEntry } from '@/types';
 
 describe('OAuth dialog view resolution', () => {
@@ -224,9 +220,7 @@ describe('Add account picker', () => {
       ['zh-CN', zhCN],
     ] as const) {
       const { markup } = await renderPage(locale, translation);
-      for (const url of [KIMI_CHINESE_AFFILIATE_URL, KIMI_INTERNATIONAL_AFFILIATE_URL]) {
-        expect(markup).not.toContain(url.replace(/&/g, '&amp;'));
-      }
+      expect(markup).not.toContain('platform.kimi.');
       expect(markup).not.toContain('aff=');
       expect(markup).not.toMatch(/sponsor/i);
     }

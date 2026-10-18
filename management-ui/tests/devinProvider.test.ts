@@ -5,7 +5,6 @@ import {
   supportsAuthFileManualRefresh,
 } from '@/features/authFiles/constants';
 import { providerLabel } from '@/features/dashboard/utils';
-import { PROVIDER_LOGOS } from '@/features/providers/brandLogos';
 import { normalizeAuthFilesResponse } from '@/services/api/authFiles';
 import type { AuthFileItem, AuthFileType } from '@/types/authFile';
 import { classifyModels } from '@/utils/models';
@@ -28,8 +27,6 @@ describe('Devin provider recognition', () => {
     expect(lightIcon).toBeTruthy();
     expect(darkIcon).toBeTruthy();
     expect(darkIcon).not.toBe(lightIcon);
-    expect(PROVIDER_LOGOS.devin.src).toBe(lightIcon);
-    expect(PROVIDER_LOGOS.devin.darkSrc).toBe(darkIcon);
     expect(TYPE_COLORS.devin.light).toBeDefined();
     expect(TYPE_COLORS.devin.dark).toBeDefined();
     expect(providerLabel('devin', 'Unknown')).toBe('Devin');

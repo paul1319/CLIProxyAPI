@@ -1055,12 +1055,9 @@
     "kimi_ai_oauth_polling_error": "Không thể kiểm tra trạng thái xác thực:"
   },
   "stats": {
-    "success": "Thành công",
-    "failure": "Thất bại"
+    "success": "Thành công"
   },
   "status_bar": {
-    "success_short": "✓",
-    "failure_short": "✗",
     "no_requests": "Không có yêu cầu"
   },
   "logs": {
@@ -2094,206 +2091,20 @@
     "version": "Phiên bản giao diện quản lý"
   },
   "providersPage": {
-    "header": {
-      "title": "AI Provider",
-      "activeResources": "{{active}}/{{total}} tài nguyên đang hoạt động",
-      "providerFamilies": "{{count}} nhóm provider",
-      "updatedAt": "Cập nhật {{time}}"
-    },
-    "actions": {
-      "refresh": "Làm mới",
-      "syncing": "Đang đồng bộ",
-      "new": "Mới",
-      "edit": "Chỉnh sửa",
-      "view": "Xem",
-      "delete": "Xóa",
-      "cancel": "Hủy",
-      "save": "Lưu",
-      "create": "Tạo",
-      "enable": "Bật",
-      "disable": "Tắt"
-    },
-    "categories": {
-      "title": "Provider",
-      "quickFill": "Điền nhanh",
-      "activeCount": "{{active}}/{{total}} đang hoạt động"
-    },
     "providerNames": {
-      "gemini": "Gemini",
-      "interactions": "Interactions API",
-      "codex": "Codex",
-      "xai": "xAI",
-      "claude": "Claude",
       "claudeApi": "ClaudeAPI",
-      "vertex": "Vertex",
-      "openaiCompatibility": "Tương thích OpenAI",
-      "apikeyFun": "APIKEY.FUN",
       "code0": "Code0",
-      "fennoAI": "FennoAI",
-      "qiniuCloud": "Qiniu Cloud",
       "lmuAI": "LMU AI (Linhmou AI)",
-      "infistar": "Infistar",
-      "kimi": "Kimi",
-      "meta": "Muse (Meta)"
-    },
-    "table": {
-      "key": "Key",
-      "baseUrl": "Base URL",
-      "prefix": "Tiền tố",
-      "models": "Model/Header",
-      "status": "Trạng thái",
-      "actions": "Hành động",
-      "metrics": {
-        "models": "Model",
-        "keys": "Key",
-        "headers": "Header"
-      },
-      "websocketsTag": "WebSocket",
-      "cloakTag": "Cloak",
-      "empty": "Chưa có tài nguyên nào, nhấn \"Mới\" để thêm.",
-      "filterPlaceholder": "Tìm key, URL, tiền tố…",
-      "description": "Quản lý tài nguyên trong {{route}}",
-      "cliProfileTag": "Hồ sơ CLI"
-    },
-    "sponsor": {
-      "protocolSummary": "Anthropic / OpenAI / Gemini / Codex API (Responses)",
-      "detailHint": "{{provider}} được lưu vào cấu hình API key tương ứng theo giao thức; khung xem này quản lý chúng cùng nhau.",
-      "registerLink": "Đăng ký tại đây",
-      "registerNow": "Đăng ký ngay",
-      "dashboardLink": "Bảng điều khiển",
-      "emptyRegisterHint": "Chưa có cấu hình nào.",
-      "apiKeyHint": "Key này chỉ được ghi vào cấu hình nhóm/giao thức đã chọn.",
-      "usageCheck": "Kiểm tra mức sử dụng",
-      "usageChecking": "Đang kiểm tra",
-      "usageRemaining": "Còn lại: {{amount}} {{unit}}",
-      "usageBreakdown": "Đã dùng {{used}} / Giới hạn {{limit}}",
-      "usageStatus": "Trạng thái: {{status}}",
-      "usageInvalid": "Key không hợp lệ",
-      "usageEmpty": "Endpoint không trả về dữ liệu sử dụng nào.",
-      "usageApiKeyRequired": "Cần có API key",
-      "aggregationConflict": "Provider được nhóm này chứa nhiều cấu hình backend hoặc key OpenAI. Hãy chỉnh trong cấu hình nguồn để tránh mất dữ liệu.",
-      "partialMutationWarning": "Thao tác thất bại sau khi một hoặc nhiều giao thức có thể đã được cập nhật. Cấu hình mới nhất đã được tải lại; hãy xem lại trước khi thử lại.",
-      "groupedKeysTitle": "Key được nhóm",
-      "groupedKeysHint": "Key nền tảng có thể được gắn vào nhóm khi tạo. Mỗi key được nhóm tại đây quản lý một giao thức, và khám phá model chỉ dùng giao thức đó.",
-      "groupedKey": "Key được nhóm #{{index}}",
-      "addGroupedKey": "Thêm key được nhóm",
-      "removeGroupedKey": "Xóa key được nhóm",
-      "protocol": "Nhóm/giao thức",
-      "protocolHint": "Chọn nhóm/giao thức cho key này.",
-      "protocolEndpoint": "Endpoint giao thức hiện tại",
-      "urlMode": "URL {{provider}}",
-      "urlHint": "Mọi URL dùng cùng quy ước API. Lưu chỉ ghi endpoint của giao thức được nhóm hiện tại.",
-      "urlOptions": {
-        "standard": "URL chuẩn",
-        "direct": "URL trực tiếp",
-        "domestic": "Tuyến Trung Quốc đại lục",
-        "overseas": "Tuyến nước ngoài",
-        "mainlandChina": "Trung Quốc đại lục (khuyến nghị)",
-        "global": "Toàn cầu"
-      },
-      "urlOptionDescriptions": {
-        "domestic": "Dành cho người dùng và khối lượng công việc tại Trung Quốc đại lục; thường có độ trễ thấp hơn trên mạng đại lục.",
-        "overseas": "Dành cho triển khai nước ngoài, truy cập xuyên biên giới hoặc khối lượng công việc cần model nước ngoài.",
-        "mainlandChinaRecommended": "Khuyến nghị cho người dùng và khối lượng công việc trên mạng Trung Quốc đại lục.",
-        "global": "Dành cho người dùng và khối lượng công việc ở mọi khu vực khác."
-      },
-      "modelsTitle": "Cài đặt model giao thức",
-      "modelsHint": "Cấu hình danh sách cho phép hoặc bí danh model riêng cho các tuyến Codex API, Anthropic, Gemini và tương thích OpenAI.",
-      "protocolModels": {
-        "codex": "Model Codex API",
-        "anthropic": "Model Anthropic",
-        "gemini": "Model Gemini",
-        "openai": "Model tương thích OpenAI"
-      },
-      "protocolModelHints": {
-        "codex": "Ghi vào cấu hình model Codex API. Lấy từ /v1/models và đặt bí danh nếu cần.",
-        "anthropic": "Ghi vào cấu hình model Anthropic. Lấy từ /v1/models và đặt bí danh nếu cần.",
-        "gemini": "Ghi vào cấu hình model Gemini. Lấy từ /v1beta/models và đặt bí danh nếu cần.",
-        "openai": "Ghi vào cấu hình model tương thích OpenAI. Lấy từ /models và đặt bí danh nếu cần."
-      },
-      "validation": {
-        "keyRequired": "Nhập API key cho mọi key được nhóm.",
-        "protocolDuplicate": "Mỗi giao thức chỉ có một key được nhóm."
-      },
-      "openaiEntries": "Key tương thích OpenAI",
-      "codexEntries": "Key Codex API",
-      "anthropicEntries": "Key Anthropic",
-      "geminiEntries": "Key Gemini",
-      "protocols": {
-        "anthropic": "Anthropic",
-        "openai": "Tương thích OpenAI",
-        "gemini": "Gemini",
-        "codexResponses": "Codex API (Responses)"
-      },
-      "kimiPromo": "Người dùng mới nạp tiền lần đầu thành công sẽ được tặng hạn mức API trị giá 10% số tiền nạp, tối đa ¥1000. Ưu đãi kết thúc vào ngày 30 tháng 9."
-    },
-    "status": {
-      "active": "Đang hoạt động",
-      "disabled": "Đã tắt",
-      "notSet": "Chưa đặt",
-      "none": "Không",
-      "notConfigured": "Chưa cấu hình",
-      "defaultSuffix": "(mặc định)"
-    },
-    "detail": {
-      "title": "Chi tiết",
-      "metadataTitle": "Metadata",
-      "fields": {
-        "identifier": "Định danh",
-        "baseUrl": "Base URL",
-        "proxyUrl": "URL Proxy",
-        "prefix": "Tiền tố",
-        "models": "Model",
-        "headers": "Header",
-        "authIndex": "Chỉ mục xác thực",
-        "excludedModels": "Model bị loại trừ",
-        "apiKeyEntries": "Mục API key"
-      }
+      "infistar": "Infistar"
     },
     "form": {
-      "createEyebrow": "Mới",
-      "editEyebrow": "Chỉnh sửa",
-      "name": "Tên",
-      "apiKey": "API key",
-      "apiKeyCreatePlaceholder": "Nhập API key",
-      "apiKeyEditPlaceholder": "Để trống nếu không đổi",
-      "baseUrl": "Base URL",
-      "baseUrlRequiredHint": "Bắt buộc với provider này",
-      "proxyUrl": "URL Proxy",
-      "prefix": "Tiền tố",
-      "priority": "Ưu tiên",
-      "weight": "Trọng số điều phối",
-      "weightHint": "Mặc định 1 · ≤ 0 bị loại trừ · tối đa 1.000.000",
-      "disabled": "Tắt mục này",
-      "disabledHint": "Gateway sẽ không dùng mục đã tắt",
-      "websockets": "Bật WebSocket",
-      "testModel": "Model kiểm thử",
-      "testModelHint": "Chỉ dùng để kiểm thử kết nối; không được lưu",
-      "testModelAutoWith": "Tự động · {{name}}",
-      "testModelAutoEmpty": "Tự động (chưa thêm model nào)",
-      "testModelCustom": "{{name}} (tùy chỉnh)",
-      "modelsSection": "Model tùy chỉnh",
       "addModel": "Thêm model",
-      "headersSection": "Header yêu cầu",
-      "addHeader": "Thêm header",
-      "excludedSection": "Model bị loại trừ",
-      "excludedDisabledNote": "“*” nghĩa là toàn bộ provider bị tắt — hãy dùng công tắc Đã tắt ở trên thay thế.",
-      "cloakSection": "Cài đặt Cloak",
-      "cloakMode": "Chế độ",
-      "cloakStrict": "Chế độ nghiêm ngặt",
-      "cloakSensitiveWords": "Từ nhạy cảm (mỗi dòng một từ)",
-      "apiKeyEntriesSection": "Mục API key",
-      "apiKeyEntry": "Key #{{index}}",
-      "addApiKeyEntry": "Thêm mục key",
-      "showApiKey": "Hiện API key",
-      "hideApiKey": "Ẩn API key",
       "disableCooling": "Tắt cooling",
       "disableCoolingHint": "Chỉ tắt cửa sổ cooldown thất bại cho credential hoặc provider này",
       "modelImage": "Cho phép endpoint ảnh",
       "modelImageHint": "Cho phép model này trên /v1/images/generations và /v1/images/edits",
       "showAllEntries": "Hiện tất cả ({{count}})",
       "showFewerEntries": "Ẩn bớt",
-      "proxyBadge": "Proxy",
       "modelBadgeImage": "Ảnh",
       "modelBadgeThinking": "Suy luận",
       "thinkingConfig": "Mức suy luận được phép",
@@ -2308,98 +2119,14 @@
         "max": "Tối đa",
         "auto": "Tự động"
       },
-      "cloakCacheUserId": "Cache user_id",
-      "cloakCacheUserIdHint": "Dùng lại user_id Claude cloak theo từng API key",
       "experimentalCchSigning": "Ký CCH thử nghiệm",
-      "experimentalCchSigningHint": "Ký body /v1/messages Claude đã cloak cuối cùng bằng CCH",
-      "validation": {
-        "nameRequired": "Tên là bắt buộc",
-        "apiKeyRequired": "Cần ít nhất một API key",
-        "baseUrlRequired": "Base URL là bắt buộc",
-        "weightInteger": "Trọng số điều phối phải là số nguyên",
-        "weightMax": "Trọng số điều phối không được vượt quá {{max}}"
-      },
-      "fingerprintProfile": "Dấu vân tay yêu cầu",
-      "fingerprintProfileDefault": "Mặc định (do phía gọi kiểm soát)",
-      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "Mặc định giữ nguyên prompt và header của phía gọi, hoặc chọn sử dụng dấu vân tay yêu cầu của Claude Code CLI."
-    },
-    "delete": {
-      "title": "Xóa tài nguyên",
-      "confirm": "Xóa {{name}}? Thao tác này không thể hoàn tác."
-    },
-    "toast": {
-      "created": "Đã tạo",
-      "updated": "Đã cập nhật",
-      "deleted": "Đã xóa",
-      "enabled": "Đã bật",
-      "disabled": "Đã tắt",
-      "toggleFailed": "Không thể cập nhật trạng thái"
+      "experimentalCchSigningHint": "Ký body /v1/messages Claude đã cloak cuối cùng bằng CCH"
     },
     "unsavedChanges": {
       "title": "Hủy thay đổi chưa lưu?",
       "message": "Bạn có chỉnh sửa chưa lưu trong form này. Đóng sẽ hủy chúng.",
       "discard": "Hủy thay đổi",
       "keepEditing": "Tiếp tục chỉnh sửa"
-    },
-    "connectivity": {
-      "test": "Kiểm thử",
-      "testAll": "Kiểm thử tất cả",
-      "success": "Kết nối được",
-      "baseUrlRequired": "Cần có Base URL",
-      "endpointInvalid": "URL endpoint không hợp lệ",
-      "apiKeyRequired": "Cần có API key",
-      "modelRequired": "Cần có model kiểm thử",
-      "timeout": "Hết thời gian sau {{seconds}} giây",
-      "requestFailed": "Yêu cầu thất bại"
-    },
-    "discovery": {
-      "openButton": "Lấy từ endpoint",
-      "searchPlaceholder": "Tìm model",
-      "reload": "Tải lại",
-      "loading": "Đang tải model…",
-      "empty": "Endpoint không trả về model nào",
-      "notLoaded": "Nhấn Tải lại để lấy model",
-      "selectAll": "Chọn tất cả",
-      "clearAll": "Bỏ chọn",
-      "selectedCount": "{{selected}} / {{total}}",
-      "alreadyAdded": "Đã thêm",
-      "close": "Đóng",
-      "apply": "Áp dụng ({{count}})"
-    },
-    "toolbar": {
-      "sortBy": "Sắp xếp theo",
-      "sort": {
-        "name": "Tên",
-        "priority": "Ưu tiên",
-        "recentSuccess": "Thành công gần đây",
-        "directionAsc": "Tăng dần",
-        "directionDesc": "Giảm dần"
-      },
-      "filter": {
-        "allModels": "Mọi model",
-        "selectedModels": "{{selected}}/{{total}} model",
-        "selectAll": "Chọn tất cả",
-        "clear": "Xóa",
-        "empty": "Chưa cấu hình model nào"
-      }
-    },
-    "modelCatalog": {
-      "notLoaded": "Chưa tải"
-    },
-    "behavior": {
-      "title": "Hành vi dành riêng cho provider",
-      "alphaSearch": "Bật Alpha Search",
-      "alphaSearchHint": "Cho phép key Codex này phục vụ Alpha Search. Upstream phải hỗ trợ tính năng này.",
-      "codexCloaking": "Ngụy trang yêu cầu Codex",
-      "codexCloakingHint": "Ghi đè các header định danh Codex chính thức cho API key này. Mặc định sẽ xóa ghi đè của credential; các cài đặt chỉ dành cho OAuth không áp dụng ở đây.",
-      "useDefault": "Dùng mặc định của backend",
-      "cloakingEnabled": "Bật ngụy trang",
-      "cloakingDisabled": "Tắt ngụy trang",
-      "rebuildMidSystemMessage": "Tái cấu trúc thông điệp hệ thống",
-      "rebuildMidSystemMessageHint": "Chuyển các tin nhắn Claude có role là system vào trường system ở cấp cao nhất.",
-      "supportPromptCacheKey": "Chèn prompt cache key",
-      "supportPromptCacheKeyHint": "Tạo và chèn prompt_cache_key cho các yêu cầu tương thích. Chỉ bật khi upstream hỗ trợ trường này."
     },
     "modelOptions": {
       "displayName": "Tên hiển thị",
@@ -2427,20 +2154,6 @@
       "removeModel": "Xóa model",
       "modelName": "Tên model",
       "modelAlias": "Bí danh (tùy chọn)"
-    },
-    "runtimePolicy": {
-      "title": "Chính sách thực thi nâng cao",
-      "description": "Kế thừa sẽ dùng chính sách nhóm cha, sau đó là mặc định của backend. Ghi đè chỉ áp dụng cho mục này.",
-      "cooling": "Chiến lược Cooling",
-      "inherit": "Kế thừa",
-      "coolingEnabled": "Bật cooling",
-      "coolingDisabled": "Tắt cooling",
-      "retry": "Số lần thử lại yêu cầu",
-      "retryHint": "Để trống sẽ kế thừa cài đặt nhóm. Dùng số nguyên: 0 để tắt thử lại; giá trị âm sẽ dùng chính sách thử lại toàn cục thay vì chính sách nhóm.",
-      "errorsMode": "Quy tắc lỗi yêu cầu",
-      "override": "Ghi đè",
-      "errorsHint": "Kế thừa sẽ tuân theo chính sách cấp trên. Ghi đè sẽ thay thế toàn bộ danh sách, có thể để trống. Chuyển đổi chế độ vẫn giữ lại bản nháp quy tắc của bạn.",
-      "invalidRetry": "Số lần thử lại phải là số nguyên an toàn, hoặc để trống để kế thừa."
     },
     "errorRules": {
       "hint": "Áp dụng quy tắc khớp đầu tiên theo thứ tự; với cùng một mã trạng thái, bất kỳ điều kiện nào cũng có thể khớp.",

@@ -9,8 +9,7 @@ import {
   validateErrorRule,
   type ErrorRuleDraft,
 } from '@/features/providers/errorRules';
-import { buildRuntimePolicy, readRuntimePolicy } from '@/features/providers/runtimePolicy';
-import type { ProviderKeyConfig, RequestScopedErrorRule } from '@/types/provider';
+import type { RequestScopedErrorRule } from '@/types/provider';
 
 const validRule = (id = 'new'): ErrorRuleDraft => ({
   ...createErrorRule(id),
@@ -20,15 +19,9 @@ const validRule = (id = 'new'): ErrorRuleDraft => ({
 
 describe('provider error-rule rows', () => {
   test('deterministic read IDs do not dirty an untouched form', () => {
-    const config: ProviderKeyConfig = {
-      apiKey: 'fixture-key',
-      requestScopedErrors: [{ status: 429, match: ['quota'], action: 'stop' }],
-    };
-    expect(JSON.stringify(readRuntimePolicy(config))).toBe(
-      JSON.stringify(readRuntimePolicy(config))
-    );
-    const draft = readRuntimePolicy(config);
-    expect(buildRuntimePolicy(draft).requestScopedErrors).toEqual(config.requestScopedErrors);
+    const rules: RequestScopedErrorRule[] = [{ status: 429, match: ['quota'], action: 'stop' }];
+    expect(JSON.stringify(readErrorRules(rules))).toBe(JSON.stringify(readErrorRules(rules)));
+    expect(buildErrorRules(readErrorRules(rules))).toEqual(rules);
   });
 
   test('literal whitespace, commas, backslashes and embedded newlines are not split or trimmed', () => {
@@ -136,20 +129,5 @@ describe('provider error-rule rows', () => {
     expect(buildErrorRules(moved.filter((rule) => rule.id !== rows[0].id))).toEqual([
       { status: 429, match: ['quota'], action: 'continue' },
     ]);
-  });
-
-  test('switching inheritance keeps drafts but does not serialize them', () => {
-    const policy = {
-      ...readRuntimePolicy(),
-      errorsMode: 'override' as const,
-      errorRules: [validRule()],
-    };
-    expect(buildRuntimePolicy(policy).requestScopedErrors).toHaveLength(1);
-    const inherited = { ...policy, errorsMode: 'inherit' as const };
-    expect(buildRuntimePolicy(inherited).requestScopedErrors).toBeUndefined();
-    expect(inherited.errorRules).toBe(policy.errorRules);
-    expect(
-      buildRuntimePolicy({ ...inherited, errorsMode: 'override' }).requestScopedErrors
-    ).toEqual(buildRuntimePolicy(policy).requestScopedErrors);
   });
 });
