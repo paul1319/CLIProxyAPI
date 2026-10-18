@@ -729,8 +729,14 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 		entry["modtime"] = auth.UpdatedAt
 		entry["updated_at"] = auth.UpdatedAt
 	}
-	if !auth.LastRefreshedAt.IsZero() {
-		entry["last_refresh"] = auth.LastRefreshedAt
+	// LastRefreshedAt is runtime-only and starts zero for auths loaded from disk;
+	// the persisted metadata timestamp also covers inline executor refreshes.
+	lastRefresh := auth.LastRefreshedAt
+	if persisted, ok := extractLastRefreshTimestamp(auth.Metadata); ok && persisted.After(lastRefresh) {
+		lastRefresh = persisted
+	}
+	if !lastRefresh.IsZero() {
+		entry["last_refresh"] = lastRefresh
 	}
 	if !nextRetryAfter.IsZero() {
 		entry["next_retry_after"] = nextRetryAfter
