@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -67,9 +66,22 @@ const (
 type resetFirstCandidate struct {
 	auth *Auth
 	tier resetFirstTier
-	// weeklyResetAt is zero when the weekly reset is unknown or the window is idle.
-	weeklyResetAt time.Time
-	shortUsed     float64
+	// resetAt is the weekly reset for ready and short-limited candidates, and
+	// the weekly recovery for exhausted ones. Zero means unknown.
+	resetAt   time.Time
+	shortUsed float64
+}
+
+// before reports whether c ranks ahead of other. Candidates arrive sorted by
+// ID, so keeping the first of equal candidates breaks ties deterministically.
+func (c resetFirstCandidate) before(other resetFirstCandidate) bool {
+	if c.tier != other.tier {
+		return c.tier < other.tier
+	}
+	if c.tier == resetFirstShortLimited && c.shortUsed != other.shortUsed {
+		return c.shortUsed < other.shortUsed
+	}
+	return !c.resetAt.IsZero() && (other.resetAt.IsZero() || c.resetAt.Before(other.resetAt))
 }
 
 // Pick selects the credential with the soonest weekly reset among those with
@@ -87,82 +99,51 @@ func (s *ResetFirstSelector) Pick(ctx context.Context, provider, model string, o
 	available = preferCodexWebsocketAuths(ctx, provider, available)
 
 	maxShort := float64(s.MaxShortUtilization())
-	candidates := make([]resetFirstCandidate, 0, len(available))
-	best := resetFirstWeeklyExhausted
-	for _, auth := range available {
+	var best resetFirstCandidate
+	var unranked []*Auth
+	for i, auth := range available {
 		candidate := classifyResetFirstCandidate(auth, resetFirstUpstreamModel(ctx, auth.ID, model), now, maxShort)
-		best = min(best, candidate.tier)
-		candidates = append(candidates, candidate)
-	}
-	tier := make([]resetFirstCandidate, 0, len(candidates))
-	for _, candidate := range candidates {
-		if candidate.tier == best {
-			tier = append(tier, candidate)
+		if candidate.tier == resetFirstReady && candidate.resetAt.IsZero() {
+			unranked = append(unranked, auth)
+		}
+		if i == 0 || candidate.before(best) {
+			best = candidate
 		}
 	}
-
-	var picked *Auth
-	switch best {
-	case resetFirstReady:
-		picked = earliestWeeklyReset(tier)
-		if picked == nil {
-			unknown := make([]*Auth, 0, len(tier))
-			for _, candidate := range tier {
-				unknown = append(unknown, candidate.auth)
-			}
-			return s.unknown.Pick(ctx, provider, model, opts, unknown)
-		}
-	case resetFirstShortLimited:
-		sort.SliceStable(tier, func(i, j int) bool { return tier[i].shortUsed < tier[j].shortUsed })
-		picked = tier[0].auth
-	default:
-		picked = earliestWeeklyReset(tier)
-		if picked == nil {
-			picked = tier[0].auth
-		}
+	if best.tier == resetFirstReady && best.resetAt.IsZero() {
+		return s.unknown.Pick(ctx, provider, model, opts, unranked)
 	}
-	selectorLogEntry(ctx).Debugf("reset-first: picked auth=%s tier=%d provider=%s model=%s", picked.ID, best, provider, model)
-	return picked, nil
-}
-
-// earliestWeeklyReset returns the candidate whose weekly window resets first,
-// or nil when no candidate has a known reset. Candidates arrive ID-sorted, so
-// ties resolve deterministically.
-func earliestWeeklyReset(candidates []resetFirstCandidate) *Auth {
-	var picked *resetFirstCandidate
-	for i := range candidates {
-		candidate := &candidates[i]
-		if candidate.weeklyResetAt.IsZero() {
-			continue
-		}
-		if picked == nil || candidate.weeklyResetAt.Before(picked.weeklyResetAt) {
-			picked = candidate
-		}
-	}
-	if picked == nil {
-		return nil
-	}
-	return picked.auth
+	selectorLogEntry(ctx).Debugf("reset-first: picked auth=%s tier=%d provider=%s model=%s", best.auth.ID, best.tier, provider, model)
+	return best.auth, nil
 }
 
 func classifyResetFirstCandidate(auth *Auth, upstreamModel string, now time.Time, maxShort float64) resetFirstCandidate {
 	windows := auth.QuotaWindows.Effective(now)
 	candidate := resetFirstCandidate{auth: auth}
 	weekly := windows.Weekly
+	limits := []QuotaWindow{weekly}
 	if isFableModel(upstreamModel) {
-		// Fable has its own weekly limit and still draws on the shared windows.
-		if quotaWindowExhausted(weekly) {
-			candidate.tier = resetFirstWeeklyExhausted
-			return candidate
-		}
+		// Fable has its own weekly limit and still draws on the shared one.
 		weekly = windows.FableWeekly
+		limits = append(limits, weekly)
 	}
-	if weekly.State == QuotaWindowActive && !weekly.ResetAt.IsZero() {
-		candidate.weeklyResetAt = weekly.ResetAt
+	exhausted, recoversAt := false, time.Time{}
+	for _, limit := range limits {
+		if !quotaWindowExhausted(limit) {
+			continue
+		}
+		// The credential recovers when its last exhausted limit resets.
+		if !exhausted || (!recoversAt.IsZero() && (limit.ResetAt.IsZero() || limit.ResetAt.After(recoversAt))) {
+			recoversAt = limit.ResetAt
+		}
+		exhausted = true
 	}
-	if quotaWindowExhausted(weekly) {
-		candidate.tier = resetFirstWeeklyExhausted
+	if exhausted {
+		candidate.tier, candidate.resetAt = resetFirstWeeklyExhausted, recoversAt
 		return candidate
+	}
+	if weekly.State == QuotaWindowActive {
+		candidate.resetAt = weekly.ResetAt
 	}
 	short := windows.Short
 	switch {

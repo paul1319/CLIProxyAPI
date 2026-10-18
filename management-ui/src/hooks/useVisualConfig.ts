@@ -203,7 +203,12 @@ export function getVisualConfigValidationErrors(
     logsMaxTotalSizeMb: getNonNegativeIntegerError(values.logsMaxTotalSizeMb),
     redisUsageQueueRetentionSeconds: getRedisRetentionError(values.redisUsageQueueRetentionSeconds),
     requestRetry: getNonNegativeIntegerError(values.requestRetry),
-    routingResetFirstMaxFiveHour: getPercentError(values.routingResetFirstMaxFiveHour),
+    // The threshold only applies to reset-first; a stale value must not block
+    // saving another strategy, where the field is read-only.
+    routingResetFirstMaxFiveHour:
+      values.routingStrategy === 'reset-first'
+        ? getPercentError(values.routingResetFirstMaxFiveHour)
+        : undefined,
     maxRetryCredentials: getIntegerError(values.maxRetryCredentials),
     maxRetryInterval: getIntegerError(values.maxRetryInterval),
     authAutoRefreshWorkers: getIntegerError(values.authAutoRefreshWorkers),

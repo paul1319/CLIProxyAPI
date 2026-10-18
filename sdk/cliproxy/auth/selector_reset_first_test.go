@@ -137,6 +137,36 @@ func TestResetFirstRanksFableByItsOwnWeeklyWindow(t *testing.T) {
 	}
 }
 
+func TestResetFirstFableRecoveryFollowsTheLastExhaustedLimit(t *testing.T) {
+	selector := newTestResetFirstSelector(85)
+	// Shared weekly quota is exhausted everywhere; b recovers first.
+	got := pickResetFirst(t, context.Background(), selector, "claude-fable-5-1",
+		resetFirstAuth("a", QuotaWindows{Weekly: activeWindow(100, 72*time.Hour), FableWeekly: activeWindow(10, 24*time.Hour)}),
+		resetFirstAuth("b", QuotaWindows{Weekly: activeWindow(100, time.Hour), FableWeekly: activeWindow(10, 96*time.Hour)}),
+	)
+	if got != "b" {
+		t.Fatalf("picked %q, want b: its shared weekly quota recovers first", got)
+	}
+	// Both limits are exhausted: a credential recovers when the later one resets.
+	got = pickResetFirst(t, context.Background(), selector, "claude-fable-5-1",
+		resetFirstAuth("a", QuotaWindows{Weekly: activeWindow(100, time.Hour), FableWeekly: activeWindow(100, 80*time.Hour)}),
+		resetFirstAuth("b", QuotaWindows{Weekly: activeWindow(100, 10*time.Hour), FableWeekly: activeWindow(100, 20*time.Hour)}),
+	)
+	if got != "b" {
+		t.Fatalf("picked %q, want b: it recovers after 20h, a after 80h", got)
+	}
+}
+
+func TestResetFirstBreaksFiveHourTiesByWeeklyReset(t *testing.T) {
+	got := pickResetFirst(t, context.Background(), newTestResetFirstSelector(85), "m",
+		resetFirstAuth("a", QuotaWindows{Weekly: activeWindow(10, 72*time.Hour), Short: activeWindow(90, time.Hour)}),
+		resetFirstAuth("b", QuotaWindows{Weekly: activeWindow(10, 24*time.Hour), Short: activeWindow(90, time.Hour)}),
+	)
+	if got != "b" {
+		t.Fatalf("picked %q, want b", got)
+	}
+}
+
 func TestResetFirstUsesUpstreamModelFromContext(t *testing.T) {
 	auths := []*Auth{
 		resetFirstAuth("a", QuotaWindows{Weekly: activeWindow(10, 24*time.Hour), FableWeekly: activeWindow(10, 120*time.Hour)}),
