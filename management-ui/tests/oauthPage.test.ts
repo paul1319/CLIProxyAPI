@@ -201,63 +201,48 @@ describe('Add account picker', () => {
     const { markup } = await renderPage('en', en);
     // Visible label stays a short verb; aria-labelledby appends the provider name.
     const connectButtons = markup.match(/<button[^>]*aria-labelledby="[^"]+ [^"]+"[^>]*>/g) ?? [];
-    const regular = OAUTH_PROVIDERS.filter((provider) => !provider.sponsor);
-    expect(connectButtons.length).toBe(regular.length + 1);
+    expect(connectButtons.length).toBe(OAUTH_PROVIDERS.length + 1);
     expect(markup.match(new RegExp(`>${en.auth_login.connect}</button>`, 'g'))?.length).toBe(
-      regular.length
+      OAUTH_PROVIDERS.length
     );
     expect(markup).toMatch(/<a[^>]*href="\/auth-files"[^>]*>/);
     expect(markup).toContain(en.auth_login.credential_file_action);
   });
 
-  test('keeps both Kimi sites in one sponsored row with per-site entries', async () => {
+  test('lists both Kimi sites as ordinary sign-in rows', async () => {
     const { markup } = await renderPage('zh-CN', zhCN);
-    // One sponsored row (role=group) with two site sign-in buttons and two affiliate links
-    expect(markup.match(/role="group"/g)?.length).toBe(1);
-    const row = markup.slice(markup.indexOf('role="group"'));
-    expect(row).toContain('aria-label="Kimi 国内站"');
-    expect(row).toContain('aria-label="Kimi 国际站"');
-    expect(row).toContain('>国内站</button>');
-    expect(row).toContain('>国际站</button>');
-    expect(row).toContain(`>${zhCN.auth_login.sponsored}<`);
-    expect(row.match(/aria-label="注册开放平台 · Kimi /g)?.length).toBe(2);
+    expect(markup).not.toContain('role="group"');
+    expect(markup).toContain(`>${zhCN.auth_login.kimi_oauth_name}<`);
+    expect(markup).toContain(`>${zhCN.auth_login.kimi_ai_oauth_name}<`);
+    expect(markup).toContain('kimi.com · ');
+    expect(markup).toContain('kimi.ai · ');
   });
 
-  test('keeps each visible Kimi site name inside its accessible name', () => {
-    const sponsors = OAUTH_PROVIDERS.filter((provider) => provider.sponsor);
-    expect(sponsors.map((provider) => provider.id)).toEqual(['kimi', 'kimi-ai']);
+  test('carries no sponsorship or affiliate links', async () => {
+    for (const [locale, translation] of [
+      ['en', en],
+      ['zh-CN', zhCN],
+    ] as const) {
+      const { markup } = await renderPage(locale, translation);
+      for (const url of [KIMI_CHINESE_AFFILIATE_URL, KIMI_INTERNATIONAL_AFFILIATE_URL]) {
+        expect(markup).not.toContain(url.replace(/&/g, '&amp;'));
+      }
+      expect(markup).not.toContain('aff=');
+      expect(markup).not.toMatch(/sponsor/i);
+    }
     for (const translation of Object.values(locales)) {
       const messages = translation.auth_login as Record<string, string>;
-      for (const provider of sponsors) {
-        const nameKey = typeof provider.label === 'string' ? '' : provider.label.key;
-        const name = messages[nameKey.replace('auth_login.', '')];
-        const region = messages[provider.sponsor!.siteKey.replace('auth_login.', '')];
-        expect(region).toBeTruthy();
-        // label-in-name: saying the visible text in voice control hits the button
-        expect(name.toLowerCase()).toContain(region.toLowerCase());
-      }
-      expect(messages.sponsor_kimi_caption).toBeTruthy();
-      expect(messages.sponsor_sign_up).toBeTruthy();
-      expect(messages.sponsored).toBeTruthy();
+      expect(messages.sponsored).toBeUndefined();
+      expect(messages.kimi_sign_up_button).toBeUndefined();
     }
   });
 
-  test('keeps the sponsored row static and on system tokens', () => {
+  test('keeps the picker static and on system tokens', () => {
     const styles = readFileSync('src/features/oauth/components/ProviderPicker.module.scss', 'utf8');
-    // The sponsor is labelled, not animated: no light pools, no keyframes, no brand tint.
+    // No light pools, no keyframes, no brand tint.
     expect(styles).not.toMatch(/@keyframes|animation\s*:/);
     expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     expect(styles).not.toContain('pool');
-  });
-
-  test('keeps both Kimi registration links as safe external links', async () => {
-    const { markup } = await renderPage('en', en);
-    for (const url of [KIMI_CHINESE_AFFILIATE_URL, KIMI_INTERNATIONAL_AFFILIATE_URL]) {
-      const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;');
-      expect(markup).toMatch(
-        new RegExp(`href="${escaped}" target="_blank" rel="noopener noreferrer"`)
-      );
-    }
   });
 
   test('tells the truth about background sign-in', () => {

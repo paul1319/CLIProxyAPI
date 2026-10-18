@@ -1,4 +1,4 @@
-// Client API keys list and the Proxy URL sponsor link (Server & access / Network sections).
+// Client API keys list (Server & access) and the plain Proxy URL row (Network).
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -9,7 +9,6 @@ import i18n from '@/i18n';
 import { DEFAULT_VISUAL_VALUES } from '@/types/visualConfig';
 import { SectionConnectivity } from '@/features/config/components/sections/SectionConnectivity';
 import { SectionNetwork } from '@/features/config/components/sections/SectionNetwork';
-import { SPONSORS } from '@/features/config/sponsors';
 import { LANGUAGE_ORDER } from '@/utils/constants';
 
 const translations = i18n.cloneInstance({ lng: 'en' });
@@ -71,9 +70,8 @@ describe('client API keys list', () => {
   });
 });
 
-describe('proxy sponsor link', () => {
-  test('is a plain link in the Proxy URL row of the Network section only', () => {
-    const sponsor = SPONSORS[0];
+describe('proxy URL row', () => {
+  test('carries no sponsor link', () => {
     const network = render(
       createElement(SectionNetwork, {
         values: DEFAULT_VISUAL_VALUES,
@@ -82,12 +80,7 @@ describe('proxy sponsor link', () => {
       })
     );
     const proxyRow = network.split('id="cfg-field-proxyUrl"')[1].split('id="cfg-field-')[0];
-    expect(proxyRow).toContain(`href="${sponsor.url}"`);
-    expect(proxyRow).toContain('rel="noopener noreferrer sponsored"');
-    expect(proxyRow).not.toContain('<img');
-    const connectivity = render(
-      createElement(SectionConnectivity, { values, disabled: false, onChange: () => {} })
-    );
-    expect(connectivity).not.toContain(sponsor.url);
+    expect(proxyRow).not.toContain('<a');
+    expect(network).not.toMatch(/sponsored|bestproxy/i);
   });
 });

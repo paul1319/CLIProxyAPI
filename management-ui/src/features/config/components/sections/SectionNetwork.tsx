@@ -1,11 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { IconExternalLink } from '@/components/ui/icons';
 import type { VisualConfigValues } from '@/types/visualConfig';
-import { SPONSORS } from '../../sponsors';
 import type { ConfigSectionProps } from '../../types';
 import { getValidationMessage } from '../blocks/shared';
 import { SelectSetting, SettingGroup, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
-import styles from './Sections.module.scss';
 
 type RoutingStrategy = VisualConfigValues['routingStrategy'];
 type DisableImageGeneration = VisualConfigValues['disableImageGeneration'];
@@ -18,8 +15,6 @@ export function SectionNetwork({
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
-  // Proxy URL carries a quiet sponsor link in its description (data in sponsors.ts).
-  const sponsor = SPONSORS[0];
 
   const routingStrategyOptions: Array<{ value: RoutingStrategy; label: string }> = [
     {
@@ -62,22 +57,6 @@ export function SectionNetwork({
           fieldId="proxyUrl"
           size="lg"
           label={t('config_management.visual.sections.network.proxy_url')}
-          description={
-            sponsor ? (
-              <>
-                {t('config_management.visual.sections.network.proxy_url_sponsor_hint')}{' '}
-                <a
-                  className={styles.sponsorLink}
-                  href={sponsor.url}
-                  target="_blank"
-                  rel="noopener noreferrer sponsored"
-                >
-                  {sponsor.name}
-                  <IconExternalLink size={11} aria-hidden="true" />
-                </a>
-              </>
-            ) : undefined
-          }
           placeholder="socks5://user:pass@127.0.0.1:1080/"
           value={values.proxyUrl}
           onChange={(proxyUrl) => onChange({ proxyUrl })}

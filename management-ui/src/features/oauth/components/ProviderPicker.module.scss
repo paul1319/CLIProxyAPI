@@ -88,13 +88,6 @@
   min-width: 0;
 }
 
-.nameLine {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
 .name {
   font-size: $text-md;
   font-weight: 600;
@@ -158,74 +151,8 @@
   text-decoration: none;
 }
 
-// Sponsored row (Kimi): one row, a site button per region and a quiet affiliate line.
-.sponsorRow {
-  align-items: start;
-  padding-top: 12px;
-  padding-bottom: 12px;
-
-  .glyph,
-  .count,
-  .status,
-  .action {
-    align-self: center;
-  }
-}
-
-.sponsoredTag {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: $radius-sm;
-  background: var(--well-strong);
-  font-size: $text-xs;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
-.sponsorLine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 10px;
-  row-gap: 2px;
-  margin-top: 2px;
-  font-size: $text-sm;
-  color: var(--ink-3);
-}
-
-.sponsorLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--focus);
-  text-decoration: none;
-  border-radius: $radius-sm;
-
-  @media (hover: hover) {
-    &:hover {
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-  }
-}
-
-.siteActions {
-  .actionButton {
-    min-width: 0;
-  }
-}
-
 // Mobile: glyph · name/method · compact action on the first line; connected count and live status
-// share a quiet second line under the name. Sponsor rows put their site buttons under the text.
+// share a quiet second line under the name.
 @media (max-width: $breakpoint-mobile) {
   .list {
     display: flex;
@@ -279,22 +206,6 @@
   .actionButton {
     min-width: 0;
     min-height: 36px;
-  }
-
-  .sponsorRow {
-    grid-template-areas:
-      'glyph main main main'
-      'glyph count status status'
-      'glyph action action action';
-
-    .glyph {
-      align-self: start;
-    }
-
-    .action {
-      justify-self: start;
-      margin-top: 10px;
-    }
   }
 
   .row:hover {

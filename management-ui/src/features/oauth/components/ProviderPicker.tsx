@@ -2,7 +2,7 @@ import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StatusLamp, type LampState } from '@/components/ui/StatusLamp';
-import { IconArrowRight, IconExternalLink } from '@/components/ui/icons';
+import { IconArrowRight } from '@/components/ui/icons';
 import { BrandGlyph } from './BrandGlyph';
 import styles from './ProviderPicker.module.scss';
 
@@ -127,109 +127,6 @@ export function ProviderRow({ icon, name, caption, count, status, action }: Prov
             <IconArrowRight size={14} aria-hidden="true" />
           </Link>
         )}
-      </span>
-    </li>
-  );
-}
-
-export interface SponsorSiteEntry {
-  id: string;
-  /** Full site name ("Kimi China"): the button's accessible name. */
-  name: string;
-  /** Visible short name ("China"); a substring of `name` (label-in-name). */
-  region: string;
-  status?: RowStatus;
-  signUpUrl: string;
-}
-
-export interface SponsorRowProps {
-  icon: string;
-  title: string;
-  caption: string;
-  sponsoredLabel: string;
-  signUpLabel: string;
-  sites: SponsorSiteEntry[];
-  count?: number | null;
-  countTitle?: string;
-  onOpen: (siteId: string) => void;
-}
-
-/**
- * Sponsored provider with several sites (Kimi China / International): one row, one sign-in
- * button per site, and a quiet "Sponsored · Join Open Platform" line with per-site links.
- * Static on purpose — the sponsor is labelled, not animated.
- */
-export function SponsorRow({
-  icon,
-  title,
-  caption,
-  sponsoredLabel,
-  signUpLabel,
-  sites,
-  count,
-  countTitle,
-  onOpen,
-}: SponsorRowProps) {
-  const titleId = useId();
-  const statusId = useId();
-  const active = sites.find((site) => site.status);
-  const status: RowStatus | undefined = active?.status
-    ? { ...active.status, text: `${active.region} · ${active.status.text}` }
-    : undefined;
-
-  return (
-    <li
-      className={`${styles.row} ${styles.sponsorRow}`}
-      data-status={status?.lamp ?? 'idle'}
-      role="group"
-      aria-labelledby={titleId}
-    >
-      <Glyph icon={icon} />
-      <span className={styles.main}>
-        <span className={styles.nameLine}>
-          <span className={styles.name} id={titleId}>
-            {title}
-          </span>
-          <span className={styles.sponsoredTag}>{sponsoredLabel}</span>
-        </span>
-        <span className={styles.caption}>{caption}</span>
-        <span className={styles.sponsorLine}>
-          <span>{signUpLabel}</span>
-          {sites.map((site) => (
-            <a
-              key={site.id}
-              className={styles.sponsorLink}
-              href={site.signUpUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`${signUpLabel} · ${site.name}`}
-            >
-              {site.region}
-              <IconExternalLink size={11} aria-hidden="true" />
-            </a>
-          ))}
-        </span>
-      </span>
-      <StatusCell status={status} id={statusId} />
-      <ConnectedCount count={count} title={countTitle} />
-      <span className={`${styles.action} ${styles.siteActions}`}>
-        {sites.map((site) => (
-          <button
-            key={site.id}
-            type="button"
-            className={`btn btn-secondary btn-sm ${styles.actionButton}`}
-            onClick={() => onOpen(site.id)}
-            aria-label={site.name}
-            aria-haspopup="dialog"
-            aria-describedby={site.status ? statusId : undefined}
-            data-status={site.status?.lamp ?? 'idle'}
-          >
-            {site.status && (
-              <StatusLamp state={site.status.lamp} live={site.status.live} size={6} />
-            )}
-            {site.region}
-          </button>
-        ))}
       </span>
     </li>
   );

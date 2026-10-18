@@ -5,14 +5,7 @@ import { MetaDot, PageHeader } from '@/components/common/PageHeader';
 import { IconFileText } from '@/components/ui/icons';
 import { useAuthStore, useThemeStore } from '@/stores';
 import iconVertex from '@/assets/icons/vertex.svg';
-import { KIMI_DISPLAY_NAME } from '@/features/providers/kimi';
-import {
-  PickerGroup,
-  ProviderRow,
-  SponsorRow,
-  type RowStatus,
-  type SponsorSiteEntry,
-} from './components/ProviderPicker';
+import { PickerGroup, ProviderRow, type RowStatus } from './components/ProviderPicker';
 import { OAuthFlowDialog, type DialogHeading } from './components/OAuthFlowDialog';
 import { VertexImportDialog } from './components/VertexImportDialog';
 import {
@@ -24,7 +17,6 @@ import { useVertexImport } from './hooks/useVertexImport';
 import { useConnectedCounts } from './hooks/useConnectedCounts';
 import { connectedCountFor } from './connectedCounts';
 import {
-  isSponsor,
   OAUTH_PROVIDERS,
   resolveThemedIcon,
   supportsManualCallback,
@@ -100,11 +92,6 @@ export function OAuthPage() {
     icon: iconOf(card),
   });
 
-  const sponsorOf = (card: OAuthProviderCard) =>
-    isSponsor(card)
-      ? { url: card.sponsor.signUpUrl, label: t('auth_login.kimi_sign_up_button') }
-      : undefined;
-
   const rowStatusOf = (state: ProviderFlowState | undefined): RowStatus | undefined => {
     switch (state?.status) {
       case 'waiting':
@@ -152,24 +139,6 @@ export function OAuthPage() {
 
   const dialogCard =
     dialog?.kind === 'oauth' ? providerCards.find((card) => card.id === dialog.id) : undefined;
-  const sponsorCards = providerCards.filter(isSponsor);
-  const regularCards = providerCards.filter((card) => !isSponsor(card));
-
-  const sponsorSites: SponsorSiteEntry[] = sponsorCards.map((card) => ({
-    id: card.id,
-    name: labelOf(card),
-    region: t(card.sponsor.siteKey),
-    status: rowStatusOf(flows.states[card.id]),
-    signUpUrl: card.sponsor.signUpUrl,
-  }));
-  const sponsorCount = counts
-    ? sponsorCards.reduce((sum, card) => sum + connectedCountFor(counts, card.id), 0)
-    : null;
-  const sponsorCountTitle = counts
-    ? sponsorCards
-        .map((card) => `${card.domain ?? labelOf(card)}: ${connectedCountFor(counts, card.id)}`)
-        .join(' · ')
-    : undefined;
 
   const waitingCount = Object.values(flows.states).filter(
     (state) => state.status === 'waiting'
@@ -203,23 +172,7 @@ export function OAuthPage() {
 
       <div className={styles.groups}>
         <PickerGroup title={t('auth_login.group_sign_in')}>
-          {sponsorCards.length > 0 && (
-            <SponsorRow
-              icon={iconOf(sponsorCards[0])}
-              title={KIMI_DISPLAY_NAME}
-              caption={t('auth_login.sponsor_kimi_caption')}
-              sponsoredLabel={t('auth_login.sponsored')}
-              signUpLabel={t('auth_login.sponsor_sign_up')}
-              sites={sponsorSites}
-              count={sponsorCount}
-              countTitle={sponsorCountTitle}
-              onOpen={(siteId) => {
-                const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
-                if (card) openProvider(card);
-              }}
-            />
-          )}
-          {regularCards.map((card) => {
+          {providerCards.map((card) => {
             const state = flows.states[card.id];
             return (
               <ProviderRow
@@ -273,7 +226,6 @@ export function OAuthPage() {
           state={flows.states[dialogCard.id] ?? {}}
           text={(suffix) => flows.providerText(dialogCard.id, suffix)}
           supportsCallback={supportsManualCallback(dialogCard)}
-          sponsor={sponsorOf(dialogCard)}
           onStart={() => void flows.startAuth(dialogCard.id)}
           onCancel={() => void flows.cancelAuth(dialogCard.id)}
           onCallbackChange={(value) => flows.setCallbackInput(dialogCard.id, value)}

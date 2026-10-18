@@ -37,8 +37,6 @@ export interface OAuthFlowDialogProps {
   /** Provider-specific copy: `auth_login.<id>_<suffix>` or the plugin template. */
   text: (suffix: string) => string;
   supportsCallback: boolean;
-  /** Sponsor: adds a sign-up link to the provider hint. */
-  sponsor?: { url: string; label: string };
   onStart: () => void;
   onCancel: () => void;
   onCallbackChange: (value: string) => void;
@@ -67,28 +65,8 @@ export function OAuthFlowDialog(props: OAuthFlowDialogProps) {
   );
 }
 
-function ProviderHint({ text, sponsor }: Pick<OAuthFlowDialogProps, 'text' | 'sponsor'>) {
-  const { t } = useTranslation();
-  return (
-    <p className={styles.hint}>
-      {text('oauth_hint')}
-      {sponsor && (
-        <>
-          {' '}
-          <span className={styles.signUpPrompt}>{t('auth_login.sign_up_prompt')}</span>{' '}
-          <a
-            className={styles.inlineLink}
-            href={sponsor.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {sponsor.label}
-            <IconExternalLink size={11} aria-hidden="true" />
-          </a>
-        </>
-      )}
-    </p>
-  );
+function ProviderHint({ text }: Pick<OAuthFlowDialogProps, 'text'>) {
+  return <p className={styles.hint}>{text('oauth_hint')}</p>;
 }
 
 function Alert({ children }: { children: ReactNode }) {
@@ -107,7 +85,7 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'succe
   if (view !== 'flow') {
     return (
       <div className={styles.stack}>
-        <ProviderHint text={text} sponsor={props.sponsor} />
+        <ProviderHint text={text} />
         {view === 'failed' && (
           <Alert>
             {text('oauth_status_error')} {state.error || ''}
@@ -124,7 +102,7 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'succe
 
   return (
     <div className={styles.stack}>
-      <ProviderHint text={text} sponsor={props.sponsor} />
+      <ProviderHint text={text} />
       {isDevin && state.state && state.status === 'error' && (
         <Alert>{t('auth_login.devin_oauth_retry_hint')}</Alert>
       )}
