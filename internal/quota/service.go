@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const UsageInterval = 15 * time.Second
+const UsageInterval = 300 * time.Second
 
 // Identity uses stable account claims when available; opaque credentials use a token fingerprint.
 type Identity struct {

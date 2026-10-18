@@ -7,7 +7,7 @@ const flush = async () => {
 };
 
 describe('visible quota refresh lifecycle', () => {
-  test('restores before refreshing, waits 15 seconds after completion and pauses while hidden', async () => {
+  test('restores before refreshing, waits 300 seconds after completion and pauses while hidden', async () => {
     let visible = true;
     let pending: (() => void) | undefined;
     const calls: QuotaReadOptions[] = [];
@@ -28,7 +28,7 @@ describe('visible quota refresh lifecycle', () => {
     });
     await flush();
     expect(calls.map((call) => call.mode)).toEqual(['cached', 'refresh']);
-    expect(intervals).toEqual([15_000]);
+    expect(intervals).toEqual([300_000]);
     pending!();
     await flush();
     expect(calls.map((call) => call.mode)).toEqual(['cached', 'refresh', 'refresh']);

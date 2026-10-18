@@ -7,7 +7,7 @@ interface RefreshDependencies {
   cancel: (timer: number | undefined) => void;
 }
 
-/** Schedule from completion so an upstream round trip cannot turn a 15s TTL into 30s polling. */
+/** Schedule from completion so an upstream round trip cannot turn a 300s TTL into 600s polling. */
 export function startQuotaRefresh(deps: RefreshDependencies) {
   let stopped = false;
   let busy = false;

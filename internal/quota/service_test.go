@@ -23,7 +23,7 @@ func TestServiceObservations(t *testing.T) {
 		Fetch: func(context.Context) (json.RawMessage, error) {
 			calls++
 			if failing {
-				return nil, &FetchError{Status: 429, RetryAt: now.Add(time.Minute)}
+				return nil, &FetchError{Status: 429, RetryAt: now.Add(10 * time.Minute)}
 			}
 			return json.RawMessage(`{"remaining":42}`), nil
 		},
@@ -46,7 +46,7 @@ func TestServiceObservations(t *testing.T) {
 		t.Fatalf("first observation: %+v, calls %d", first, calls)
 	}
 	first.Body[0] = 'x'
-	now = now.Add(14 * time.Second)
+	now = now.Add(UsageInterval - time.Second)
 	if string(observe(req).Body) != `{"remaining":42}` || calls != 1 {
 		t.Fatal("fresh cache was not reused or was mutated by a caller")
 	}
@@ -57,7 +57,7 @@ func TestServiceObservations(t *testing.T) {
 		t.Fatalf("failure erased a successful observation: %+v, calls %d", failed, calls)
 	}
 	req.Force = true
-	now = now.Add(59 * time.Second)
+	now = now.Add(10*time.Minute - time.Second)
 	observe(req)
 	if calls != 2 {
 		t.Fatal("manual refresh bypassed Retry-After")
