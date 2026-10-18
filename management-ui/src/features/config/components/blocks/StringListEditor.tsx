@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
+import { IconPlus, IconX } from '@/components/ui/icons';
 import { makeClientId } from '@/types/visualConfig';
 import { ExpandableInput } from './ExpandableInput';
 import styles from './Blocks.module.scss';
@@ -52,14 +53,24 @@ export const StringListEditor = memo(function StringListEditor({
             onChange={(nextValue) => updateItem(index, nextValue)}
             disabled={disabled}
           />
-          <Button variant="ghost" size="sm" onClick={() => removeItem(index)} disabled={disabled}>
-            {t('config_management.visual.common.delete')}
-          </Button>
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => removeItem(index)}
+            disabled={disabled}
+            aria-label={`${t('config_management.visual.common.delete')}: ${item || inputAriaLabel || index + 1}`}
+            title={t('config_management.visual.common.delete')}
+          >
+            <IconX size={14} />
+          </button>
         </div>
       ))}
       <div className={styles.actionRow}>
-        <Button variant="secondary" size="sm" onClick={addItem} disabled={disabled}>
-          {t('config_management.visual.common.add')}
+        <Button variant="ghost" size="sm" onClick={addItem} disabled={disabled}>
+          <span className={styles.buttonIconLabel}>
+            <IconPlus size={14} aria-hidden="true" />
+            {t('config_management.visual.common.add')}
+          </span>
         </Button>
       </div>
     </div>

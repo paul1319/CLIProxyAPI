@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  COMMON_FIELD_IDS,
-  CONFIG_SECTION_IDS,
-  CONFIG_TAB_IDS,
-  FIELD_VALUE_KEYS,
-  SECTION_INDEX_LABELS,
-} from '@/features/config/constants';
+import { CONFIG_SECTION_IDS, CONFIG_TAB_IDS, FIELD_VALUE_KEYS } from '@/features/config/constants';
 import {
   CONFIG_FIELD_SEARCH_INDEX,
   findConfigFieldById,
@@ -17,7 +11,9 @@ import {
   countTotalErrors,
   readSavedMode,
   readSavedSection,
+  resolveDirtyFieldIds,
   resolveDirtyTabs,
+  resolveErrorFieldIds,
   resolveStatus,
   type ConfigStatusInput,
 } from '@/features/config/uiState';
@@ -95,7 +91,7 @@ describe('resolveStatus', () => {
 });
 
 describe('countSectionErrors', () => {
-  test('buckets field errors by section and mirrors common-tab fields', () => {
+  test('buckets field errors by section', () => {
     const errors: VisualConfigValidationErrors = {
       port: 'port_range',
       requestRetry: 'non_negative_integer',
@@ -109,14 +105,12 @@ describe('countSectionErrors', () => {
     expect(counts).not.toHaveProperty('quota');
     expect(counts.advanced).toBe(0);
     expect(counts.payload).toBe(0);
-    // port 由常用 tab 渲染，同一错误在两个 tab 都要可见
-    expect(counts.common).toBe(1);
+    expect(counts).not.toHaveProperty('common');
   });
 
   test('payload flag adds one to the payload tab only', () => {
     const counts = countSectionErrors(undefined, true);
     expect(counts.payload).toBe(1);
-    expect(counts.common).toBe(0);
     expect(counts.connectivity).toBe(0);
   });
 
@@ -124,7 +118,6 @@ describe('countSectionErrors', () => {
     const errors: VisualConfigValidationErrors = { port: undefined };
     const counts = countSectionErrors(errors, false);
     expect(counts.connectivity).toBe(0);
-    expect(counts.common).toBe(0);
   });
 });
 
@@ -146,15 +139,12 @@ describe('resolveDirtyTabs', () => {
     const tabs = resolveDirtyTabs(new Set(['rmSecretKey', 'streaming.bootstrapRetries']));
     expect(tabs.has('connectivity')).toBe(true);
     expect(tabs.has('streaming')).toBe(true);
-    expect(tabs.has('common')).toBe(false);
     expect(tabs.size).toBe(2);
   });
 
-  test('a common field lights both the common tab and its canonical section', () => {
+  test('a field lights only its own section (every field has exactly one home)', () => {
     const tabs = resolveDirtyTabs(new Set(['apiKeysText']));
-    expect(tabs.has('common')).toBe(true);
-    expect(tabs.has('connectivity')).toBe(true);
-    expect(tabs.size).toBe(2);
+    expect([...tabs]).toEqual(['connectivity']);
 
     expect([...resolveDirtyTabs(new Set(['quotaAntigravityCredits']))]).toEqual(['advanced']);
     expect(resolveDirtyTabs(new Set(['quotaSwitchProject', 'quotaSwitchPreviewModel'])).size).toBe(
@@ -168,24 +158,34 @@ describe('resolveDirtyTabs', () => {
   });
 });
 
+describe('dirty and error field ids', () => {
+  test('map value keys to setting rows in page order and drop unknown keys', () => {
+    expect(
+      resolveDirtyFieldIds(new Set(['githubToken', 'streaming.bootstrapRetries', 'host', 'nope']))
+    ).toEqual(['host', 'githubToken', 'streamingBootstrapRetries']);
+  });
+
+  test('only fields with a current error are listed, in page order', () => {
+    const errors: VisualConfigValidationErrors = {
+      'streaming.keepaliveSeconds': 'non_negative_integer',
+      port: 'port_range',
+      requestRetry: undefined,
+    };
+    expect(resolveErrorFieldIds(errors)).toEqual(['port', 'streamingKeepaliveSeconds']);
+    expect(resolveErrorFieldIds(undefined)).toEqual([]);
+  });
+});
+
 describe('Antigravity credits UI and search', () => {
-  test('removes the quota tab and keeps section numbering contiguous', () => {
+  test('removes the quota tab', () => {
     expect(CONFIG_TAB_IDS).not.toContain('quota');
-    expect(CONFIG_SECTION_IDS.map((id) => SECTION_INDEX_LABELS[id])).toEqual([
-      '01',
-      '02',
-      '03',
-      '04',
-      '05',
-      '06',
-    ]);
+    expect(CONFIG_SECTION_IDS).toHaveLength(6);
     expect(CONFIG_FIELD_SEARCH_INDEX.some((entry) => String(entry.sectionId) === 'quota')).toBe(
       false
     );
     for (const field of ['quotaSwitchProject', 'quotaSwitchPreviewModel']) {
       expect(findConfigFieldById(field)).toBeUndefined();
       expect(FIELD_VALUE_KEYS).not.toHaveProperty(field);
-      expect(COMMON_FIELD_IDS).not.toContain(field);
     }
     for (const query of ['switch-project', 'switch-preview-model', 'quota-exceeded']) {
       expect(searchConfigFields(query, (key) => key)).toEqual([]);
@@ -209,13 +209,14 @@ describe('Antigravity credits UI and search', () => {
     }
   });
 
-  test('renders credits inside the Advanced Antigravity group, not common', async () => {
+  test('renders credits inside the Advanced Antigravity group', async () => {
     const root = 'src/features/config';
-    const advanced = await Bun.file(`${root}/components/sections/SectionAdvanced.tsx`).text();
-    const group = advanced.slice(
-      advanced.indexOf("label={t('config_management.visual.sections.advanced.antigravity_title')}"),
-      advanced.indexOf("label={t('config_management.visual.sections.advanced.devin_title')}")
-    );
+    const providers = await Bun.file(`${root}/components/sections/SectionProviders.tsx`).text();
+    const start = providers.indexOf('<SettingGroup group="antigravity">');
+    const end = providers.indexOf('<SettingGroup group="devin">');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const group = providers.slice(start, end);
     expect(group).toContain('fieldId="quotaAntigravityCredits"');
     expect(group).toContain('checked={values.quotaAntigravityCredits}');
     expect(group).toContain(
@@ -223,8 +224,8 @@ describe('Antigravity credits UI and search', () => {
     );
     expect(group).toContain('config_management.visual.sections.advanced.antigravity_credits');
     for (const file of [
-      'components/sections/SectionCommon.tsx',
-      'components/fields/sharedFields.tsx',
+      'components/sections/SectionAdvanced.tsx',
+      'components/sections/SectionProviders.tsx',
       'ConfigPage.tsx',
     ]) {
       const source = await Bun.file(`${root}/${file}`).text();
@@ -290,15 +291,16 @@ describe('localStorage readers', () => {
   test('readSavedMode falls back to visual on unknown values', () => {
     expect(readSavedMode('source')).toBe('source');
     expect(readSavedMode('visual')).toBe('visual');
-    expect(readSavedMode('full')).toBe('visual'); // 旧「简单/完整」值域不再合法
+    expect(readSavedMode('full')).toBe('visual'); // the retired simple/full values are invalid
     expect(readSavedMode(null)).toBe('visual');
   });
 
-  test('readSavedSection falls back to common on stale values', () => {
-    expect(readSavedSection('quota')).toBe('common');
+  test('readSavedSection falls back to the first section on stale values', () => {
+    expect(readSavedSection('quota')).toBe('connectivity');
     expect(readSavedSection('payload')).toBe('payload');
-    expect(readSavedSection('common')).toBe('common');
-    expect(readSavedSection('server')).toBe('common'); // 历史分区 id 不再存在
-    expect(readSavedSection(null)).toBe('common');
+    // The removed "Common" alias view migrates to the section that owns host/port/API keys.
+    expect(readSavedSection('common')).toBe('connectivity');
+    expect(readSavedSection('server')).toBe('connectivity'); // historical section id
+    expect(readSavedSection(null)).toBe('connectivity');
   });
 });

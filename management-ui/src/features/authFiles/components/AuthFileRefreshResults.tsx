@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { StatusLamp } from '@/components/ui/StatusLamp';
 import type { AuthFileRefreshResult } from '@/services/api/authFiles';
 import styles from './AuthFileRefreshResults.module.scss';
 
@@ -9,7 +10,7 @@ export function AuthFileRefreshResultsContent({ results }: { results: AuthFileRe
   const success = results.filter((result) => result.success).length;
   return (
     <div>
-      <p role="status">
+      <p role="status" className={styles.summary}>
         {results.length === 0
           ? t('auth_files.refresh_all_empty')
           : t('auth_files.refresh_all_summary', { success, failed: results.length - success })}
@@ -17,7 +18,8 @@ export function AuthFileRefreshResultsContent({ results }: { results: AuthFileRe
       <ul className={styles.results}>
         {results.map((result, index) => (
           <li key={`${result.id}:${index}`} className={styles.result}>
-            <strong className={styles.identity}>{result.id}</strong>
+            <StatusLamp state={result.success ? 'ok' : 'fault'} size={6} />
+            <span className={styles.identity}>{result.id}</span>
             <span className={result.success ? styles.success : styles.failure}>
               {t(
                 result.success

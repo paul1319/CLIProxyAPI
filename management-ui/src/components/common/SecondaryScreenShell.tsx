@@ -1,5 +1,4 @@
 import { forwardRef, type ReactNode } from 'react';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { IconChevronLeft } from '@/components/ui/icons';
 import styles from './SecondaryScreenShell.module.scss';
@@ -43,26 +42,23 @@ export const SecondaryScreenShell = forwardRef<HTMLDivElement, SecondaryScreenSh
     return (
       <div className={containerClassName} ref={ref}>
         <div className={[styles.topBar, topBarClassName].filter(Boolean).join(' ')}>
-          {onBack ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              className={styles.backButton}
-              aria-label={resolvedBackAriaLabel}
-            >
-              <span className={styles.backIcon}>
-                <IconChevronLeft size={18} />
-              </span>
-              <span className={styles.backText}>{backLabel}</span>
-            </Button>
-          ) : (
-            <div />
-          )}
-          <div className={styles.topBarTitle} title={titleTooltip}>
-            {title}
+          <div className={styles.heading}>
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className={styles.backButton}
+                aria-label={resolvedBackAriaLabel}
+              >
+                <IconChevronLeft size={14} />
+                <span>{backLabel}</span>
+              </button>
+            ) : null}
+            <h1 className={styles.topBarTitle} title={titleTooltip}>
+              {title}
+            </h1>
           </div>
-          <div className={styles.rightSlot}>{rightAction}</div>
+          {rightAction ? <div className={styles.rightSlot}>{rightAction}</div> : null}
         </div>
 
         {isLoading ? (

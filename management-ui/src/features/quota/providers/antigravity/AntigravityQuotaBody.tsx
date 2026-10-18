@@ -1,5 +1,5 @@
 /**
- * Antigravity 额度渲染体：套餐 chip 行（ultra/ultra-lite=金卡）+ 分组水位条。
+ * Antigravity quota body: plan chip row (ultra/ultra-lite = premium tier) plus grouped meters.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -107,7 +107,7 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
       ),
     [quota.groups]
   );
-  // 首屏直接显示准确文案；后续 effect 会在最近的分钟边界更新并重新排程。
+  // Show accurate copy on first paint; the effect below re-renders on the next minute boundary and reschedules.
   const [nowMs, setNowMs] = useState(() => Date.now() + serverTimeOffsetMs);
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                   </span>
                 )}
               </div>
-              {group.buckets.map((bucket, index) => {
+              {group.buckets.map((bucket) => {
                 const clamped = Math.max(0, Math.min(1, bucket.remainingFraction));
                 const percent = clamped * 100;
                 const percentLabel = shouldShowAntigravityQuotaAvailable(bucket, group.buckets)
@@ -214,7 +214,7 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                         </span>
                       </div>
                     </div>
-                    <QuotaMeter percent={percent} classes={classes} index={index} />
+                    <QuotaMeter percent={percent} classes={classes} />
                   </div>
                 );
               })}

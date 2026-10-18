@@ -134,7 +134,7 @@ export function ClaudeQuotaBody({ quota, classes }: QuotaBodyProps<ClaudeQuotaSt
       {windows.length === 0 && !extraUsage && !quota.dollarWindows?.length ? (
         <div className={classes.quotaMessage}>{t('claude_quota.empty_windows')}</div>
       ) : (
-        windows.map((window, index) => {
+        windows.map((window) => {
           const used = window.usedPercent;
           const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
           const remaining =
@@ -165,7 +165,7 @@ export function ClaudeQuotaBody({ quota, classes }: QuotaBodyProps<ClaudeQuotaSt
                   )}
                 </div>
               </div>
-              <QuotaMeter percent={remaining} classes={classes} index={index} />
+              <QuotaMeter percent={remaining} classes={classes} />
             </div>
           );
         })

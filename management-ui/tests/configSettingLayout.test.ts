@@ -1,15 +1,19 @@
-// 两列排布不变量：渲染每个分区，逐个列表检查——任何一行都不会在右侧留下空格。
-// 落单补整行只看 SettingList 直接子元素的 props，包装组件把 wide 藏在内部就会算错奇偶；
-// 这里用真实分区渲染兜住这类回归。
+// One setting per row, grouped: every section renders its settings as headed groups in the order
+// of the group registry (groups.ts), each group lists exactly its registered fields, and every
+// field anchor appears once. The section index (group anchors, unsaved dots) relies on this.
 
 import { describe, expect, mock, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_VISUAL_VALUES } from '@/types/visualConfig';
-import { resolveRowSpans } from '@/features/config/components/fields/rowSpans';
+import { CONFIG_SECTION_IDS } from '@/features/config/constants';
+import { CONFIG_SECTION_GROUPS } from '@/features/config/groups';
+import { CONFIG_FIELD_SEARCH_INDEX } from '@/features/config/searchIndex';
 
-// bun 把 CSS Module 解析成路径字符串，类名全是 undefined；改成按原名回显，才能在标记里看到 rowWide。
+// Bun resolves CSS modules to path strings (class names undefined); echo the original names so the
+// markup shows row / list classes.
 mock.module(
   join(import.meta.dir, '../src/features/config/components/fields/Field.module.scss'),
   () => ({
@@ -20,7 +24,6 @@ mock.module(
 const { I18nextProvider } = await import('react-i18next');
 const { default: i18n } = await import('@/i18n');
 const sections = {
-  common: (await import('@/features/config/components/sections/SectionCommon')).SectionCommon,
   connectivity: (await import('@/features/config/components/sections/SectionConnectivity'))
     .SectionConnectivity,
   network: (await import('@/features/config/components/sections/SectionNetwork')).SectionNetwork,
@@ -28,6 +31,7 @@ const sections = {
   streaming: (await import('@/features/config/components/sections/SectionStreaming'))
     .SectionStreaming,
   advanced: (await import('@/features/config/components/sections/SectionAdvanced')).SectionAdvanced,
+  payload: (await import('@/features/config/components/sections/SectionPayload')).SectionPayload,
 } as Record<string, ComponentType<Record<string, unknown>>>;
 
 const translations = i18n.cloneInstance({ lng: 'en' });
@@ -39,53 +43,85 @@ const render = (Section: ComponentType<Record<string, unknown>>, tlsEnable: bool
       createElement(Section, {
         values: { ...DEFAULT_VISUAL_VALUES, tlsEnable },
         disabled: false,
+        hasPayloadValidationErrors: false,
         onChange: () => {},
       })
     )
   );
 
-/** 每个列表容器里按顺序排列的行：[fieldId, 是否占整行]。列表之间不嵌套。 */
-function listsOf(markup: string) {
+/** Group ids in render order, each with the field anchors rendered inside it. */
+function groupsOf(markup: string) {
   return markup
-    .split('class="list"')
+    .split('<section id="cfg-group-')
     .slice(1)
-    .map((chunk) =>
-      [...chunk.split('class="group"')[0].matchAll(/<div id="cfg-field-([^"]+)" class="([^"]*)"/g)]
-        .filter(([, , classes]) => classes.split(' ').includes('row'))
-        .map(([, fieldId, classes]) => ({ fieldId, wide: classes.split(' ').includes('rowWide') }))
-    );
+    .map((chunk) => ({
+      id: chunk.slice(0, chunk.indexOf('"')),
+      fields: [...chunk.matchAll(/id="cfg-field-([^"]+)"/g)].map(([, fieldId]) => fieldId),
+    }));
 }
 
-describe('two-column setting layout', () => {
-  for (const [name, Section] of Object.entries(sections)) {
-    for (const tlsEnable of name === 'connectivity' ? [false, true] : [false]) {
-      test(`${name}${tlsEnable ? ' (TLS on)' : ''}: no list leaves a half-empty row`, () => {
-        const lists = listsOf(render(Section, tlsEnable));
-        expect(lists.length).toBeGreaterThan(0);
-        for (const rows of lists) {
-          expect(rows.length).toBeGreaterThan(0);
-          const wide = rows.map((row) => row.wide);
-          // 已经排好的版式再算一遍不应再有需要补整行的落单行
-          expect({ rows: rows.map((row) => row.fieldId), wide: resolveRowSpans(wide) }).toEqual({
-            rows: rows.map((row) => row.fieldId),
-            wide,
-          });
+const TLS_DEPENDENT = new Set(['tlsCert', 'tlsKey']);
+
+describe('grouped one-per-row layout', () => {
+  for (const sectionId of CONFIG_SECTION_IDS) {
+    for (const tlsEnable of sectionId === 'connectivity' ? [false, true] : [false]) {
+      test(`${sectionId}${tlsEnable ? ' (TLS on)' : ''}: groups follow the registry`, () => {
+        const markup = render(sections[sectionId], tlsEnable);
+        const registry = CONFIG_SECTION_GROUPS[sectionId];
+        const groups = groupsOf(markup);
+        expect(groups.map((group) => group.id)).toEqual(registry.map((group) => group.id));
+        for (const [index, group] of groups.entries()) {
+          const expected = registry[index].fields.filter(
+            (fieldId) => tlsEnable || !TLS_DEPENDENT.has(fieldId)
+          );
+          expect(group.fields).toEqual(expected);
+        }
+        for (const fieldId of groups.flatMap((group) => group.fields)) {
+          expect(markup.split(`id="cfg-field-${fieldId}"`)).toHaveLength(2);
         }
       });
     }
   }
 
-  test('long URL and master switches keep their deliberate full-width rows', () => {
-    const common = listsOf(render(sections.common, false)).flat();
-    const network = listsOf(render(sections.network, false)).flat();
-    const connectivity = listsOf(render(sections.connectivity, true)).flat();
-    const wideOf = (rows: typeof common, fieldId: string) =>
-      rows.find((row) => row.fieldId === fieldId)?.wide;
-    expect(wideOf(common, 'proxyUrl')).toBe(true);
-    expect(wideOf(network, 'proxyUrl')).toBe(true);
-    expect(wideOf(network, 'requestRetry')).toBe(false);
-    expect(wideOf(connectivity, 'tlsEnable')).toBe(true);
-    expect(wideOf(connectivity, 'tlsCert')).toBe(false);
-    expect(wideOf(connectivity, 'tlsKey')).toBe(false);
+  test('setting rows are full-width list items, never paired into columns', () => {
+    expect(
+      existsSync(join(import.meta.dir, '../src/features/config/components/fields/rowSpans.ts'))
+    ).toBe(false);
+    for (const sectionId of ['connectivity', 'network', 'advanced']) {
+      const markup = render(sections[sectionId], true);
+      expect(markup).not.toContain('rowWide');
+      const rows = [...markup.matchAll(/<div id="cfg-field-[^"]+" class="([^"]*)"/g)].map(
+        ([, classes]) => classes.split(' ')
+      );
+      expect(rows.length).toBeGreaterThan(5);
+      for (const classes of rows) {
+        expect(classes.includes('row') || classes.includes('cell')).toBe(true);
+      }
+    }
+  });
+
+  test('the group registry covers every search index field exactly once, in its own section', () => {
+    const registered = CONFIG_SECTION_IDS.flatMap((sectionId) =>
+      CONFIG_SECTION_GROUPS[sectionId].flatMap((group) =>
+        group.fields.map((fieldId) => ({ fieldId, sectionId }))
+      )
+    );
+    expect(new Set(registered.map((entry) => entry.fieldId)).size).toBe(registered.length);
+    expect(registered.map((entry) => entry.fieldId).sort()).toEqual(
+      CONFIG_FIELD_SEARCH_INDEX.map((entry) => entry.fieldId).sort()
+    );
+    for (const entry of CONFIG_FIELD_SEARCH_INDEX) {
+      expect(registered.find((item) => item.fieldId === entry.fieldId)?.sectionId).toBe(
+        entry.sectionId
+      );
+    }
+  });
+
+  test('group ids are unique and every group title resolves in en.json', () => {
+    const groups = Object.values(CONFIG_SECTION_GROUPS).flat();
+    expect(new Set(groups.map((group) => group.id)).size).toBe(groups.length);
+    for (const group of groups) {
+      expect(translations.exists(group.titleKey)).toBe(true);
+    }
   });
 });

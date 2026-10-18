@@ -5,7 +5,7 @@ import zhTW from '@/i18n/locales/zh-TW.json';
 import ru from '@/i18n/locales/ru.json';
 
 test('provider advanced editors have complete translations in all four languages', () => {
-  for (const section of ['runtimePolicy', 'modelOptions', 'behavior'] as const) {
+  for (const section of ['modelOptions'] as const) {
     const keys = Object.keys(en.providersPage[section]).sort();
     expect(keys.length).toBeGreaterThan(0);
     for (const locale of [zhCN, zhTW, ru]) {

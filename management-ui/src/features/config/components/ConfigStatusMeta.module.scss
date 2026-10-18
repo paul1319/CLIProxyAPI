@@ -1,0 +1,19 @@
+.meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.warning {
+  color: var(--signal-warn-ink);
+}
+
+.error {
+  color: var(--signal-fault-ink);
+}

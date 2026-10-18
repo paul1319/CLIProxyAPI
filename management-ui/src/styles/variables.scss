@@ -1,17 +1,18 @@
 /**
- * SCSS 变量定义
+ * SCSS variables (compile-time). Runtime colors live in themes.scss as CSS custom properties;
+ * prefer `var(--ink)`, `var(--panel)`, `var(--signal-ok)` … in new code.
+ * The color variables below exist for legacy `rgba($x, a)` call sites and mirror the light theme.
  */
 
-// 颜色
-$primary-color: #8b8680;
-$success-color: #10b981;
-$warning-color: #c65746;
-$error-color: #c65746;
+// Colors (light-theme mirrors; do not use for new surfaces)
+$primary-color: #17181a;
+$success-color: #12904a;
+$warning-color: #c27803;
+$error-color: #d23f3f;
 
-// 灰阶
-$gray-400: #9ca3af;
+$gray-400: #a9abaf;
 
-// 间距
+// Spacing — 4px grid
 $spacing-xs: 4px;
 $spacing-sm: 8px;
 $spacing-md: 16px;
@@ -19,22 +20,38 @@ $spacing-lg: 24px;
 $spacing-xl: 32px;
 $spacing-2xl: 48px;
 
-// 圆角
+// Radius scale: badges / controls / panels / overlays
 $radius-sm: 4px;
-$radius-md: 8px;
-$radius-lg: 12px;
+$radius-md: 6px;
+$radius-lg: 8px;
+$radius-xl: 12px;
 $radius-full: 9999px;
 
-// 阴影
-$shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-$shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-$shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+// Shadows (floating layers only; panels use hairlines)
+$shadow-sm: none;
+$shadow-md: var(--shadow-float);
+$shadow-lg: var(--shadow-overlay);
 
-// 过渡
-$transition-fast: 150ms ease;
-$transition-normal: 300ms ease;
+// Motion
+$ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+$transition-fast: 120ms $ease-out;
+$transition-normal: 200ms $ease-out;
 
-// 断点
+// Type scale — 13px body, ~1.2 ratio
+$text-xs: 11px; // overlines, units
+$text-sm: 12px; // metadata, table headers
+$text-md: 13px; // body, controls
+$text-lg: 15px; // panel titles
+$text-xl: 18px; // page titles
+$text-2xl: 24px; // hero figures
+$text-3xl: 32px; // display figures
+
+// Control heights
+$control-sm: 28px;
+$control-md: 32px;
+$control-lg: 36px;
+
+// Breakpoints
 $breakpoint-mobile: 768px;
 $breakpoint-tablet: 1024px;
 
@@ -43,11 +60,6 @@ $z-dropdown: 1000;
 $z-modal: 2000;
 $z-notification: 3000;
 
-// 字体
-$font-family:
-  -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-  'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-
-$font-mono:
-  ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', 'Fira Code', Menlo, Consolas,
-  'Liberation Mono', monospace;
+// Fonts
+$font-family: var(--font-sans);
+$font-mono: var(--font-mono);

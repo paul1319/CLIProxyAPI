@@ -1,0 +1,137 @@
+@use '../../../styles/mixins' as *;
+
+/*
+ * Provider filter: underline tabs matching UnderlineTabs (13px/500, ink-3 → ink,
+ * 2px ink underline, mono counts). The hairline under the row belongs to the
+ * page toolbar so it spans the full width; the strip only scrolls.
+ */
+
+.tabs {
+  --fade: 32px;
+
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+  max-width: calc(100% + 8px);
+  /* 4px of inline room keeps the inset focus outline clear of the clipping edge. */
+  margin: 0 -4px;
+  padding: 0 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Fade the clipped edge so off-screen providers read as "more this way". */
+  &[data-overflow-end] {
+    mask-image: linear-gradient(to right, black calc(100% - var(--fade)), transparent);
+  }
+
+  &[data-overflow-start] {
+    mask-image: linear-gradient(to right, transparent, black var(--fade));
+  }
+
+  &[data-overflow-start][data-overflow-end] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade),
+      black calc(100% - var(--fade)),
+      transparent
+    );
+  }
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: $radius-sm;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-hover) var(--ease-out-strong);
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 4px;
+    bottom: 0;
+    left: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: transparent;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+}
+
+.tabActive {
+  color: var(--ink);
+
+  &::after {
+    background: var(--ink);
+  }
+}
+
+.glyph {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: $radius-sm;
+
+  img {
+    display: block;
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+  }
+}
+
+.glyphFallback {
+  color: var(--ink-2);
+  font-size: $text-xs;
+  font-weight: 600;
+}
+
+.count {
+  color: var(--ink-3);
+  font-family: $font-mono;
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover {
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}
+
+@include mobile {
+  .tab {
+    min-height: 44px;
+  }
+}

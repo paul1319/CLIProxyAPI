@@ -1,0 +1,270 @@
+@use '../../../styles/mixins' as *;
+
+/* Save bar: docked to the bottom of the content column while there are unsaved changes. */
+
+.dock {
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  margin-top: 8px;
+
+  @include mobile {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: $radius-lg;
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-float);
+  animation: save-bar-in 140ms var(--ease-out-strong) both;
+}
+
+@keyframes save-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: $text-md;
+}
+
+.summaryText {
+  @include text-ellipsis;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.toneError {
+  color: var(--signal-fault-ink);
+}
+
+.summaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: $radius-md;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-hover) var(--ease-out-strong);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .summaryButton:hover {
+    background: var(--well);
+  }
+}
+
+.summaryChevron {
+  color: var(--ink-3);
+  transition: transform var(--dur-hover) var(--ease-out-strong);
+}
+
+.summaryChevronOpen {
+  transform: rotate(180deg);
+}
+
+.errors {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.separator {
+  color: var(--ink-4);
+}
+
+.errorText {
+  color: var(--signal-fault-ink);
+  font-weight: 500;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--focus);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color var(--dur-hover) var(--ease-out-strong);
+
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.saveLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--ink-inverse) 16%, transparent);
+  color: inherit;
+  font-family: $font-mono;
+  font-size: $text-xs;
+  opacity: 0.8;
+}
+
+/* Change list popover, opens upward from the summary. */
+.popover {
+  position: absolute;
+  left: 8px;
+  bottom: calc(100% + 8px);
+  width: min(360px, calc(100% - 16px));
+  max-height: min(320px, 50vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: save-bar-in 160ms var(--ease-out-strong) both;
+}
+
+.popoverHeader {
+  padding: 10px 12px 6px;
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.changeList {
+  margin: 0;
+  padding: 0 4px 4px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.changeItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: $radius-md;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .changeItem:hover {
+    background: var(--panel-hover);
+  }
+}
+
+.changeLabel {
+  min-width: 0;
+  color: var(--ink);
+  font-size: $text-md;
+  overflow-wrap: anywhere;
+}
+
+.changeSection {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  white-space: nowrap;
+}
+
+@include mobile {
+  .bar {
+    flex-wrap: wrap;
+    padding: 8px 8px 8px 12px;
+  }
+
+  .left {
+    flex: 1 1 auto;
+    min-height: 28px;
+  }
+
+  .actions {
+    margin-left: auto;
+    justify-content: flex-end;
+
+    :global(.btn) {
+      min-height: 36px;
+    }
+  }
+
+  .kbd {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .popover {
+    animation: none;
+  }
+
+  .summaryButton,
+  .summaryChevron,
+  .linkButton {
+    transition: none;
+  }
+}

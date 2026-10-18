@@ -1,381 +1,505 @@
 @use '../../../styles/mixins' as *;
 
 /*
- * Each card spans one page-grid row per top-level block (header, overview, schedule,
- * limits, notes, manual resets) and shares those rows through subgrid, so matching
- * blocks line up across every card in the same grid row.
+ * Each card spans one section-grid row per block (header, hero, windows, footer)
+ * and shares them through subgrid, so heroes, window lists and footers line up
+ * across every card in the same row and a refresh never shifts a neighbour.
  */
 .card {
-  width: 100%;
-  max-width: 420px;
-  min-width: 0;
   display: grid;
-  grid-row: span 6;
+  grid-row: span 4;
   grid-template-rows: subgrid;
   grid-template-columns: minmax(0, 1fr);
   row-gap: 0;
+  min-width: 0;
+  margin-bottom: 16px;
   padding: 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: $text-md;
+  line-height: 1.45;
 }
-.cardEnter {
-  animation: quota-card-in 360ms var(--ease-out-strong, ease-out) both;
-  animation-delay: var(--card-delay, 0ms);
-}
-@keyframes quota-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
+
+/* Header: lamp · account · plan · freshness · refresh */
+
 .head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  min-height: $control-sm;
   margin-bottom: 12px;
+}
+
+.title {
+  flex: 1 1 auto;
   min-width: 0;
-}
-.iconWrap {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--bg-secondary);
-}
-.icon {
-  display: block;
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-.identity {
-  flex: 1;
-  min-width: 0;
-}
-.provider {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 12px;
-  @include text-ellipsis;
-}
-.fileName {
-  margin: 2px 0 0;
-  font-size: 14px;
-  line-height: 1.45;
-  font-weight: 650;
-  @include text-ellipsis;
-  letter-spacing: -0.02em;
-}
-.refresh {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.scheduleBlock {
-  min-width: 0;
-}
-.overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 12px;
-  margin: 0 0 12px;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--bg-secondary);
-}
-.overview > div {
-  min-width: 0;
-}
-.overview dt {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-.overview dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  font-size: $text-md;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+  @include text-ellipsis;
 }
+
 .plan {
-  font-size: 16px;
-  font-weight: 650;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: $radius-sm;
+  background: var(--well-strong);
+  color: var(--ink-2);
+  font-size: $text-xs;
+  font-weight: 500;
+  line-height: 20px;
+  @include text-ellipsis;
 }
-.balance {
+
+.fresh {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &[data-tone='warn'] {
+    color: var(--signal-warn-ink);
+  }
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+}
+
+.freshDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-warn);
+
+  [data-tone='fault'] > & {
+    background: var(--signal-fault);
+  }
+}
+
+.refresh {
+  @include button-reset;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: $control-sm;
+  height: $control-sm;
+  margin-right: -6px;
+  border-radius: $radius-md;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color $transition-fast,
+    color $transition-fast;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+/* Hero: remaining capacity of the most constrained gating window */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  min-width: 0;
+
+  /* Badges share the first row with the figure; the caption below spans the full width. */
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.heroMain {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 20px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-}
-.unavailable {
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: normal;
-  color: var(--text-secondary);
-}
-.muted {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.schedule {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding-bottom: 10px;
-}
-.date {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 2px 8px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.relative {
-  color: var(--text-secondary);
-}
-.limits {
-  padding: 10px 0 12px;
-  border-top: 1px solid var(--border-color);
-}
-.sectionHead {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.card h3 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-}
-.sectionHead > span {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.limit + .limit {
-  margin-top: 12px;
-}
-.limitHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-.limitHead > span {
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
-.limitHead strong {
-  font-size: 14px;
+
+.heroFigure {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+
+  &[data-tone='warn'] {
+    color: var(--signal-warn-ink);
+  }
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  &[data-tone='none'] {
+    color: var(--ink-4);
+    font-weight: 500;
+  }
+}
+
+.heroUnit {
+  margin-left: 1px;
+  font-size: $text-lg;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-3);
+
+  [data-tone='warn'] > &,
+  [data-tone='fault'] > & {
+    color: inherit;
+    opacity: 0.8;
+  }
+}
+
+.heroCaption {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+    font-weight: 500;
+  }
+}
+
+.errorText {
+  color: var(--signal-fault-ink);
+  font-weight: 500;
+}
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.textAction {
+  @include button-reset;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--focus);
+  font-size: $text-sm;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--ink-4);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.badges {
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: calc(100% - 104px);
+  margin-top: 5px;
+}
+
+.cooldown {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: $radius-sm;
+  background: var(--signal-warn-soft);
+  color: var(--signal-warn-ink);
+  font-size: $text-xs;
+  font-weight: 500;
+  line-height: 20px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.meter {
-  height: 6px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-  margin-bottom: 6px;
-}
-.meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--viz-success, var(--success-color));
-}
-.meter > span[data-level='medium'] {
-  background: var(--quota-medium-color);
-}
-.meter > span[data-level='low'] {
-  background: var(--viz-failure, var(--danger-color));
-}
-.resetDate {
+
+/* Window rows: label · meter · percent · countdown */
+
+.windows {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 3px 10px;
-  font-size: 11px;
-  color: var(--text-secondary);
+  flex-direction: column;
+  min-width: 0;
+
+  /* Spacing lives here so an empty window list leaves no slack under the hero. */
+  &:not(:empty) {
+    padding-top: 12px;
+  }
 }
-.resetDate .date {
-  font-size: 11px;
-  color: var(--text-primary);
-}
-.notes {
-  align-self: start;
-  margin: 0 0 12px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.notes p {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.notes p + p {
-  margin-top: 4px;
-}
-.notes:empty {
+
+.rows {
+  /* One column grid per card; rows subgrid into it so percent and countdown
+     columns size to the widest entry instead of a fixed guess per locale.
+     The meter column is fixed so long (translated) labels get the slack. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
   margin: 0;
   padding: 0;
-  background: transparent;
+  list-style: none;
 }
-.resets {
+
+.rowItem {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-width: 0;
+}
+
+.pool {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+  @include text-ellipsis;
+
+  .rowItem:first-child > & {
+    margin-top: 0;
+  }
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 0;
+  font-size: $text-sm;
+}
+
+.rowLabel {
+  /* Long labels wrap to a second line before truncating; the title keeps the full text. */
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  [data-hero='true'] > & {
+    color: var(--ink);
+    font-weight: 500;
+  }
+}
+
+.bar {
+  min-width: 0;
+}
+
+.rowValue {
+  min-width: 32px;
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+
+  &[data-tone='warn'] {
+    color: var(--signal-warn-ink);
+  }
+
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  &[data-tone='idle'] {
+    color: var(--ink-4);
+  }
+}
+
+.rowReset {
+  min-width: 0;
+  max-width: 96px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
+}
+
+.moreToggle {
+  @include button-reset;
+  align-self: flex-start;
+  min-height: 24px;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.note {
+  margin: 6px 0 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+}
+
+/* Footer: credits · renewal · manual resets, and the reset action */
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+  margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
+  border-top: 1px solid var(--rule);
 }
-.resetHeading,
-.expiry,
-.resetFeedback:not(:empty) {
-  padding-bottom: 10px;
+
+.footEmpty {
+  display: none;
 }
-.resetAction {
+
+.facts {
+  /* Gap-separated, so a wrapped line never ends or starts on a dangling dot. */
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+
+  strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
 }
-.resetHeading {
+
+.fact {
+  white-space: nowrap;
+}
+
+.resetLine {
+  /* Summary and action wrap as whole units: the action drops below rather than splitting the summary. */
   display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  gap: 4px 12px;
+  min-width: 0;
+  min-height: $control-sm;
 }
-.count {
-  min-width: 30px;
-  padding: 2px 8px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 650;
-  border-radius: 8px;
-  background: var(--bg-secondary);
+
+.resetSummary {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
 }
-.expiry {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.expiry .date {
-  justify-content: flex-start;
-}
+
 .resetButton {
-  width: 100%;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--border-hover);
-  border-radius: 10px;
-  background: var(--text-primary);
-  color: var(--bg-secondary);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
-.resetButton:disabled {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  border-color: var(--border-color);
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.refresh:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.refresh:focus-visible,
-.resetButton:focus-visible,
-.idleBody:focus-visible {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 3px;
-}
-.errorStrip {
-  padding: 10px 12px;
-  background: var(--warning-bg);
-  color: var(--warning-text);
-  border: 1px solid var(--warning-border);
-  border-radius: 10px;
-  margin-bottom: 16px;
-  overflow-wrap: anywhere;
-}
-.errorText {
+
+.feedback {
+  flex-basis: 100%;
   margin: 0;
-  color: var(--warning-text);
-  font-size: 12px;
-  overflow-wrap: anywhere;
+  color: var(--signal-fault-ink);
+  font-size: $text-sm;
 }
-.idleBody {
-  max-width: 100%;
-  padding: 12px;
-  margin-bottom: 16px;
-  border: 1px dashed var(--border-color);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
+
 .spinning {
-  animation: spin 1s linear infinite;
+  animation: quota-spin 0.9s linear infinite;
 }
-@keyframes spin {
+
+@keyframes quota-spin {
   to {
     transform: rotate(360deg);
   }
 }
-@media (max-width: 480px) {
-  .card {
-    padding: 14px;
-    border-radius: 16px;
+
+@media (hover: hover) and (pointer: fine) {
+  .refresh:hover:not(:disabled) {
+    background: var(--panel-hover);
+    color: var(--ink);
   }
-  .overview {
-    padding: 12px;
-    gap: 12px;
+
+  .textAction:hover:not(:disabled) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
-  .refresh {
-    width: 40px;
-    height: 40px;
-  }
-  .resetButton {
-    min-height: 40px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cardEnter,
-  .spinning {
-    animation: none;
+
+  .moreToggle:hover {
+    color: var(--ink);
   }
 }
 
-.creditDetail {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: normal;
-  color: var(--text-secondary);
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+
+  .refresh:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@include mobile {
+  .card {
+    margin-bottom: 12px;
+    padding: 14px;
+  }
+
+  .refresh {
+    width: 40px;
+    height: 40px;
+    margin: -6px -10px -6px 0;
+  }
+
+  .textAction,
+  .moreToggle,
+  .resetButton {
+    min-height: 40px;
+  }
 }

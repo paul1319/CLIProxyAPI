@@ -1,5 +1,16 @@
 .policyFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
+
+  :global(.form-group) {
+    margin-bottom: 0;
+  }
+
+  :global(.form-group) > :global(.hint) {
+    margin-top: 6px;
+  }
 }
 
 .unsupported {

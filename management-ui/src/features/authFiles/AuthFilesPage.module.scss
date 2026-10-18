@@ -1,102 +1,236 @@
 @use '../../styles/mixins' as *;
 
 /* ============================================================
- * 认证文件页壳层：纯布局，视觉细节都在各组件的 colocated 模块里。
+ * Credentials page shell: header, tab panel, accounts panel, rule panels.
+ * Component visuals live in their colocated modules.
  * ============================================================ */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
   width: 100%;
+  max-width: 1440px;
   min-width: 0;
-  /* 底部为悬浮批量条留出实时高度 */
-  padding-bottom: calc(
-    var(--auth-files-action-bar-height, 0px) + 16px + env(safe-area-inset-bottom, 0px)
-  );
 }
 
-/* ---------- 工作区（tabs + 工具栏 + 网格 + 分页） ---------- */
-
-.workbench {
+.tabPanel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
-.errorBanner {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--danger-color);
-  background: var(--bg-error-light);
-  border: 1px solid var(--warning-border);
-  border-radius: 10px;
-  padding: 9px 12px;
+/* ---------- Header ---------- */
+
+.metaFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: $radius-sm;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.metaFilterActive {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-ink);
+  text-underline-offset: 3px;
+}
+
+.updated {
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spinning {
+  animation: credentials-spin 900ms linear infinite;
+}
+
+@keyframes credentials-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chevron {
+  margin-right: -2px;
+  opacity: 0.7;
+}
+
+.iconButton {
+  width: $control-sm;
+  padding: 0 !important;
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.inlineError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 12px;
+  border-radius: $radius-md;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-sm;
   overflow-wrap: anywhere;
 }
 
-/* ---------- 卡片网格 ---------- */
+/* ---------- Empty / error / no results ---------- */
 
-.grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-  align-items: stretch;
+.emptyPanel {
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px;
 }
 
-.gridCompact {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+  border-radius: $radius-md;
+  background: var(--well-strong);
+  color: var(--ink-2);
 }
 
-/* provider tab 激活（配额模式）时卡片承载配额区，需要更宽的列。
-   值与 .grid 相同但**必须保留且排在 .gridCompact 之后**：三个类同时挂在网格上，
-   同specificity 靠源序决胜，删掉这条会让「紧凑 + 配额」从 340 掉回 260。 */
-.gridQuota {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+.emptyIconFault {
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: $text-lg;
+  font-weight: 600;
+}
+
+.emptyText {
+  margin: 0;
+  max-width: 560px;
+  color: var(--ink-3);
+  font-size: $text-md;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .emptyActions {
   display: flex;
-  align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
-  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-/* ---------- 分页 ---------- */
+.noResults {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 24px 16px;
+
+  .emptyTitle {
+    font-size: $text-md;
+  }
+
+  :global(.btn) {
+    margin-top: 6px;
+  }
+}
+
+/* ---------- Pagination ---------- */
 
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 8px 6px 16px;
+  border-top: 1px solid var(--rule);
 }
 
 .pageInfo {
-  font-family: $font-mono;
-  font-size: 12px;
+  color: var(--ink-3);
+  font-size: $text-sm;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  color: var(--text-tertiary);
-  white-space: nowrap;
 }
 
-/* ---------- OAuth 配置双卡 ---------- */
+.pageButtons {
+  display: flex;
+  gap: 2px;
+}
 
-.configGrid {
-  display: grid;
+.flip {
+  transform: rotate(180deg);
+}
+
+/* ---------- Model rules ---------- */
+
+.rules {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  grid-template-columns: minmax(0, 1fr);
-
-  @media (min-width: 1024px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  min-width: 0;
 }
 
 @include mobile {
-  .page {
-    gap: 16px;
+  .updated {
+    display: none;
+  }
+
+  // The hidden freshness label is the first child, so PageHeader's leading-ghost
+  // alignment cannot match the Refresh button; align it to the title edge here.
+  .updated + :global(.btn-ghost) {
+    margin-left: -10px;
+  }
+
+  .emptyPanel {
+    padding: 20px 16px;
+  }
+
+  .emptyActions {
+    width: 100%;
+
+    :global(.btn) {
+      flex: 1 1 auto;
+      min-height: 40px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
   }
 }

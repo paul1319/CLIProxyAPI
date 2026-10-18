@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
 import { formatPercent } from '@/utils/format';
 import { TRAFFIC_BUCKET_MINUTES, type TrafficWindow } from '../types';
 import { axisMax } from '../utils';
+import panelStyles from '../dashboard.module.scss';
 import styles from './ThroughputChart.module.scss';
 
-/** 纵轴刻度条数（含 0），即 TICK_COUNT - 1 个间隔 */
-const TICK_COUNT = 5;
+/** Gridlines including zero, i.e. TICK_COUNT - 1 intervals. */
+const TICK_COUNT = 3;
 
 /**
- * 桶时间标签。后端返回的是服务器本地时间字符串（"15:04-15:14"），
- * 优先使用它，而不是用浏览器时钟反推，避免时区不一致。
+ * Bucket time label. The backend sends server-local strings ("15:04-15:14"); prefer them
+ * over deriving times from the browser clock so time zones cannot disagree.
  */
 function bucketRangeLabel(time: string | undefined, index: number, count: number): string {
   if (time) return time;
@@ -29,11 +29,11 @@ interface ThroughputChartProps {
   traffic: TrafficWindow;
 }
 
-export function ThroughputChart({ traffic }: ThroughputChartProps) {
+function ThroughputChart({ traffic }: ThroughputChartProps) {
   const { t } = useTranslation();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const { buckets, totalSuccess, totalFailure, total, peakIndex, peakTotal } = traffic;
+  const { buckets, totalSuccess, totalFailure, total, peakTotal } = traffic;
   const scaleMax = useMemo(() => axisMax(peakTotal, TICK_COUNT - 1), [peakTotal]);
 
   const ticks = useMemo(
@@ -54,16 +54,6 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
     }));
   }, [buckets]);
 
-  const summary = t('dashboard.traffic_chart_summary', {
-    total,
-    success: totalSuccess,
-    failed: totalFailure,
-    minutes: traffic.windowMinutes,
-  });
-
-  const activeBucket = activeIndex === null ? null : buckets[activeIndex];
-  const activeTotal = activeBucket ? activeBucket.success + activeBucket.failed : 0;
-
   if (buckets.length === 0) {
     return (
       <div className={styles.placeholder}>
@@ -73,22 +63,26 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
     );
   }
 
+  const summary = t('dashboard.traffic_chart_summary', {
+    total,
+    success: totalSuccess,
+    failed: totalFailure,
+    minutes: traffic.windowMinutes,
+  });
+
+  const activeBucket = activeIndex === null ? null : buckets[activeIndex];
+  const activeTotal = activeBucket ? activeBucket.success + activeBucket.failed : 0;
+  const tooltipShift =
+    activeIndex === null
+      ? 'translateX(-50%)'
+      : activeIndex < buckets.length * 0.2
+        ? 'translateX(-10%)'
+        : activeIndex > buckets.length * 0.8
+          ? 'translateX(-90%)'
+          : 'translateX(-50%)';
+
   return (
     <figure className={styles.chart}>
-      {/* 两条序列 → 图例常驻，并直接带上数值（浅色主题下绿色对比度偏低，数值即为补偿） */}
-      <figcaption className={styles.legend}>
-        <span className={styles.legendItem}>
-          <span className={`${styles.legendSwatch} ${styles.swatchSuccess}`} aria-hidden="true" />
-          {t('stats.success')}
-          <b className={styles.legendValue}>{totalSuccess.toLocaleString()}</b>
-        </span>
-        <span className={styles.legendItem}>
-          <span className={`${styles.legendSwatch} ${styles.swatchFailure}`} aria-hidden="true" />
-          {t('stats.failure')}
-          <b className={styles.legendValue}>{totalFailure.toLocaleString()}</b>
-        </span>
-      </figcaption>
-
       <div className={styles.plot}>
         <div className={styles.yAxis} aria-hidden="true">
           {ticks.map((tick) => (
@@ -117,51 +111,28 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
             className={styles.columns}
             role="img"
             aria-label={summary}
-            onMouseLeave={() => setActiveIndex(null)}
+            onPointerLeave={() => setActiveIndex(null)}
           >
             {buckets.map((bucket, index) => {
               const bucketTotal = bucket.success + bucket.failed;
-              const successHeight = (bucket.success / scaleMax) * 100;
-              const failureHeight = (bucket.failed / scaleMax) * 100;
-              const hasBoth = bucket.success > 0 && bucket.failed > 0;
-              /* 级差按桶数归一化：不管窗口多长，整波入场都收在 360ms 内 */
-              const barDelayMs =
-                buckets.length > 1 ? Math.round((index / (buckets.length - 1)) * 360) : 0;
-
               return (
                 <div
                   key={bucket.time ?? index}
                   className={`${styles.column} ${activeIndex === index ? styles.columnActive : ''}`}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => setActiveIndex((current) => (current === index ? null : index))}
+                  onPointerEnter={() => setActiveIndex(index)}
+                  onPointerDown={() => setActiveIndex(index)}
                 >
-                  {/* 峰值直标放在 scaleY 容器之外，避免入场时被一起挤压 */}
-                  {index === peakIndex && peakTotal > 0 && (
-                    <span
-                      className={styles.peakLabel}
-                      style={{ bottom: `${Math.min(100, (bucketTotal / scaleMax) * 100)}%` }}
-                    >
-                      {peakTotal.toLocaleString()}
-                    </span>
-                  )}
-                  <div
-                    className={styles.stack}
-                    style={{ '--bar-delay': `${barDelayMs}ms` } as React.CSSProperties}
-                  >
+                  <div className={styles.stack}>
                     {bucket.failed > 0 && (
                       <span
-                        className={`${styles.segment} ${styles.segmentFailure} ${
-                          hasBoth ? styles.segmentGap : ''
-                        }`}
-                        style={{ height: `${failureHeight}%` }}
+                        className={`${styles.segment} ${styles.segmentFailure}`}
+                        style={{ height: `${(bucket.failed / scaleMax) * 100}%` }}
                       />
                     )}
                     {bucket.success > 0 && (
                       <span
-                        className={`${styles.segment} ${styles.segmentSuccess} ${
-                          bucket.failed > 0 ? styles.segmentSquareTop : ''
-                        }`}
-                        style={{ height: `${successHeight}%` }}
+                        className={`${styles.segment} ${styles.segmentSuccess}`}
+                        style={{ height: `${(bucket.success / scaleMax) * 100}%` }}
                       />
                     )}
                     {bucketTotal === 0 && <span className={styles.idleTick} />}
@@ -173,37 +144,26 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
 
           {total === 0 && <p className={styles.noRequests}>{t('status_bar.no_requests')}</p>}
 
-          {activeBucket && (
+          {activeBucket && activeIndex !== null && (
             <div
               className={styles.tooltip}
               style={{
-                left: `${((activeIndex! + 0.5) / buckets.length) * 100}%`,
-                transform:
-                  activeIndex! < buckets.length * 0.15
-                    ? 'translateX(-12%)'
-                    : activeIndex! > buckets.length * 0.85
-                      ? 'translateX(-88%)'
-                      : 'translateX(-50%)',
+                left: `${((activeIndex + 0.5) / buckets.length) * 100}%`,
+                transform: tooltipShift,
               }}
-              role="status"
+              aria-hidden="true"
             >
               <span className={styles.tooltipTime}>
-                {bucketRangeLabel(activeBucket.time, activeIndex!, buckets.length)}
+                {bucketRangeLabel(activeBucket.time, activeIndex, buckets.length)}
               </span>
               <span className={styles.tooltipRow}>
-                <span
-                  className={`${styles.legendSwatch} ${styles.swatchSuccess}`}
-                  aria-hidden="true"
-                />
+                <span className={`${styles.swatch} ${styles.swatchSuccess}`} />
                 {t('stats.success')}
                 <b>{activeBucket.success.toLocaleString()}</b>
               </span>
               <span className={styles.tooltipRow}>
-                <span
-                  className={`${styles.legendSwatch} ${styles.swatchFailure}`}
-                  aria-hidden="true"
-                />
-                {t('stats.failure')}
+                <span className={`${styles.swatch} ${styles.swatchFailure}`} />
+                {t('dashboard.figure_failures')}
                 <b>{activeBucket.failed.toLocaleString()}</b>
               </span>
               <span className={styles.tooltipRate}>
@@ -228,33 +188,72 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
         ))}
       </div>
 
-      <Collapsible className={styles.tableToggle} label={t('dashboard.traffic_table')}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col">{t('dashboard.traffic_table_window')}</th>
-              <th scope="col">{t('stats.success')}</th>
-              <th scope="col">{t('stats.failure')}</th>
-              <th scope="col">{t('dashboard.success_rate')}</th>
+      {/* Screen-reader equivalent of the hover tooltip. */}
+      <table className={styles.srOnly}>
+        <caption>{summary}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t('dashboard.traffic_table_window')}</th>
+            <th scope="col">{t('stats.success')}</th>
+            <th scope="col">{t('dashboard.figure_failures')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {buckets.map((bucket, index) => (
+            <tr key={bucket.time ?? index}>
+              <th scope="row">{bucketRangeLabel(bucket.time, index, buckets.length)}</th>
+              <td>{bucket.success}</td>
+              <td>{bucket.failed}</td>
             </tr>
-          </thead>
-          <tbody>
-            {buckets.map((bucket, index) => {
-              const bucketTotal = bucket.success + bucket.failed;
-              return (
-                <tr key={bucket.time ?? index}>
-                  <th scope="row">{bucketRangeLabel(bucket.time, index, buckets.length)}</th>
-                  <td>{bucket.success.toLocaleString()}</td>
-                  <td>{bucket.failed.toLocaleString()}</td>
-                  <td>
-                    {bucketTotal > 0 ? formatPercent((bucket.success / bucketTotal) * 100) : '—'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Collapsible>
+          ))}
+        </tbody>
+      </table>
     </figure>
+  );
+}
+
+interface ThroughputPanelProps {
+  traffic: TrafficWindow;
+  windowLabel: string;
+}
+
+/** Freshness lives in the page header next to Refresh, as on Credentials. */
+export function ThroughputPanel({ traffic, windowLabel }: ThroughputPanelProps) {
+  const { t } = useTranslation();
+  const hasBuckets = traffic.buckets.length > 0;
+
+  return (
+    <section
+      className={`${panelStyles.panel} ${styles.panel}`}
+      aria-labelledby="overview-throughput-title"
+    >
+      <header className={panelStyles.panelHeader}>
+        <div className={panelStyles.panelHeading}>
+          <h2 id="overview-throughput-title" className={panelStyles.panelTitle}>
+            {t('dashboard.throughput_title')}
+          </h2>
+          {hasBuckets && (
+            <p className={panelStyles.panelMeta}>
+              {t('dashboard.throughput_meta', { window: windowLabel })}
+            </p>
+          )}
+        </div>
+        {hasBuckets && (
+          <ul className={styles.legend}>
+            <li className={styles.legendItem}>
+              <span className={`${styles.swatch} ${styles.swatchSuccess}`} aria-hidden="true" />
+              {t('stats.success')}
+              <b>{traffic.totalSuccess.toLocaleString()}</b>
+            </li>
+            <li className={styles.legendItem}>
+              <span className={`${styles.swatch} ${styles.swatchFailure}`} aria-hidden="true" />
+              {t('dashboard.figure_failures')}
+              <b>{traffic.totalFailure.toLocaleString()}</b>
+            </li>
+          </ul>
+        )}
+      </header>
+      <ThroughputChart traffic={traffic} />
+    </section>
   );
 }

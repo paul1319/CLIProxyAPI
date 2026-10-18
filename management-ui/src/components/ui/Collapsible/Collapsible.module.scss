@@ -2,9 +2,9 @@
 @use '../../../styles/variables' as *;
 
 .root {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
   overflow: hidden;
 }
 
@@ -26,11 +26,11 @@
   }
 
   &:hover {
-    background: color-mix(in srgb, var(--accent-bg) 35%, transparent);
+    background: var(--panel-hover);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--primary-color);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 }
@@ -63,16 +63,16 @@
 
 .content {
   padding: 14px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--rule);
 }
 
 .contentFlush {
   padding: 0;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--rule);
 }
 
-/* 展开时内容 160ms 淡入。只做透明度、不做高度动画 ——
-   与程序化 details.open = true（搜索跳转强制展开）不会互相打架。 */
+/* Content fades in on open (opacity only, no height animation) so it never fights a
+   programmatic details.open = true from search jumps. */
 .root[open] > .content,
 .root[open] > .contentFlush {
   animation: collapsible-content-in var(--dur-press, 160ms) var(--ease-out-strong, ease-out);

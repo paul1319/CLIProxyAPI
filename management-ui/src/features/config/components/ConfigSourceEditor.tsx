@@ -1,8 +1,9 @@
 import { useMemo, type Ref } from 'react';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { yaml } from '@codemirror/lang-yaml';
-import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { Prec } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
+import { sourceEditorTheme } from './sourceEditorTheme';
 
 type ConfigSourceEditorProps = {
   value: string;
@@ -11,6 +12,8 @@ type ConfigSourceEditorProps = {
   theme: 'light' | 'dark';
   editable: boolean;
   placeholder: string;
+  /** Mod-F inside the editor: hand over to the page's single YAML search box. */
+  onFindShortcut?: () => void;
 };
 
 export default function ConfigSourceEditor({
@@ -20,10 +23,29 @@ export default function ConfigSourceEditor({
   theme,
   editable,
   placeholder,
+  onFindShortcut,
 }: ConfigSourceEditorProps) {
+  // CodeMirror's own search panel is intentionally not loaded: the header search box is the only
+  // search UI, so Mod-F is routed there instead of opening a second panel.
+  // Token-based theme instead of CodeMirror's stock light/dark (their red/green token colors
+  // collide with the state colors); CSS variables make one theme follow both appearances.
+  const editorTheme = useMemo(() => sourceEditorTheme(theme === 'dark'), [theme]);
   const extensions = useMemo(
-    () => [yaml(), search(), highlightSelectionMatches(), keymap.of(searchKeymap)],
-    []
+    () => [
+      yaml(),
+      Prec.highest(
+        keymap.of([
+          {
+            key: 'Mod-f',
+            run: () => {
+              onFindShortcut?.();
+              return true;
+            },
+          },
+        ])
+      ),
+    ],
+    [onFindShortcut]
   );
 
   return (
@@ -32,7 +54,7 @@ export default function ConfigSourceEditor({
       value={value}
       onChange={onChange}
       extensions={extensions}
-      theme={theme}
+      theme={editorTheme}
       editable={editable}
       placeholder={placeholder}
       height="100%"
@@ -52,7 +74,7 @@ export default function ConfigSourceEditor({
         crosshairCursor: false,
         highlightSelectionMatches: true,
         closeBracketsKeymap: true,
-        searchKeymap: true,
+        searchKeymap: false,
         foldKeymap: true,
         completionKeymap: false,
         lintKeymap: true,

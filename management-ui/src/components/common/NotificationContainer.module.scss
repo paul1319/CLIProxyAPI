@@ -1,15 +1,14 @@
 .container {
   position: fixed;
   z-index: $z-notification;
-  top: max(1rem, env(safe-area-inset-top));
-  inset-inline: 0;
-  max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - 1rem);
-  margin-inline: auto;
+  right: 0;
+  bottom: 0;
+  max-height: 100dvh;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem max(1rem, env(safe-area-inset-right)) 1.5rem max(1rem, env(safe-area-inset-left));
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 16px max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) 16px;
   overflow-y: auto;
   scrollbar-width: thin;
   pointer-events: none;
@@ -20,22 +19,21 @@
 }
 
 .notification {
-  --notification-accent: var(--text-secondary);
-  --notification-tint: var(--bg-tertiary);
+  --notification-accent: var(--ink-3);
 
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 0.625rem;
+  gap: 10px;
   flex-shrink: 0;
   width: fit-content;
-  max-width: min(26rem, 100%);
-  padding: 0.625rem 0.625rem 0.625rem 0.875rem;
-  border: 1px solid var(--border-color);
+  min-width: 240px;
+  max-width: min(400px, 100%);
+  padding: 8px 6px 8px 12px;
   border-radius: $radius-lg;
-  background: var(--floating-surface);
-  box-shadow: var(--shadow-lg), var(--shadow);
-  color: var(--text-primary);
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
   pointer-events: auto;
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -45,53 +43,53 @@
 
   @starting-style {
     opacity: 0;
-    transform: translateY(-8px) scale(0.98);
+    transform: translateY(8px) scale(0.98);
   }
 
   &[data-exiting] {
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateX(8px);
     transition-duration: 160ms;
     pointer-events: none;
   }
 }
 
 .success {
-  --notification-accent: var(--success-badge-text);
-  --notification-tint: var(--success-badge-bg);
+  --notification-accent: var(--signal-ok);
 }
 
 .warning {
-  --notification-accent: var(--amber-text);
-  --notification-tint: var(--amber-10);
+  --notification-accent: var(--signal-warn);
 }
 
 .error {
-  --notification-accent: var(--failure-badge-text);
-  --notification-tint: var(--failure-badge-bg);
+  --notification-accent: var(--signal-fault);
 }
 
 .info {
-  --notification-accent: var(--text-secondary);
+  --notification-accent: var(--ink-3);
 }
 
 .icon {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-top: 0.125rem;
-  border-radius: 50%;
-  background: var(--notification-tint);
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
   color: var(--notification-accent);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .message {
   min-width: 0;
   flex: 1;
-  padding-block: 0.3125rem;
-  font-size: 0.875rem;
+  padding-block: 4px;
+  font-size: $text-md;
   font-weight: 500;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -102,13 +100,13 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
   border-radius: $radius-md;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--ink-3);
   cursor: pointer;
   touch-action: manipulation;
   transition:
@@ -118,8 +116,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
+      background: var(--panel-hover);
+      color: var(--ink);
     }
   }
 
@@ -128,8 +126,8 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--text-secondary);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
@@ -143,6 +141,19 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .container {
+    left: 0;
+    align-items: stretch;
+    padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .notification {
+    width: auto;
+    max-width: none;
+  }
 }
 
 @media (pointer: coarse) {
@@ -176,6 +187,6 @@
 
 @media (prefers-contrast: more) {
   .notification {
-    border-color: var(--text-primary);
+    border: 1px solid var(--ink);
   }
 }

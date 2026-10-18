@@ -13,6 +13,28 @@ import { enrichQuotaInBackground } from './quotaEnrichment';
 
 const inFlight = new Map<string, Promise<void>>();
 
+/** Only a user-initiated network read may put a card or toolbar into a visible loading state. */
+export const isVisibleQuotaLoad = (options: QuotaReadOptions = {}): boolean =>
+  !options.automatic && options.mode !== 'cached';
+
+/**
+ * Whether a read should replace the card with its loading state.
+ *
+ * Background polling runs every 15 seconds. Flipping an observed card into
+ * `loading` each time spun every refresh icon, disabled reset actions and made
+ * error-only cards flash "Loading" between two identical errors. An automatic
+ * read therefore keeps whatever is on screen and only an unobserved card (or a
+ * manual read) shows progress.
+ */
+export function shouldEnterLoadingState(
+  existing: QuotaCardState | undefined,
+  options: QuotaReadOptions
+): boolean {
+  if (options.mode === 'cached') return false;
+  if (!options.automatic) return true;
+  return !existing || existing.status === 'idle';
+}
+
 /** All card hosts share loading, restore, session isolation and observation metadata. */
 export function loadQuotaEntry(
   file: AuthFileItem,
@@ -40,7 +62,7 @@ export function loadQuotaEntry(
   const options: QuotaReadOptions = { ...requested };
   const execute = async () => {
     let observed = false;
-    if (options.mode !== 'cached')
+    if (shouldEnterLoadingState(adapter.storeSelector(useQuotaStore.getState())[cacheKey], options))
       setQuota((previous) => ({ ...previous, [cacheKey]: adapter.buildLoadingState() }));
     try {
       const fetched = await adapter.fetchQuota(file, t, options);
@@ -60,6 +82,7 @@ export function loadQuotaEntry(
           stale: options.stale,
           errorStatus: options.errorStatus,
           persistenceError: options.persistenceError,
+          retryAt: options.errorStatus ? options.retryAt : undefined,
         };
         setQuota((previous) => {
           const existing = previous[cacheKey];
@@ -85,7 +108,10 @@ export function loadQuotaEntry(
         commitIfQuotaCacheCurrent(generation, () => {
           setQuota((previous) => ({
             ...previous,
-            [cacheKey]: adapter.buildErrorState(message, getStatusFromError(error)),
+            [cacheKey]: {
+              ...adapter.buildErrorState(message, getStatusFromError(error)),
+              retryAt: options.retryAt,
+            },
           }));
         });
       }

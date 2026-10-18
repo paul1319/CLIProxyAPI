@@ -1,105 +1,501 @@
-/* 凭证详情/编辑抽屉内容区 */
+@use '../../../styles/mixins' as *;
 
-.editor {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+/* Credential details sheet: tabs pinned under the sheet header, sections separated by hairlines. */
 
-.loading {
-  display: flex;
+.eyebrow,
+.headerMeta {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 24px 0;
-  justify-content: center;
-  font-size: 13px;
-  color: var(--text-secondary);
+  gap: 6px;
+  min-width: 0;
 }
 
-.error {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--danger-color);
-  background: var(--bg-error-light);
-  border: 1px solid var(--warning-border);
-  border-radius: 8px;
-  padding: 8px 10px;
+.headerMeta {
+  flex-wrap: wrap;
+  font-size: $text-sm;
+  color: var(--ink-3);
+}
+
+.dot {
+  color: var(--ink-4);
+}
+
+.mono {
+  font-family: $font-mono;
+  font-size: $text-sm;
   overflow-wrap: anywhere;
 }
 
-.jsonWrapper {
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tabs {
+  position: sticky;
+  top: -20px;
+  z-index: 2;
+  margin: -20px -20px 0;
+  padding: 0 20px;
+  background: var(--panel-raised);
+}
+
+.panel {
+  padding-top: 20px;
+}
+
+.dirtyNote {
+  margin-right: auto;
+  color: var(--ink-3);
+  font-size: $text-sm;
+}
+
+/* ---------- Overview ---------- */
+
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.statusPanel {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.label {
-  font-family: $font-mono;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-
-.textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  font-family: $font-mono;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
   padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+}
 
-  &:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-10);
+.status_failing {
+  border-color: transparent;
+  background: var(--signal-fault-soft);
+
+  .statusMessage {
+    color: var(--signal-fault-ink);
   }
 }
 
-.textareaInvalid {
-  border-color: var(--danger-color) !important;
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
 }
 
-.invalidPreview {
+.statusLabel {
+  color: var(--ink);
+  font-size: $text-md;
+  font-weight: 600;
+}
+
+.statusToggle {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: $text-sm;
+}
+
+.statusMessage {
   margin: 0;
-  max-height: 240px;
-  overflow: auto;
+  padding-left: 18px;
+  color: var(--ink-2);
   font-family: $font-mono;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border-hover);
-  border-radius: 10px;
-  padding: 10px 12px;
-  white-space: pre-wrap;
+  font-size: $text-sm;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.fields {
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: $radius-sm;
+  background: var(--well-strong);
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+}
+
+.section {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sectionAside {
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+.activityChart {
+  padding: 12px;
+  border-radius: $radius-md;
+  background: var(--well);
+
+  svg {
+    width: 100%;
+    height: 44px;
+  }
+}
+
+.mutedNote {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  min-height: 32px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  dt {
+    color: var(--ink-3);
+    font-size: $text-sm;
+  }
+
+  dd {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: $text-md;
+  }
+}
+
+.factValue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--well-strong);
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+/* ---------- Models ---------- */
+
+.modelList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  list-style: none;
+  overflow: hidden;
+
+  li + li {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+.modelItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--panel-hover);
+
+    .modelCopy {
+      opacity: 1;
+    }
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset var(--focus-ring);
+
+    .modelCopy {
+      opacity: 1;
+    }
+  }
+}
+
+.modelItemExcluded .modelId {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+
+.modelId {
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: $text-sm;
+  @include text-ellipsis;
+}
+
+.modelName {
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  @include text-ellipsis;
+}
+
+.modelBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: $radius-sm;
+  background: var(--signal-idle-soft);
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+}
+
+.modelCopy {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out-strong);
+}
+
+.modelSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+}
+
+/* ---------- Settings ---------- */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.group {
+  min-width: 0;
+  margin: 0;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+
+  &:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+.groupTitle {
+  float: left;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.groupBody {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  :global(.form-group) {
+    margin-bottom: 0;
+  }
+}
+
+.fieldPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.switchField {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.switchCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.switchLabel {
+  color: var(--ink);
+  font-size: $text-md;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.switchHint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  line-height: 1.5;
+}
+
+.codeInput {
+  font-family: $font-mono;
+  font-size: $text-sm;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.textareaInvalid {
+  border-color: var(--signal-fault) !important;
 }
 
 .settingsLink {
-  color: var(--primary-color);
-  font-weight: 600;
+  color: var(--focus);
   text-decoration: none;
 
   &:hover {
     text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
+    outline: none;
     border-radius: 2px;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+/* ---------- Raw JSON / loading / errors ---------- */
+
+.rawBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.code {
+  margin: 0;
+  max-height: 480px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: $radius-md;
+  background: var(--well);
+  color: var(--ink-2);
+  font-family: $font-mono;
+  font-size: $text-sm;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.loadingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inlineError {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border-radius: $radius-md;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-sm;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@include mobile {
+  .fact {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .fieldPair {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modelCopy {
+    transition: none;
   }
 }

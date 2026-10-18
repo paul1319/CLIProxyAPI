@@ -5,7 +5,7 @@ import { IconChevronDown, IconRefreshCw } from '@/components/ui/icons';
 import type { AuthFileCooldownSnapshot } from '@/types/authFile';
 import { createSharedClock } from '@/utils/time/sharedClock';
 import { formatDateTimeValue } from '@/utils/format';
-import { cooldownReasonKey, summarizeCooldowns } from '@/features/authFiles/cooldowns';
+import { cooldownReasonText, summarizeCooldowns } from '@/features/authFiles/cooldowns';
 import styles from './AuthFileCooldownSection.module.scss';
 
 // One timer for visible cooldown cards, never one interval/request per credential.
@@ -16,6 +16,8 @@ export type AuthFileCooldownSectionProps = {
   resetting?: boolean;
   resetDisabled?: boolean;
   onReset?: () => void;
+  /** The details sheet shows the timers expanded; compact hosts keep them collapsed. */
+  defaultOpen?: boolean;
 };
 
 export function AuthFileCooldownSection({
@@ -23,6 +25,7 @@ export function AuthFileCooldownSection({
   resetting = false,
   resetDisabled = false,
   onReset,
+  defaultOpen = false,
 }: AuthFileCooldownSectionProps) {
   const { t } = useTranslation();
   if (!snapshot) return null; // Old backend: no claim about cooldown support or health.
@@ -36,6 +39,7 @@ export function AuthFileCooldownSection({
       resetting={resetting}
       resetDisabled={resetDisabled}
       onReset={onReset}
+      defaultOpen={defaultOpen}
     />
   );
 }
@@ -45,11 +49,13 @@ function CooldownDetails({
   resetting,
   resetDisabled,
   onReset,
+  defaultOpen,
 }: {
   snapshot: AuthFileCooldownSnapshot;
   resetting: boolean;
   resetDisabled: boolean;
   onReset?: () => void;
+  defaultOpen: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const now = useSyncExternalStore(clock.subscribe, clock.getSnapshot, clock.getSnapshot);
@@ -67,7 +73,10 @@ function CooldownDetails({
     : t('auth_files.cooldown_models', { count: modelCount });
 
   return (
-    <details className={`${styles.section} ${elapsed ? styles.elapsed : ''}`}>
+    <details
+      className={`${styles.section} ${elapsed ? styles.elapsed : ''}`}
+      open={defaultOpen || undefined}
+    >
       <summary className={styles.summary}>
         <span className={styles.summaryContent}>
           <span className={styles.scope}>
@@ -83,37 +92,46 @@ function CooldownDetails({
       </summary>
       <div className={styles.body}>
         <ul className={styles.list}>
-          {rows.map(({ record, remainingSeconds }, index) => (
-            <li className={styles.row} key={`${record.scope}:${record.modelKey ?? ''}:${index}`}>
-              <div className={styles.rowHead}>
-                <span className={styles.model}>
-                  {record.scope === 'credential'
-                    ? t('auth_files.cooldown_scope_credential')
-                    : record.modelKey}
-                </span>
-                <span className={styles.remaining}>
-                  {remainingSeconds > 0
-                    ? duration(remainingSeconds)
-                    : t('auth_files.cooldown_timer_elapsed')}
-                </span>
-              </div>
-              <div className={styles.reason}>
-                <span>{t(cooldownReasonKey(record.reason))}</span>
-                {record.httpStatus !== undefined && (
-                  <span>{t('auth_files.cooldown_http_status', { status: record.httpStatus })}</span>
-                )}
-                {record.backoffLevel !== undefined && (
-                  <span>{t('auth_files.cooldown_backoff', { level: record.backoffLevel })}</span>
-                )}
-              </div>
-              <div className={styles.deadline}>
-                {t('auth_files.cooldown_deadline')}{' '}
-                <time dateTime={record.retryAt}>
-                  {formatDateTimeValue(record.retryAt, i18n.language)}
-                </time>
-              </div>
-            </li>
-          ))}
+          {rows.map(({ record, remainingSeconds }, index) => {
+            const reason = cooldownReasonText(t, record.reason);
+            return (
+              <li className={styles.row} key={`${record.scope}:${record.modelKey ?? ''}:${index}`}>
+                <div className={styles.rowHead}>
+                  <span
+                    className={`${styles.model} ${
+                      record.scope === 'credential' ? styles.modelScope : ''
+                    }`}
+                  >
+                    {record.scope === 'credential'
+                      ? t('auth_files.cooldown_scope_credential')
+                      : record.modelKey}
+                  </span>
+                  <span className={styles.remaining}>
+                    {remainingSeconds > 0
+                      ? duration(remainingSeconds)
+                      : t('auth_files.cooldown_timer_elapsed')}
+                  </span>
+                </div>
+                <div className={styles.reason}>
+                  {reason && <span>{reason}</span>}
+                  {record.httpStatus !== undefined && (
+                    <span>
+                      {t('auth_files.cooldown_http_status', { status: record.httpStatus })}
+                    </span>
+                  )}
+                  {record.backoffLevel !== undefined && (
+                    <span>{t('auth_files.cooldown_backoff', { level: record.backoffLevel })}</span>
+                  )}
+                </div>
+                <div className={styles.deadline}>
+                  {t('auth_files.cooldown_deadline')}{' '}
+                  <time dateTime={record.retryAt}>
+                    {formatDateTimeValue(record.retryAt, i18n.language)}
+                  </time>
+                </div>
+              </li>
+            );
+          })}
         </ul>
         {snapshot.observedAt && (
           <p className={styles.observed}>

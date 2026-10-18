@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
-import { loadQuotaEntry } from '@/features/quota/quotaRequests';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuotaAutoRefresh } from '@/features/quota/hooks/useQuotaAutoRefresh';
 import { useQuotaBatchLoader } from '@/features/quota/hooks/useQuotaBatchLoader';
 import { useTranslation } from 'react-i18next';
+import { useNow } from '@/hooks/useNow';
 import {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
@@ -15,14 +15,14 @@ import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { isRuntimeOnlyAuthFile, type QuotaProviderType } from '@/features/authFiles/constants';
 import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
-import { bindQuotaClasses } from '@/features/quota/types';
+import { buildAccountOverview, type AccountOverview } from '@/features/quota/accountCardModel';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '@/features/quota/providers';
 import { hasClaudeUsageData } from '@/features/quota/providers/claude/data';
 import { QuotaFreshness } from '@/features/quota/components/QuotaFreshness';
+import { QuotaWindows } from '@/features/quota/components/QuotaWindows';
+import { formatFullInstant } from '@/features/quota/format';
+import { forceRefreshAuthFileQuota } from '@/features/authFiles/quotaActions';
 import styles from './AuthFileQuota.module.scss';
-
-/** Bind the auth-file host's compact styles to the quota rendering contract. */
-const compactQuotaClasses = bindQuotaClasses(styles, 'AuthFileQuota.module.scss');
 
 const assertNever = (value: never): never => {
   throw new Error(`Unsupported quota type: ${value}`);
@@ -36,20 +36,24 @@ export type AuthFileQuotaSectionProps = {
   file: AuthFileItem;
   quotaType: QuotaProviderType;
   disableControls: boolean;
+  /** The credentials list already runs one shared refresh loop for visible rows. */
+  autoRefresh?: boolean;
 };
 
 export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
-  const { file, quotaType, disableControls } = props;
-  const { t } = useTranslation();
+  const { file, quotaType, disableControls, autoRefresh = true } = props;
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage;
   const showNotification = useNotificationStore((state) => state.showNotification);
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
   const [resettingQuota, setResettingQuota] = useState(false);
   const adapter = QUOTA_ADAPTERS[quotaType];
   const cacheKey = getQuotaCacheKey(file);
   const { loadQuota } = useQuotaBatchLoader();
+  const autoRefreshEntries = useMemo(() => [{ file, type: quotaType }], [file, quotaType]);
   useQuotaAutoRefresh(
-    [{ file, type: quotaType }],
-    disableControls || Boolean(file.disabled),
+    autoRefreshEntries,
+    !autoRefresh || disableControls || Boolean(file.disabled),
     loadQuota
   );
 
@@ -68,6 +72,14 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
   const retainedClaudeUsage =
     Boolean(quota?.hasData) ||
     (quotaType === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined));
+  // Same presentation model as the Quota page card, shown whenever data is visible.
+  const overview = useMemo(
+    () =>
+      quota && (quota.status === 'success' || retainedClaudeUsage)
+        ? buildAccountOverview(quotaType, quota, t, locale)
+        : null,
+    [locale, quota, quotaType, retainedClaudeUsage, t]
+  );
 
   const updateQuotaState = useQuotaStore(
     (state) => state[adapter.storeSetter] as unknown as QuotaMapUpdater
@@ -78,24 +90,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     if (isRuntimeOnlyAuthFile(file)) return;
     if (file.disabled) return;
     if (quota?.status === 'loading' || resettingQuota) return;
-
-    const cacheGeneration = captureQuotaCacheGeneration(file.name);
-
-    try {
-      await loadQuotaEntry(file, adapter, t, { mode: 'force' });
-      commitIfQuotaCacheCurrent(cacheGeneration, () => {
-        showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('common.unknown_error');
-      commitIfQuotaCacheCurrent(cacheGeneration, () => {
-        showNotification(
-          t('auth_files.quota_refresh_failed', { name: file.name, message }),
-          'error'
-        );
-      });
-    }
-  }, [adapter, disableControls, file, quota?.status, resettingQuota, showNotification, t]);
+    await forceRefreshAuthFileQuota(file, quotaType, t, showNotification);
+  }, [disableControls, file, quota?.status, quotaType, resettingQuota, showNotification, t]);
 
   const resetQuotaForFile = useCallback(() => {
     if (disableControls) return;
@@ -179,9 +175,36 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
 
   return (
     <div className={styles.quotaSection}>
-      <QuotaFreshness quota={quota} />
+      <div className={styles.quotaSectionHead}>
+        <div className={styles.quotaFreshness}>
+          <QuotaFreshness quota={quota} />
+        </div>
+        {(showRefreshQuotaAction || resetQuotaAction) && (
+          <div className={styles.quotaCardActions}>
+            {resetQuotaAction}
+            {showRefreshQuotaAction && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={styles.quotaResetCreditButton}
+                onClick={() => void refreshQuotaForFile()}
+                disabled={!canRefreshQuota || quotaStatus === 'loading'}
+                loading={quotaStatus === 'loading'}
+                title={t('auth_files.quota_refresh_hint')}
+              >
+                {quotaStatus !== 'loading' && <IconRefreshCw size={14} />}
+                {t('auth_files.quota_refresh_single')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
       {quotaStatus === 'loading' ? (
-        <div className={styles.quotaMessage}>{t(`${adapter.i18nPrefix}.loading`)}</div>
+        // Retained rows stay in place while a refresh runs; the button carries the spinner.
+        overview ? null : (
+          <div className={styles.quotaMessage}>{t(`${adapter.i18nPrefix}.loading`)}</div>
+        )
       ) : quotaStatus === 'idle' ? (
         <button
           type="button"
@@ -189,40 +212,91 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
           onClick={() => void refreshQuotaForFile()}
           disabled={!canRefreshQuota}
         >
-          {t(`${adapter.i18nPrefix}.idle`)}
+          <IconRefreshCw size={14} />
+          {t('credentials.quota_idle')}
         </button>
       ) : quotaStatus === 'error' ? (
-        <div className={styles.quotaError}>
+        <div className={styles.quotaError} role="alert">
           {t(`${adapter.i18nPrefix}.load_failed`, {
             message: quotaErrorMessage,
           })}
         </div>
-      ) : quota && !retainedClaudeUsage ? (
-        <adapter.Body quota={quota} classes={compactQuotaClasses} />
-      ) : !retainedClaudeUsage ? (
-        <div className={styles.quotaMessage}>{t(`${adapter.i18nPrefix}.idle`)}</div>
+      ) : !overview ? (
+        <div className={styles.quotaMessage}>{t('credentials.quota_idle')}</div>
       ) : null}
-      {retainedClaudeUsage && quota && <adapter.Body quota={quota} classes={compactQuotaClasses} />}
-      {(showRefreshQuotaAction || resetQuotaAction) && (
-        <div className={styles.quotaCardActions}>
-          {resetQuotaAction}
-          {showRefreshQuotaAction && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className={styles.quotaResetCreditButton}
-              onClick={() => void refreshQuotaForFile()}
-              disabled={!canRefreshQuota || quotaStatus === 'loading'}
-              loading={quotaStatus === 'loading'}
-              title={t('auth_files.quota_refresh_hint')}
-            >
-              {quotaStatus !== 'loading' && <IconRefreshCw size={14} />}
-              {t('auth_files.quota_refresh_single')}
-            </Button>
-          )}
-        </div>
-      )}
+      {overview && <QuotaOverview overview={overview} />}
     </div>
+  );
+}
+
+/**
+ * One-line window rows (label · meter · % · countdown) shared with the Quota page card,
+ * then plan / credits / renewal as a compact key–value list.
+ */
+function QuotaOverview({ overview }: { overview: AccountOverview }) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage;
+  const now = useNow();
+
+  const facts: Array<{
+    key: string;
+    label: string;
+    value: string;
+    detail?: string;
+    title?: string;
+  }> = [];
+  if (overview.plan) {
+    facts.push({ key: 'plan', label: t('account_quota.plan'), value: overview.plan });
+  }
+  overview.credits.forEach((credit, index) => {
+    facts.push({
+      key: `credit:${index}`,
+      label: credit.label,
+      value: credit.value,
+      detail: credit.detail,
+    });
+  });
+  if (overview.renewalAtMs) {
+    facts.push({
+      key: 'renewal',
+      label: t('account_quota.renewal'),
+      value: new Date(overview.renewalAtMs).toLocaleDateString(locale, {
+        month: 'short',
+        day: 'numeric',
+      }),
+      title: formatFullInstant(overview.renewalAtMs, locale),
+    });
+  }
+
+  const hasLimits = overview.limits.length > 0;
+
+  return (
+    <>
+      {hasLimits ? (
+        <div className={styles.quotaWindows}>
+          <QuotaWindows limits={overview.limits} heroId={overview.heroLimitId} now={now} />
+        </div>
+      ) : overview.notes.length === 0 ? (
+        <p className={styles.quotaEmpty}>{t('quota_management.hero_no_limits')}</p>
+      ) : null}
+      {overview.notes.map((note, index) => (
+        <p key={index} className={styles.quotaNote}>
+          {note}
+        </p>
+      ))}
+      {facts.length > 0 && (
+        <dl className={styles.quotaFacts}>
+          {facts.map((fact) => (
+            <div key={fact.key} className={styles.quotaFact}>
+              <dt>{fact.label}</dt>
+              <dd title={fact.title}>
+                <span className={styles.quotaFactValue}>{fact.value}</span>
+                {fact.detail && <span className={styles.quotaFactDetail}>{fact.detail}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
   );
 }

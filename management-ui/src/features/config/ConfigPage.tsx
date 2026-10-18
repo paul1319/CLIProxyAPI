@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { PageHeader } from '@/components/common/PageHeader';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
+import { Button } from '@/components/ui/Button';
+import { IconRefreshCw } from '@/components/ui/icons';
+import { prefersReducedMotion } from '@/hooks/motion';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useRevealGroup } from '@/hooks/motion';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
@@ -12,33 +16,40 @@ import {
   CONFIG_SECTION_STORAGE_KEY,
   LEGACY_EDITOR_MODE_STORAGE_KEY,
   configPanelDomId,
-  configTabDomId,
   type ConfigEditorMode,
   type ConfigTabId,
 } from './constants';
+import { revealTopOf } from './dom';
+import { configGroupDomId, configSectionNavKey } from './groups';
 import {
-  CONFIG_FIELD_COUNT,
   buildHeaderMeta,
+  CONFIG_FIELD_COUNT,
   countSectionErrors,
   countTotalErrors,
   readSavedMode,
   readSavedSection,
+  resolveDirtyFieldIds,
   resolveDirtyTabs,
+  resolveErrorFieldIds,
   resolveStatus,
 } from './uiState';
 import { findConfigFieldById } from './searchIndex';
+import { isMacPlatform, isModShortcut, modShortcutLabel } from './shortcuts';
 import { shouldReloadVisualDraft, useConfigDocument } from './hooks/useConfigDocument';
+import { useActiveGroup } from './hooks/useActiveGroup';
 import { useFieldJump } from './hooks/useFieldJump';
 import { useSourceSearch } from './hooks/useSourceSearch';
-import { ConfigHeader } from './components/ConfigHeader';
 import { ConfigSearch } from './components/ConfigSearch';
-import { ConfigTabs } from './components/ConfigTabs';
+import { ConfigStatusMeta } from './components/ConfigStatusMeta';
 import { DiffModal } from './components/DiffModal';
-import { FloatingSaveBar } from './components/FloatingSaveBar';
 import { ModeSwitch } from './components/ModeSwitch';
+import { SaveBar, type SaveBarChange } from './components/SaveBar';
+import { SectionNav, SectionSelect } from './components/SectionNav';
+import { SectionSkeleton } from './components/SectionSkeleton';
 import { SourcePanel, SourceSearchBar } from './components/SourcePanel';
+import { FIELDS_ROOT_CLASS } from './components/fields/FieldPrimitives';
+import { DirtyFieldsContext } from './components/fields/settingState';
 import { SectionAdvanced } from './components/sections/SectionAdvanced';
-import { SectionCommon } from './components/sections/SectionCommon';
 import { SectionConnectivity } from './components/sections/SectionConnectivity';
 import { SectionLogging } from './components/sections/SectionLogging';
 import { SectionNetwork } from './components/sections/SectionNetwork';
@@ -46,8 +57,7 @@ import { SectionPayload } from './components/sections/SectionPayload';
 import { SectionStreaming } from './components/sections/SectionStreaming';
 import styles from './ConfigPage.module.scss';
 
-/** 首载入场预算：卡片延迟 0.28s + 0.45s 动画，之后关闭 animateIn，切 tab 不再重播。 */
-const ENTRANCE_BUDGET_MS = 800;
+const IS_MAC = isMacPlatform();
 
 export function ConfigPage() {
   const { t } = useTranslation();
@@ -62,8 +72,10 @@ export function ConfigPage() {
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const revealRef = useRevealGroup<HTMLDivElement>();
+  const isCompact = useMediaQuery('(max-width: 960px)');
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const sourceSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     visualValues,
@@ -87,14 +99,8 @@ export function ConfigPage() {
       readSavedSection(localStorage.getItem(CONFIG_SECTION_STORAGE_KEY))
   );
   const handledRequestedFieldRef = useRef<string | null>(null);
-  // 首载入场：挂载后一个预算周期内为 true；此后切 tab 新挂载的卡片不再播入场。
-  const [animateCards, setAnimateCards] = useState(true);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setAnimateCards(false), ENTRANCE_BUDGET_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
 
-  // 旧「简单/完整」双模式已退役，清掉遗留的持久化键。
+  // The retired simple/full editor mode left a persisted key behind; clear it.
   useEffect(() => {
     localStorage.removeItem(LEGACY_EDITOR_MODE_STORAGE_KEY);
   }, []);
@@ -131,7 +137,26 @@ export function ConfigPage() {
     dialog: unsavedChangesDialog,
   });
 
-  // YAML 解析失败：切换到源码模式；修复后仍可重试进入可视化模式。
+  // Closing or reloading the tab with unsaved edits asks the browser to confirm.
+  useEffect(() => {
+    if (!isCurrentLayer || !doc.isDirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [doc.isDirty, isCurrentLayer]);
+
+  // The shell refresh button reloads the editor too (with the discard confirmation when dirty).
+  const { isDirty: docIsDirty, handleReload, loadConfig } = doc;
+  const handleHeaderRefresh = useCallback(
+    () => (docIsDirty ? handleReload() : loadConfig()),
+    [docIsDirty, handleReload, loadConfig]
+  );
+  useHeaderRefresh(handleHeaderRefresh, isCurrentLayer);
+
+  // Invalid YAML: switch to source mode; once fixed, visual mode can be entered again.
   useEffect(() => {
     if (mode !== 'visual' || !visualParseError) return;
 
@@ -143,9 +168,10 @@ export function ConfigPage() {
     );
   }, [mode, showNotification, t, visualParseError]);
 
-  // 可视化 ↔ 源码切换的 dirty 交接：
-  // → 源码：物化可视化脏字段供查看，但不把同步动作记作用户源码编辑；
-  // → 可视化：源码草稿必须先保存或放弃；纯查看源码往返保留字段级 dirty。
+  // Dirty hand-over between visual and source:
+  // → source: materialize visual dirty fields for viewing without recording a source edit;
+  // → visual: source drafts must be saved or discarded first; a view-only round trip keeps the
+  //   field-level dirty state.
   const handleModeChange = useCallback(
     (nextMode: ConfigEditorMode) => {
       if (nextMode === mode) return;
@@ -193,6 +219,22 @@ export function ConfigPage() {
     localStorage.setItem(CONFIG_SECTION_STORAGE_KEY, sectionId);
   }, []);
 
+  /** Section picked in the index: show it from the top. */
+  const handleNavSectionChange = useCallback(
+    (sectionId: ConfigTabId) => {
+      handleSectionChange(sectionId);
+      requestAnimationFrame(() => revealTopOf(layoutRef.current));
+    },
+    [handleSectionChange]
+  );
+
+  const handleGroupJump = useCallback((groupId: string) => {
+    document.getElementById(configGroupDomId(groupId))?.scrollIntoView({
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, []);
+
   const { jumpToField } = useFieldJump({
     values: visualValues,
     setActiveSection: handleSectionChange,
@@ -232,10 +274,18 @@ export function ConfigPage() {
     [visualHasPayloadValidationErrors, visualValidationErrors]
   );
   const dirtyTabs = useMemo(() => resolveDirtyTabs(visualDirtyFields), [visualDirtyFields]);
+  const dirtyFieldIds = useMemo(() => resolveDirtyFieldIds(visualDirtyFields), [visualDirtyFields]);
+  const dirtyFieldIdSet = useMemo(() => new Set(dirtyFieldIds), [dirtyFieldIds]);
+  const errorFieldIds = useMemo(
+    () => resolveErrorFieldIds(visualValidationErrors),
+    [visualValidationErrors]
+  );
+  const errorFieldIdSet = useMemo(() => new Set(errorFieldIds), [errorFieldIds]);
   const totalErrors = useMemo(
     () => countTotalErrors(visualValidationErrors, visualHasPayloadValidationErrors),
     [visualHasPayloadValidationErrors, visualValidationErrors]
   );
+  const activeGroup = useActiveGroup(activeSection, mode === 'visual' && !isCompact);
 
   const status = resolveStatus({
     disconnected: disableControls,
@@ -249,7 +299,7 @@ export function ConfigPage() {
   const headerMeta = buildHeaderMeta({
     fieldCount: CONFIG_FIELD_COUNT,
     status,
-    dirtyCount: visualDirtyFields.size,
+    dirtyCount: dirtyFieldIds.length,
     sourceDirty: doc.sourceDirty,
     errorCount: mode === 'visual' ? totalErrors : 0,
   });
@@ -263,19 +313,95 @@ export function ConfigPage() {
     hasVisualModeError ||
     hasVisualValidationErrors;
 
+  const saveShortcut = modShortcutLabel('s', IS_MAC);
+  const searchShortcut = modShortcutLabel('k', IS_MAC);
+  const { handleSave, diffModalOpen } = doc;
+
+  // ⌘S opens the save review; ⌘K focuses the search of the current mode.
+  useEffect(() => {
+    if (!isCurrentLayer) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isSave = isModShortcut(event, 's');
+      const isSearch = isModShortcut(event, 'k');
+      if (!isSave && !isSearch) return;
+      event.preventDefault();
+      if (diffModalOpen || document.querySelector('[aria-modal="true"]')) return;
+      if (isSave) {
+        if (!saveDisabled) void handleSave();
+        return;
+      }
+      const input = mode === 'visual' ? searchInputRef.current : sourceSearchInputRef.current;
+      input?.focus();
+      input?.select();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [diffModalOpen, handleSave, isCurrentLayer, mode, saveDisabled]);
+
+  const focusSourceSearch = useCallback(() => {
+    sourceSearchInputRef.current?.focus();
+    sourceSearchInputRef.current?.select();
+  }, []);
+
+  const saveBarChanges = useMemo<SaveBarChange[]>(
+    () =>
+      dirtyFieldIds.flatMap((fieldId) => {
+        const entry = findConfigFieldById(fieldId);
+        if (!entry) return [];
+        const label = t(entry.labelKey);
+        return [
+          {
+            fieldId,
+            label: entry.qualifierKey ? `${label} · ${t(entry.qualifierKey)}` : label,
+            section: t(configSectionNavKey(entry.sectionId)),
+          },
+        ];
+      }),
+    [dirtyFieldIds, t]
+  );
+
+  const handleJumpToChange = useCallback(
+    (fieldId: string) => {
+      const entry = findConfigFieldById(fieldId);
+      if (entry) jumpToField(entry);
+    },
+    [jumpToField]
+  );
+
+  const handleGoToError = useCallback(() => {
+    const entry = findConfigFieldById(errorFieldIds[0]);
+    if (entry) {
+      jumpToField(entry);
+      return;
+    }
+    if (visualHasPayloadValidationErrors) {
+      handleNavSectionChange('payload');
+    }
+  }, [errorFieldIds, handleNavSectionChange, jumpToField, visualHasPayloadValidationErrors]);
+
+  const saveBarStatus: { text: string; tone: 'busy' | 'error' | 'muted' } | null =
+    doc.recoveryRequired
+      ? { text: t('config_management.precise_save_recovery_required'), tone: 'error' }
+      : status.key === 'saving' || status.key === 'loading'
+        ? { text: t(status.labelKey), tone: 'busy' }
+        : status.key === 'disconnected'
+          ? { text: t(status.shortLabelKey), tone: 'muted' }
+          : status.key === 'yaml_error'
+            ? { text: t(status.labelKey), tone: 'error' }
+            : null;
+
+  const sectionDisabled =
+    disableControls || doc.loading || doc.saving || doc.diffModalOpen || doc.recoveryRequired;
   const sectionProps = {
     values: visualValues,
     validationErrors: visualValidationErrors,
-    disabled:
-      disableControls || doc.loading || doc.saving || doc.diffModalOpen || doc.recoveryRequired,
-    animateIn: animateCards,
+    disabled: sectionDisabled,
     onChange: setVisualValues,
   };
+  const initialLoading = doc.loading && !doc.serverYaml;
 
   const renderActiveSection = () => {
     switch (activeSection) {
-      case 'common':
-        return <SectionCommon {...sectionProps} />;
       case 'connectivity':
         return <SectionConnectivity {...sectionProps} />;
       case 'network':
@@ -296,85 +422,144 @@ export function ConfigPage() {
     }
   };
 
+  const saveBar = (
+    <SaveBar
+      visible={isCurrentLayer && doc.isDirty}
+      changes={saveBarChanges}
+      sourceDirty={doc.sourceDirty}
+      errorCount={mode === 'visual' ? totalErrors : 0}
+      statusText={saveBarStatus?.text ?? null}
+      statusTone={saveBarStatus?.tone}
+      saving={doc.saving}
+      saveDisabled={saveDisabled}
+      discardDisabled={doc.loading || doc.saving}
+      shortcutLabel={saveShortcut}
+      onSave={handleSave}
+      onDiscard={doc.handleDiscard}
+      onJumpToField={mode === 'visual' ? handleJumpToChange : undefined}
+      onGoToError={mode === 'visual' ? handleGoToError : undefined}
+    />
+  );
+
+  const sectionName = t(configSectionNavKey(activeSection));
+
   return (
-    <div className={styles.page} ref={revealRef}>
-      <ConfigHeader
-        meta={headerMeta}
-        reloadDisabled={doc.loading || doc.saving}
-        reloading={doc.loading}
-        onReload={doc.handleReload}
+    <div className={styles.page}>
+      <PageHeader
+        title={t('config_management.title')}
+        meta={
+          <ConfigStatusMeta segments={headerMeta} busy={status.key === 'loading' || doc.saving} />
+        }
+        actions={
+          <div className={styles.headerActions}>
+            {mode === 'visual' ? (
+              <ConfigSearch
+                inputRef={searchInputRef}
+                shortcutLabel={searchShortcut}
+                disabled={disableControls || initialLoading}
+                onJump={jumpToField}
+              />
+            ) : (
+              <SourceSearchBar
+                inputRef={sourceSearchInputRef}
+                shortcutLabel={searchShortcut}
+                search={sourceSearch}
+                disabled={disableControls || doc.loading}
+              />
+            )}
+            <ModeSwitch
+              mode={mode}
+              disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
+              onChange={handleModeChange}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.iconAction}
+              onClick={doc.handleReload}
+              disabled={doc.loading || doc.saving}
+              aria-label={t('config_management.reload')}
+              title={t('config_management.reload')}
+            >
+              <IconRefreshCw
+                size={15}
+                className={doc.loading ? styles.spinning : undefined}
+                aria-hidden="true"
+              />
+            </Button>
+          </div>
+        }
       />
 
-      {doc.error && (
-        <div className="error-box" role="alert">
-          {doc.error}
+      {doc.error ? (
+        <div className={styles.alert} role="alert">
+          <span className={styles.alertText}>{doc.error}</span>
+          <Button variant="secondary" size="sm" onClick={doc.handleReload} disabled={doc.loading}>
+            {t('config_management.reload')}
+          </Button>
         </div>
-      )}
-      {!doc.error && visualParseError && (
-        <div className="error-box" role="alert">
-          {t('config_management.visual_mode_unavailable_detail', { message: visualParseError })}
+      ) : visualParseError ? (
+        <div className={styles.alert} role="alert">
+          <span className={styles.alertText}>
+            {t('config_management.visual_mode_unavailable_detail', { message: visualParseError })}
+          </span>
         </div>
-      )}
-
-      <div className={styles.toolbar} data-reveal>
-        {mode === 'visual' ? (
-          <ConfigSearch disabled={disableControls || doc.loading} onJump={jumpToField} />
-        ) : (
-          <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
-        )}
-        <ModeSwitch
-          mode={mode}
-          disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
-          onChange={handleModeChange}
-        />
-      </div>
+      ) : null}
 
       {mode === 'visual' ? (
-        <>
-          <div className={styles.tabsRow} data-reveal>
-            <ConfigTabs
+        <div
+          ref={layoutRef}
+          className={`${styles.layout} ${isCompact ? styles.layoutCompact : ''}`}
+        >
+          {isCompact ? (
+            <SectionSelect
               active={activeSection}
               errorCounts={errorCounts}
               dirtyTabs={dirtyTabs}
-              disabled={doc.saving || doc.loading}
-              onChange={handleSectionChange}
+              onChange={handleNavSectionChange}
             />
+          ) : (
+            <aside className={styles.index}>
+              <SectionNav
+                active={activeSection}
+                errorCounts={errorCounts}
+                dirtyTabs={dirtyTabs}
+                dirtyFieldIds={dirtyFieldIdSet}
+                errorFieldIds={errorFieldIdSet}
+                activeGroup={activeGroup}
+                onChange={handleNavSectionChange}
+                onGroupJump={handleGroupJump}
+              />
+            </aside>
+          )}
+          <div className={`${styles.content} ${FIELDS_ROOT_CLASS}`}>
+            <div
+              id={configPanelDomId(activeSection)}
+              role="region"
+              aria-label={sectionName}
+              aria-busy={initialLoading || undefined}
+              className={styles.panel}
+            >
+              <DirtyFieldsContext.Provider value={dirtyFieldIdSet}>
+                {initialLoading ? <SectionSkeleton /> : renderActiveSection()}
+              </DirtyFieldsContext.Provider>
+            </div>
+            {saveBar}
           </div>
-          <div
-            className={styles.panel}
-            role="tabpanel"
-            id={configPanelDomId(activeSection)}
-            aria-labelledby={configTabDomId(activeSection)}
-          >
-            {renderActiveSection()}
-          </div>
-        </>
+        </div>
       ) : (
-        <SourcePanel
-          search={sourceSearch}
-          value={doc.content}
-          onChange={doc.handleChange}
-          theme={resolvedTheme}
-          editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
-        />
+        <div className={styles.source}>
+          <SourcePanel
+            search={sourceSearch}
+            value={doc.content}
+            onChange={doc.handleChange}
+            theme={resolvedTheme}
+            editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
+            onFindShortcut={focusSourceSearch}
+          />
+          {saveBar}
+        </div>
       )}
-
-      <FloatingSaveBar
-        visible={isCurrentLayer && doc.isDirty}
-        statusText={t(
-          doc.recoveryRequired
-            ? 'config_management.precise_save_recovery_required'
-            : isMobile
-              ? status.shortLabelKey
-              : status.labelKey
-        )}
-        statusTone={status.tone}
-        saving={doc.saving}
-        saveDisabled={saveDisabled}
-        discardDisabled={doc.loading || doc.saving}
-        onSave={doc.handleSave}
-        onDiscard={doc.handleDiscard}
-      />
 
       <DiffModal
         open={doc.diffModalOpen}

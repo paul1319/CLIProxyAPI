@@ -1,4 +1,6 @@
+import type { TFunction } from 'i18next';
 import type { AuthFileCooldown, AuthFileCooldownSnapshot } from '@/types/authFile';
+import { formatCompactDuration } from './quotaSummary';
 
 const REASON_KEYS: Record<string, string> = {
   quota: 'auth_files.cooldown_reason_quota',
@@ -12,10 +14,65 @@ const REASON_KEYS: Record<string, string> = {
   transient_error: 'auth_files.cooldown_reason_transient_error',
 };
 
+const UNKNOWN_REASON_KEY = 'auth_files.cooldown_reason_unknown';
+
 export function cooldownReasonKey(reason: string): string {
   return Object.prototype.hasOwnProperty.call(REASON_KEYS, reason)
     ? REASON_KEYS[reason]
-    : 'auth_files.cooldown_reason_unknown';
+    : UNKNOWN_REASON_KEY;
+}
+
+/**
+ * Display text for a server reason: known codes are translated, anything else is shown
+ * as the server sent it. Never the generic "unknown reason" label; blank → null (omit).
+ */
+export function cooldownReasonText(t: TFunction, reason: string | null | undefined): string | null {
+  const raw = typeof reason === 'string' ? reason.trim() : '';
+  if (!raw) return null;
+  const key = cooldownReasonKey(raw);
+  return key === UNKNOWN_REASON_KEY ? raw : t(key);
+}
+
+export type CooldownLineInput = {
+  /** The whole credential is benched, not just some models. */
+  credentialWide: boolean;
+  /** Models with an active cooldown. */
+  modelCount: number;
+  /** Seconds left on the most relevant timer; 0 once it has elapsed. */
+  remainingSeconds: number;
+  httpStatus?: number;
+  /** Raw server reason of the most relevant record. */
+  reason?: string | null;
+};
+
+/**
+ * The one cooldown wording shared by the Credentials rows and the Overview
+ * "Needs attention" list: "Cooling down 42m · 429 · Quota restriction".
+ */
+export function formatCooldownLine(
+  t: TFunction,
+  cooldown: CooldownLineInput,
+  locale?: string
+): string {
+  const time =
+    cooldown.remainingSeconds > 0
+      ? formatCompactDuration(cooldown.remainingSeconds * 1000, locale)
+      : null;
+  const scope = time
+    ? cooldown.credentialWide
+      ? t('credentials.problem_cooling', { time })
+      : t('credentials.problem_models_cooling', { count: cooldown.modelCount, time })
+    : cooldown.credentialWide
+      ? t('dashboard.attention_cooldown')
+      : t('auth_files.cooldown_models', { count: cooldown.modelCount });
+  return [
+    scope,
+    time ? null : t('auth_files.cooldown_timer_elapsed'),
+    cooldown.httpStatus !== undefined ? String(cooldown.httpStatus) : null,
+    cooldownReasonText(t, cooldown.reason),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function cooldownRemainingSeconds(

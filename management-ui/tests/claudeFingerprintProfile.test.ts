@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { claudeToResource } from '../src/features/providers/adapters';
 import { normalizeConfigResponse } from '../src/services/api/transformers';
 
 describe('Claude fingerprint profile', () => {
-  test('normalizes the backend field and exposes the CLI profile resource flag', () => {
+  test('normalizes the backend fingerprint-profile field', () => {
     const config = normalizeConfigResponse({
       'api-keys': {
         claude: [
@@ -23,6 +22,5 @@ describe('Claude fingerprint profile', () => {
         fingerprintProfile: 'claude-code-cli',
       },
     ]);
-    expect(claudeToResource(config.claudeApiKeys![0], 0).flags.claudeCodeCliProfile).toBe(true);
   });
 });

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authFilesApi } from '@/services/api';
-import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
-import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { useAuthStore, useConfigStore } from '@/stores';
+import { useInterval } from '@/hooks/useInterval';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
+import { getCredentialLampState, summarizePool } from '@/components/layout/poolRail';
+import { AUTH_FILES_CHANGED_EVENT } from '@/features/authFiles/authFilesEvents';
 import {
   mergeRecentRequestBucketGroups,
   normalizeRecentRequestUsageEntry,
@@ -12,11 +14,14 @@ import type { Config } from '@/types';
 import type { AuthFileItem } from '@/types/authFile';
 import {
   TRAFFIC_BUCKET_MINUTES,
-  type CredentialHealth,
   type DashboardCounts,
   type ProviderTraffic,
   type TrafficWindow,
 } from '../types';
+import { providerIdOfAuthFile } from '../utils';
+
+/** Credentials change state (cooldowns, failures) far faster than the 240s usage poll. */
+const AUTH_FILES_POLL_MS = 60_000;
 
 const EMPTY_TRAFFIC: TrafficWindow = {
   buckets: [],
@@ -29,18 +34,14 @@ const EMPTY_TRAFFIC: TrafficWindow = {
   windowMinutes: 0,
 };
 
-/** `api-key-usage` 的键形如 `<baseUrl>|<apiKey>`，取第一个分隔符之后的部分 */
+/** `api-key-usage` keys look like `<baseUrl>|<apiKey>`; take everything after the first separator. */
 const apiKeyFromCompositeKey = (compositeKey: string): string => {
   const separatorIndex = compositeKey.indexOf('|');
   return separatorIndex < 0 ? '' : compositeKey.slice(separatorIndex + 1).trim();
 };
 
-const providerIdOfAuthFile = (file: AuthFileItem): string => {
-  const candidate = String(file.type ?? file.provider ?? '')
-    .trim()
-    .toLowerCase();
-  return candidate && candidate !== 'empty' ? candidate : 'unknown';
-};
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : typeof error === 'string' ? error : '';
 
 const buildTrafficWindow = (bucketGroups: RecentRequestBucket[][]): TrafficWindow => {
   const buckets = mergeRecentRequestBucketGroups(bucketGroups);
@@ -78,16 +79,20 @@ const buildTrafficWindow = (bucketGroups: RecentRequestBucket[][]): TrafficWindo
 };
 
 interface ProviderAccumulator {
-  credentials: number;
-  success: number;
-  failure: number;
+  accounts: number;
+  serving: number;
+  failing: number;
+  cooling: number;
+  apiKeys: number;
   bucketGroups: RecentRequestBucket[][];
 }
 
 const createAccumulator = (): ProviderAccumulator => ({
-  credentials: 0,
-  success: 0,
-  failure: 0,
+  accounts: 0,
+  serving: 0,
+  failing: 0,
+  cooling: 0,
+  apiKeys: 0,
   bucketGroups: [],
 });
 
@@ -103,68 +108,72 @@ export const getProviderKeyCounts = (config: Config) => ({
 });
 
 /**
- * 汇总仪表盘所需的全部数据。
+ * Everything the overview shows.
  *
- * 流量数据有两个互不重叠的来源：`api-key-usage`（配置内联的 API Key 凭证）
- * 与 `auth-files`（文件/运行时凭证）。后端对二者的判定条件互斥，但插件提供的
- * 凭证理论上可同时命中，因此这里按 `account_type` + `account` 做一次防御性去重。
+ * Traffic has two non-overlapping sources: `api-key-usage` (config-inline API key
+ * credentials) and `auth-files` (file/runtime credentials). The backend keeps them
+ * mutually exclusive, but plugin-provided credentials could in theory appear in both,
+ * so accounts are de-duplicated defensively by `account_type` + `account`.
  */
 export function useDashboardOverview() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
-  const apiBase = useAuthStore((state) => state.apiBase);
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
 
-  const models = useModelsStore((state) => state.models);
-  const modelsLoading = useModelsStore((state) => state.loading);
-  const modelsError = useModelsStore((state) => state.error);
-  const fetchModelsFromStore = useModelsStore((state) => state.fetchModels);
-
   const connected = connectionStatus === 'connected';
-  const resolveApiKeysForModels = useApiKeysForModels();
 
   const { usageByProvider, refreshRecentRequests } = useProviderRecentRequests({
     enabled: connected,
   });
 
   const [authFiles, setAuthFiles] = useState<AuthFileItem[] | null>(null);
+  const [authFilesError, setAuthFilesError] = useState<string | null>(null);
+  const [authFilesLoading, setAuthFilesLoading] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const requestIdRef = useRef(0);
 
   const loadAuthFiles = useCallback(async () => {
     if (!connected) return;
+    const requestId = ++requestIdRef.current;
+    setAuthFilesLoading(true);
     try {
       const response = await authFilesApi.list();
-      setAuthFiles(response.files);
-    } catch {
-      setAuthFiles(null);
+      if (requestId !== requestIdRef.current) return;
+      setAuthFiles(Array.isArray(response?.files) ? response.files : []);
+      setAuthFilesError(null);
+      setUpdatedAt(Date.now());
+    } catch (error: unknown) {
+      if (requestId !== requestIdRef.current) return;
+      // Keep the last good list: a failed refresh is not "no credentials".
+      setAuthFilesError(errorText(error) || 'unknown');
+    } finally {
+      if (requestId === requestIdRef.current) setAuthFilesLoading(false);
     }
   }, [connected]);
-
-  const loadModels = useCallback(async () => {
-    if (!connected || !apiBase) return;
-    try {
-      const apiKeys = await resolveApiKeysForModels();
-      await fetchModelsFromStore(apiBase, apiKeys[0]);
-    } catch {
-      // 模型列表失败不应影响仪表盘其余部分
-    }
-  }, [connected, apiBase, resolveApiKeysForModels, fetchModelsFromStore]);
 
   useEffect(() => {
     if (!connected) return;
     void fetchConfig().catch(() => undefined);
     void loadAuthFiles();
-    void loadModels();
-  }, [connected, fetchConfig, loadAuthFiles, loadModels]);
+  }, [connected, fetchConfig, loadAuthFiles]);
+
+  useEffect(() => {
+    const handleChanged = () => void loadAuthFiles();
+    window.addEventListener(AUTH_FILES_CHANGED_EVENT, handleChanged);
+    return () => window.removeEventListener(AUTH_FILES_CHANGED_EVENT, handleChanged);
+  }, [loadAuthFiles]);
+
+  useInterval(
+    () => {
+      if (document.visibilityState === 'visible') void loadAuthFiles();
+    },
+    connected ? AUTH_FILES_POLL_MS : null
+  );
 
   const refresh = useCallback(async () => {
     if (!connected) return;
-    await Promise.allSettled([
-      fetchConfig(true),
-      loadAuthFiles(),
-      loadModels(),
-      refreshRecentRequests(),
-    ]);
-  }, [connected, fetchConfig, loadAuthFiles, loadModels, refreshRecentRequests]);
+    await Promise.allSettled([fetchConfig(true), loadAuthFiles(), refreshRecentRequests()]);
+  }, [connected, fetchConfig, loadAuthFiles, refreshRecentRequests]);
 
   const providerKeyCounts = useMemo(() => (config ? getProviderKeyCounts(config) : null), [config]);
 
@@ -188,9 +197,7 @@ export function useDashboardOverview() {
         if (apiKey) {
           apiKeysFromUsage.add(apiKey);
         }
-        accumulator.credentials += 1;
-        accumulator.success += entry.success;
-        accumulator.failure += entry.failed;
+        accumulator.apiKeys += 1;
         if (entry.recentRequests.length > 0) {
           accumulator.bucketGroups.push(entry.recentRequests);
           allBucketGroups.push(entry.recentRequests);
@@ -203,16 +210,18 @@ export function useDashboardOverview() {
         .trim()
         .toLowerCase();
       const account = String(file.account ?? '').trim();
-      // 已经由 api-key-usage 统计过的凭证不再重复计入
+      // Credentials already counted through api-key-usage are not counted twice.
       if (accountType === 'api_key' && account && apiKeysFromUsage.has(account)) {
         return;
       }
 
       const accumulator = accumulatorFor(providerIdOfAuthFile(file));
+      const lamp = getCredentialLampState(file);
       const entry = normalizeRecentRequestUsageEntry(file);
-      accumulator.credentials += 1;
-      accumulator.success += entry.success;
-      accumulator.failure += entry.failed;
+      accumulator.accounts += 1;
+      if (lamp === 'ok') accumulator.serving += 1;
+      if (lamp === 'fault') accumulator.failing += 1;
+      if (lamp === 'warn') accumulator.cooling += 1;
       if (entry.recentRequests.length > 0) {
         accumulator.bucketGroups.push(entry.recentRequests);
         allBucketGroups.push(entry.recentRequests);
@@ -221,19 +230,34 @@ export function useDashboardOverview() {
 
     const providerRows: ProviderTraffic[] = Array.from(accumulators.entries())
       .map(([id, accumulator]) => {
-        const total = accumulator.success + accumulator.failure;
+        const buckets = mergeRecentRequestBucketGroups(accumulator.bucketGroups);
+        // Window totals come from the buckets so every column covers the same span.
+        let success = 0;
+        let failure = 0;
+        buckets.forEach((bucket) => {
+          success += bucket.success;
+          failure += bucket.failed;
+        });
+        const total = success + failure;
         return {
           id,
-          credentials: accumulator.credentials,
-          success: accumulator.success,
-          failure: accumulator.failure,
+          accounts: accumulator.accounts,
+          serving: accumulator.serving,
+          failing: accumulator.failing,
+          cooling: accumulator.cooling,
+          apiKeys: accumulator.apiKeys,
+          success,
+          failure,
           total,
-          successRate: total > 0 ? (accumulator.success / total) * 100 : null,
-          buckets: mergeRecentRequestBucketGroups(accumulator.bucketGroups),
+          successRate: total > 0 ? (success / total) * 100 : null,
+          buckets,
         };
       })
       .sort(
-        (a, b) => b.total - a.total || b.credentials - a.credentials || a.id.localeCompare(b.id)
+        (a, b) =>
+          b.total - a.total ||
+          b.accounts + b.apiKeys - (a.accounts + a.apiKeys) ||
+          a.id.localeCompare(b.id)
       );
 
     return {
@@ -242,33 +266,7 @@ export function useDashboardOverview() {
     };
   }, [usageByProvider, authFiles]);
 
-  const credentials = useMemo<CredentialHealth | null>(() => {
-    if (!authFiles) return null;
-
-    let disabled = 0;
-    let unavailable = 0;
-    const countsByType = new Map<string, number>();
-
-    authFiles.forEach((file) => {
-      if (file.disabled) {
-        disabled += 1;
-      } else if (file.unavailable) {
-        unavailable += 1;
-      }
-      const type = providerIdOfAuthFile(file);
-      countsByType.set(type, (countsByType.get(type) ?? 0) + 1);
-    });
-
-    return {
-      total: authFiles.length,
-      active: authFiles.length - disabled - unavailable,
-      disabled,
-      unavailable,
-      byType: Array.from(countsByType.entries())
-        .map(([type, count]) => ({ type, count }))
-        .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
-    };
-  }, [authFiles]);
+  const pool = useMemo(() => (authFiles ? summarizePool(authFiles) : null), [authFiles]);
 
   const counts = useMemo<DashboardCounts>(
     () => ({
@@ -276,10 +274,8 @@ export function useDashboardOverview() {
       providerKeys: providerKeyCounts
         ? Object.values(providerKeyCounts).reduce((sum, count) => sum + count, 0)
         : null,
-      credentials: authFiles ? authFiles.length : null,
-      models: modelsLoading || modelsError ? null : models.length,
     }),
-    [config, providerKeyCounts, authFiles, models.length, modelsLoading, modelsError]
+    [config, providerKeyCounts]
   );
 
   return {
@@ -290,7 +286,12 @@ export function useDashboardOverview() {
     providerKeyCounts,
     traffic,
     providers,
-    credentials,
+    authFiles,
+    authFilesError,
+    authFilesLoading,
+    pool,
+    updatedAt,
+    reloadAuthFiles: loadAuthFiles,
     refresh,
   };
 }

@@ -4,17 +4,15 @@
 
 @use './variables.scss' as *;
 @use './mixins.scss' as *;
+@use './fonts.scss';
 @use './reset.scss';
 @use './themes.scss';
 @use './components.scss';
 @use './layout.scss';
 
 body {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  transition:
-    background-color $transition-normal,
-    color $transition-normal;
+  background-color: var(--rack);
+  color: var(--ink);
 }
 
 html.modal-open,
@@ -26,21 +24,32 @@ body.modal-open .content {
   overflow: hidden;
 }
 
-// Scrollbar styles
+::selection {
+  background: color-mix(in srgb, var(--focus) 24%, transparent);
+}
+
+// Scrollbars: thin, quiet, findable.
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--rule-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: $radius-full;
 
   &:hover {
-    background: var(--border-hover);
+    background-color: var(--rule-ink);
   }
 }

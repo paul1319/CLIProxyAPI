@@ -29,6 +29,8 @@ export interface QuotaCardState extends QuotaObservation {
   status: 'idle' | 'loading' | 'success' | 'error';
   error?: string;
   errorStatus?: number;
+  /** Server's next upstream attempt after a failed read (ISO), when reported. */
+  retryAt?: string;
 }
 
 export interface QuotaAdapter {

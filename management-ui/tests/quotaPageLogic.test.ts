@@ -142,7 +142,7 @@ describe('filterEntriesBySearch', () => {
       )
     );
     const filtered = filterEntriesBySearch(filterEntriesByTab(all, 'codex'), 'target@');
-    const sorted = sortQuotaEntries(filtered, 'default', () => null);
+    const sorted = sortQuotaEntries(filtered, 'name');
     const { pageItems, totalPages } = paginate(sorted, 1, QUOTA_PAGE_SIZE);
     expect(pageItems.map(({ file }) => file.name)).toEqual(['codex-20.json', 'codex-21.json']);
     expect(totalPages).toBe(1);
@@ -194,10 +194,36 @@ describe('sortQuotaEntries', () => {
   const resolver = (instants: Record<string, number>) => (entry: QuotaFileEntry) =>
     instants[entry.file.name] ?? null;
 
-  test('default mode preserves order but returns a new array', () => {
-    const sorted = sortQuotaEntries(entries, 'default', () => 1);
-    expect(byName(sorted)).toEqual(byName(entries));
-    expect(sorted).not.toBe(entries);
+  test('name mode keeps provider sections and orders cards by title within each', () => {
+    const named = classifyQuotaFiles([
+      file('codex-z.json', 'codex', { email: 'zoe@example.com' }),
+      file('claude-b.json', 'claude', { email: 'Bob@example.com' }),
+      file('codex-a.json', 'codex', { email: 'adam@example.com' }),
+      file('claude-1234abcd-alice.json', 'claude'),
+    ]);
+    const sorted = sortQuotaEntries(named, 'name', () => 1);
+    expect(byName(sorted)).toEqual([
+      'claude-1234abcd-alice.json',
+      'claude-b.json',
+      'codex-a.json',
+      'codex-z.json',
+    ]);
+    expect(sorted).not.toBe(named);
+  });
+
+  test('remaining mode puts the least capacity first and unloaded accounts last', () => {
+    const sorted = sortQuotaEntries(
+      entries,
+      'remaining',
+      resolver({ 'codex-a.json': 80, 'kimi-a.json': 0, 'grok-a.json': 12 })
+    );
+    expect(byName(sorted)).toEqual([
+      'kimi-a.json',
+      'grok-a.json',
+      'codex-a.json',
+      'claude-a.json',
+      'codex-b.json',
+    ]);
   });
 
   test('orders loaded credentials by how soon they recover, across providers', () => {

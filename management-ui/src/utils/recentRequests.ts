@@ -64,12 +64,6 @@ export function normalizeUsageTotal(value: unknown): number {
   return 0;
 }
 
-export function buildRecentRequestCompositeKey(baseUrl: unknown, apiKey: unknown): string {
-  const normalizedBaseUrl = String(baseUrl ?? '').trim();
-  const normalizedApiKey = String(apiKey ?? '').trim();
-  return `${normalizedBaseUrl}|${normalizedApiKey}`;
-}
-
 export function normalizeRecentRequestAuthIndex(value: unknown): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value.toString();
@@ -151,19 +145,6 @@ export function mergeRecentRequestBucketGroups(
   });
 
   return merged;
-}
-
-export function sumRecentRequests(buckets: RecentRequestBucket[]): {
-  success: number;
-  failure: number;
-} {
-  return normalizeRecentRequestBuckets(buckets).reduce(
-    (total, bucket) => ({
-      success: total.success + bucket.success,
-      failure: total.failure + bucket.failed,
-    }),
-    { success: 0, failure: 0 }
-  );
 }
 
 export function statusBarDataFromRecentRequests(buckets: RecentRequestBucket[]): StatusBarData {

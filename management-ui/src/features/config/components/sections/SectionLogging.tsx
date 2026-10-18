@@ -1,34 +1,28 @@
 import { useTranslation } from 'react-i18next';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
-import { SettingList, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
-import { DebugToggle, LoggingToFileToggle } from '../fields/sharedFields';
+import { SettingGroup, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
 import { getValidationMessage } from '../blocks/shared';
 
-const Icon = CONFIG_TAB_ICONS.logging;
-
-/** 03 日志与诊断：调试、商业模式（重启生效）、日志输出与使用统计。 */
+/** Logging: debug output, commercial mode (restart required), log files and usage statistics. */
 export function SectionLogging({
   values,
   validationErrors,
   disabled,
-  animateIn,
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
-  const fieldProps = { values, disabled, onChange };
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.logging}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.logging.title')}
-      description={t('config_management.visual.sections.logging.description')}
-      animateIn={animateIn}
-    >
-      <SettingList>
-        <DebugToggle {...fieldProps} />
+    <>
+      <SettingGroup group="logs">
+        <ToggleSetting
+          fieldId="debug"
+          label={t('config_management.visual.sections.system.debug')}
+          description={t('config_management.visual.sections.system.debug_desc')}
+          checked={values.debug}
+          disabled={disabled}
+          onChange={(debug) => onChange({ debug })}
+        />
         <ToggleSetting
           fieldId="commercialMode"
           label={t('config_management.visual.sections.system.commercial_mode')}
@@ -37,10 +31,14 @@ export function SectionLogging({
           disabled={disabled}
           onChange={(commercialMode) => onChange({ commercialMode })}
         />
-        <LoggingToFileToggle {...fieldProps} />
-      </SettingList>
-
-      <SettingList>
+        <ToggleSetting
+          fieldId="loggingToFile"
+          label={t('config_management.visual.sections.system.logging_to_file')}
+          description={t('config_management.visual.sections.system.logging_to_file_desc')}
+          checked={values.loggingToFile}
+          disabled={disabled}
+          onChange={(loggingToFile) => onChange({ loggingToFile })}
+        />
         <TextSetting
           fieldId="logsMaxTotalSizeMb"
           size="sm"
@@ -63,6 +61,17 @@ export function SectionLogging({
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.errorLogsMaxFiles)}
         />
+      </SettingGroup>
+
+      <SettingGroup group="usage">
+        <ToggleSetting
+          fieldId="usageStatisticsEnabled"
+          label={t('config_management.visual.sections.system.usage_statistics_enabled')}
+          description={t('config_management.visual.sections.system.usage_statistics_enabled_desc')}
+          checked={values.usageStatisticsEnabled}
+          disabled={disabled}
+          onChange={(usageStatisticsEnabled) => onChange({ usageStatisticsEnabled })}
+        />
         <TextSetting
           fieldId="redisUsageQueueRetentionSeconds"
           size="sm"
@@ -79,18 +88,7 @@ export function SectionLogging({
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.redisUsageQueueRetentionSeconds)}
         />
-      </SettingList>
-
-      <SettingList>
-        <ToggleSetting
-          fieldId="usageStatisticsEnabled"
-          label={t('config_management.visual.sections.system.usage_statistics_enabled')}
-          description={t('config_management.visual.sections.system.usage_statistics_enabled_desc')}
-          checked={values.usageStatisticsEnabled}
-          disabled={disabled}
-          onChange={(usageStatisticsEnabled) => onChange({ usageStatisticsEnabled })}
-        />
-      </SettingList>
-    </SectionCard>
+      </SettingGroup>
+    </>
   );
 }

@@ -1,21 +1,29 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Input } from '@/components/ui/Input';
 import { IconSearch } from '@/components/ui/icons';
+import { configSectionNavKey } from '../groups';
 import { searchConfigFields, type ConfigFieldSearchEntry } from '../searchIndex';
 import styles from './ConfigSearch.module.scss';
 
 export type ConfigSearchProps = {
   disabled?: boolean;
-  /** 用户选中结果：由页面切换 tab 并滚动/脉冲目标字段（useFieldJump）。 */
+  /** Keyboard hint shown inside the box (e.g. "⌘K"); the page owns the shortcut. */
+  shortcutLabel?: string;
+  inputRef?: Ref<HTMLInputElement>;
+  /** A result was chosen: the page switches section and scrolls/pulses the field (useFieldJump). */
   onJump: (entry: ConfigFieldSearchEntry) => void;
 };
 
 /**
- * 全局字段搜索 combobox（标签 / YAML 键名 / 关键词），键盘可导航。
- * 跳转后保留输入文本，只收起结果列表，便于继续调整查询。
+ * Settings search combobox (label / YAML key / keywords) with keyboard navigation.
+ * After a jump the query stays in the box and only the results close, so it can be refined.
  */
-export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
+export function ConfigSearch({
+  disabled = false,
+  shortcutLabel,
+  inputRef,
+  onJump,
+}: ConfigSearchProps) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   // Dropdown visibility is tracked separately from the query text so a jump can close the
@@ -66,10 +74,14 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
 
   return (
     <div className={styles.searchBox} ref={searchBoxRef}>
-      <Input
-        className={styles.searchControl}
-        placeholder={t('config_management.visual.search.placeholder')}
+      <IconSearch size={14} className={styles.searchIcon} aria-hidden="true" />
+      <input
+        ref={inputRef}
+        type="search"
+        className={`input ${styles.searchControl}`}
+        placeholder={t('config_management.visual.search.placeholder_short')}
         aria-label={t('config_management.visual.search.placeholder')}
+        title={t('config_management.visual.search.placeholder')}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={isResultsOpen}
@@ -122,12 +134,14 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
             handleResultJump(searchResults[effectiveActiveIndex] ?? searchResults[0]);
           }
         }}
-        rightElement={
-          <span className={styles.searchIcon} aria-hidden="true">
-            <IconSearch size={16} />
-          </span>
-        }
+        autoComplete="off"
+        spellCheck={false}
       />
+      {shortcutLabel && !searchQuery ? (
+        <kbd className={styles.shortcut} aria-hidden="true">
+          {shortcutLabel}
+        </kbd>
+      ) : null}
       {isResultsOpen ? (
         <div
           className={styles.searchResults}
@@ -152,14 +166,19 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
                 onMouseEnter={() => setActiveResultIndex(index)}
                 onClick={() => handleResultJump(entry)}
               >
-                <span className={styles.searchResultLabel}>
-                  {t(entry.labelKey)}
-                  {entry.qualifierKey ? (
-                    <span className={styles.searchResultQualifier}>{t(entry.qualifierKey)}</span>
+                <span className={styles.searchResultCopy}>
+                  <span className={styles.searchResultLabel}>
+                    {t(entry.labelKey)}
+                    {entry.qualifierKey ? (
+                      <span className={styles.searchResultQualifier}>{t(entry.qualifierKey)}</span>
+                    ) : null}
+                  </span>
+                  {entry.yamlKeys?.length ? (
+                    <span className={styles.searchResultKey}>{entry.yamlKeys.join('.')}</span>
                   ) : null}
                 </span>
                 <span className={styles.searchResultSection}>
-                  {t(`config_management.visual.sections.${entry.sectionId}.title`)}
+                  {t(configSectionNavKey(entry.sectionId))}
                 </span>
               </button>
             ))

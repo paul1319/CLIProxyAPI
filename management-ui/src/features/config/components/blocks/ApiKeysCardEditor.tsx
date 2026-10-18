@@ -2,6 +2,7 @@ import { memo, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { IconCopy, IconPencil, IconPlus, IconTrash2 } from '@/components/ui/icons';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { apiKeyNameFingerprint, readApiKeyNames, saveApiKeyName } from '../../apiKeyNames';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -9,10 +10,16 @@ import { makeClientId } from '@/types/visualConfig';
 import { generateSecureApiKey } from '@/utils/apiKey';
 import { maskApiKey } from '@/utils/format';
 import { isValidApiKeyCharset } from '@/utils/validation';
+import { findConfigFieldById } from '../../searchIndex';
+import { SettingCell, SettingGroup } from '../fields/FieldPrimitives';
 import { ApiKeyStrengthMeter } from './ApiKeyStrengthMeter';
 import styles from './Blocks.module.scss';
 
 interface ApiKeysCardEditorProps {
+  /** Group registry id (heading, section index anchor). */
+  group: string;
+  /** Search anchor of the key list. */
+  fieldId: string;
   value: string;
   disabled?: boolean;
   onChange: (nextValue: string) => void;
@@ -24,6 +31,8 @@ export const ApiKeysCardEditor = memo(function ApiKeysCardEditor(props: ApiKeysC
 });
 
 function ScopedApiKeysCardEditor({
+  group,
+  fieldId,
   value,
   disabled,
   onChange,
@@ -136,7 +145,7 @@ function ScopedApiKeysCardEditor({
   const handleCopy = async (apiKey: string) => {
     const copied = await copyToClipboard(apiKey);
     showNotification(
-      t(copied ? 'notification.link_copied' : 'notification.copy_failed'),
+      t(copied ? 'config_management.visual.api_keys.copied' : 'notification.copy_failed'),
       copied ? 'success' : 'error'
     );
   };
@@ -146,65 +155,83 @@ function ScopedApiKeysCardEditor({
     setFormError('');
   };
 
-  return (
-    <div className={styles.apiKeys}>
-      <div className={styles.apiKeysHeader}>
-        <div className={styles.apiKeysCopy}>
-          <span className={styles.apiKeysTitle}>
-            {t('config_management.visual.api_keys.label')}
-          </span>
-          <span className={styles.apiKeysHint}>{t('config_management.visual.api_keys.hint')}</span>
-        </div>
-        <Button size="sm" onClick={openAddModal} disabled={disabled}>
-          {t('config_management.visual.api_keys.add')}
-        </Button>
-      </div>
+  const yamlKey = findConfigFieldById(fieldId)?.yamlKeys?.join('.');
 
-      {apiKeys.length === 0 ? (
-        <div className={styles.emptyState}>{t('config_management.visual.api_keys.empty')}</div>
-      ) : (
-        <ol className={styles.apiKeyList}>
-          {apiKeys.map((key, index) => (
-            <li key={renderApiKeyIds[index] ?? `${key}-${index}`} className={styles.apiKeyRow}>
-              <span className={styles.apiKeyIndex}>#{index + 1}</span>
-              <span className={styles.apiKeyMeta}>
-                <span className={styles.apiKeyName}>
-                  {names[nameFingerprints[index]] ??
-                    t('config_management.visual.api_keys.input_label')}
-                </span>
-                <span className={styles.apiKeyValue}>{maskApiKey(String(key || ''))}</span>
-              </span>
-              <span className={styles.apiKeyActions}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopy(key)}
-                  disabled={disabled}
-                >
-                  {t('common.copy')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
-                  disabled={disabled}
-                >
-                  {t('config_management.visual.common.edit')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={styles.apiKeyDelete}
-                  onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
-                  disabled={disabled}
-                >
-                  {t('config_management.visual.common.delete')}
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+  return (
+    <>
+      <SettingGroup
+        group={group}
+        description={
+          <>
+            {t('config_management.visual.api_keys.hint')}
+            {yamlKey ? <code className={styles.groupYamlKey}>{yamlKey}</code> : null}
+          </>
+        }
+        actions={
+          <Button variant="secondary" size="sm" onClick={openAddModal} disabled={disabled}>
+            <span className={styles.buttonIconLabel}>
+              <IconPlus size={14} aria-hidden="true" />
+              {t('config_management.visual.api_keys.add')}
+            </span>
+          </Button>
+        }
+      >
+        <SettingCell fieldId={fieldId}>
+          {apiKeys.length === 0 ? (
+            <div className={styles.apiKeysEmpty}>
+              {t('config_management.visual.api_keys.empty')}
+            </div>
+          ) : (
+            <ul className={styles.apiKeyList}>
+              {apiKeys.map((key, index) => {
+                const name = names[nameFingerprints[index]];
+                const masked = maskApiKey(String(key || ''));
+                const rowLabel = name ?? masked;
+                const rowId = renderApiKeyIds[index] ?? '';
+                return (
+                  <li key={rowId || `${key}-${index}`} className={styles.apiKeyRow}>
+                    {/* The masked key is the identity; a name is shown only when one is set. */}
+                    <code className={styles.apiKeyValue}>{masked}</code>
+                    {name ? <span className={styles.apiKeyName}>{name}</span> : null}
+                    <span className={styles.apiKeyActions}>
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={() => handleCopy(key)}
+                        disabled={disabled}
+                        aria-label={`${t('common.copy')}: ${rowLabel}`}
+                        title={t('common.copy')}
+                      >
+                        <IconCopy size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={() => openEditModal(rowId)}
+                        disabled={disabled}
+                        aria-label={`${t('config_management.visual.common.edit')}: ${rowLabel}`}
+                        title={t('config_management.visual.common.edit')}
+                      >
+                        <IconPencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                        onClick={() => handleDelete(rowId)}
+                        disabled={disabled}
+                        aria-label={`${t('config_management.visual.common.delete')}: ${rowLabel}`}
+                        title={t('config_management.visual.common.delete')}
+                      >
+                        <IconTrash2 size={14} />
+                      </button>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </SettingCell>
+      </SettingGroup>
 
       <Modal
         open={modalOpen}
@@ -278,6 +305,6 @@ function ScopedApiKeysCardEditor({
           )}
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

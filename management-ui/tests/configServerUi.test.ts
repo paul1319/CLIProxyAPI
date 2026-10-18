@@ -54,12 +54,17 @@ describe('server configuration UI', () => {
     ]);
   });
 
-  test('discovery stays mounted in its own closed details even when disabled', () => {
+  test('discovery renders as its own headed group with every field mounted', () => {
     const markup = render(createElement(SectionDiscovery, props));
-    expect(markup.match(/<details\b/g)).toHaveLength(1);
-    expect(markup.match(/<details\b[^>]*>/)?.[0]).not.toContain('open=');
+    expect(markup).not.toContain('<details');
+    expect(markup).toContain('<section id="cfg-group-discovery"');
+    expect(markup).toMatch(
+      new RegExp(
+        `<h3[^>]*>${escapeText(translations.t('config_management.visual.serverExtras.discoveryTitle'))}</h3>`
+      )
+    );
     expect(markup).toContain(
-      escapeText(translations.t('config_management.visual.serverExtras.discoveryTitle'))
+      escapeText(translations.t('config_management.visual.serverExtras.discoveryHint'))
     );
     for (const entry of extras.filter((e) => e.fieldId !== 'trustedProxies')) {
       expect(markup).toContain(`id="cfg-field-${entry.fieldId}"`);

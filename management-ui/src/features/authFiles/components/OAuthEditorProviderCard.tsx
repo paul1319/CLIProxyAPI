@@ -31,9 +31,6 @@ export function OAuthEditorProviderCard({
       <div className={styles.providerSection}>
         <div className={styles.providerRow}>
           <div className={styles.sectionHeading}>
-            <span className={styles.stepNumber} aria-hidden="true">
-              01
-            </span>
             <div className={styles.headingCopy}>
               <label className={styles.sectionTitle} htmlFor={id}>
                 {t(`${translationPrefix}.provider_label`)}

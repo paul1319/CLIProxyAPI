@@ -203,9 +203,8 @@ describe('v8 scalar read/write path parity', () => {
                 : 'fixture-updated';
       const config = runVisualConfig(fixture, [{ [field]: value }]);
       const output = config.applyVisualChangesToYaml(fixture);
+      // yamlKeys are exact leaf paths (also shown on each setting row).
       const path = [...entry.yamlKeys!];
-      if (field === 'tlsEnable') path.push('enable');
-      if (field === 'pluginsEnabled') path.push('enabled');
       const expected =
         field === 'apiKeysText' ? [value] : numericFields.has(field) ? Number(value) : value;
       expect(

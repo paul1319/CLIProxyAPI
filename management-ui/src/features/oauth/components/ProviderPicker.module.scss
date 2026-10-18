@@ -1,0 +1,214 @@
+@use '../../../styles/mixins' as *;
+
+// Add-account picker: grouped hairline rows on a panel.
+// Desktop rows share one column grid (subgrid) so counts, statuses and actions line up
+// across the whole group; mobile rows keep a compact action on the right.
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: $text-xs;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+// Zero-width edge tracks + the column gap give the 16px inset (padding on a subgrid row
+// would be added to its edge items and eat the glyph gap). Status sits left of the count so a
+// flow starting never shifts the count or the action. Count/action minimums keep both groups
+// aligned with each other.
+.list {
+  display: grid;
+  grid-template-columns:
+    [edge-start] 0
+    [glyph] 32px
+    [main] minmax(0, 1fr)
+    [status] minmax(0, max-content)
+    [count] minmax(88px, max-content)
+    [action] minmax(168px, max-content)
+    [edge-end] 0;
+  column-gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+.row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 56px;
+  padding: 10px 0;
+  transition: background-color $transition-fast;
+
+  & + & {
+    border-top: 1px solid var(--rule);
+  }
+
+  &:hover {
+    background: var(--panel-hover);
+  }
+}
+
+.glyph {
+  grid-column: glyph;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-md;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+}
+
+.glyphImage {
+  display: block;
+  object-fit: contain;
+}
+
+.main {
+  grid-column: main;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-size: $text-md;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+  @include text-ellipsis;
+}
+
+.caption {
+  font-size: $text-sm;
+  line-height: 1.4;
+  color: var(--ink-3);
+  @include text-ellipsis;
+}
+
+.count {
+  grid-column: count;
+  justify-self: end;
+  font-size: $text-sm;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &[data-zero='true'] {
+    color: var(--ink-3);
+  }
+}
+
+.status {
+  grid-column: status;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: $text-sm;
+  color: var(--ink-2);
+}
+
+.statusText {
+  @include text-ellipsis;
+
+  &[data-lamp='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  &[data-lamp='ok'] {
+    color: var(--signal-ok-ink);
+  }
+}
+
+.action {
+  grid-column: action;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionButton {
+  min-width: 84px;
+  text-decoration: none;
+}
+
+// Mobile: glyph · name/method · compact action on the first line; connected count and live status
+// share a quiet second line under the name.
+@media (max-width: $breakpoint-mobile) {
+  .list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .row {
+    grid-template-columns: 32px auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'glyph main main action'
+      'glyph count status status';
+    column-gap: 12px;
+    padding: 12px;
+  }
+
+  .glyph {
+    grid-area: glyph;
+    align-self: start;
+  }
+
+  .main {
+    grid-area: main;
+  }
+
+  .caption {
+    white-space: normal;
+  }
+
+  .count {
+    grid-area: count;
+    justify-self: start;
+
+    &:not(:empty) {
+      margin-top: 4px;
+    }
+  }
+
+  .status {
+    grid-area: status;
+
+    &:not(:empty) {
+      margin-top: 4px;
+    }
+  }
+
+  .action {
+    grid-area: action;
+    align-self: start;
+  }
+
+  .actionButton {
+    min-width: 0;
+    min-height: 36px;
+  }
+
+  .row:hover {
+    background: var(--panel);
+  }
+}

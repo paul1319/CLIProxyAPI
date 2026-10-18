@@ -5,7 +5,7 @@ import {
   type QuotaTabId,
 } from './constants';
 
-/** 额度页 UI 偏好：会话级持久化（sessionStorage），跨会话不携带。 */
+/** Quota page UI preferences, persisted per browser session (sessionStorage) only. */
 export type QuotaUiState = {
   tab?: QuotaTabId;
   sortMode?: QuotaSortMode;

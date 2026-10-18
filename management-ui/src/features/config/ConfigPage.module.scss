@@ -1,43 +1,129 @@
 @use '../../styles/mixins' as *;
 
-/* 配置面板页壳：纯布局，视觉细节都在各组件的 colocated 模块里。 */
+/* Config page shell: header, sticky section index on the left, one content column. */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  flex: 1 0 auto;
   width: 100%;
   min-width: 0;
-  /* 悬浮保存栏出现时由 --config-action-bar-height 撑出底部留白 */
-  padding-bottom: calc(
-    var(--config-action-bar-height, 0px) + 16px + env(safe-area-inset-bottom, 0px)
-  );
 }
 
-/* 工具栏行：模式相关搜索（字段搜索 / 源码搜索）+ 右端的模式切换 */
-.toolbar {
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
+.iconAction {
+  width: $control-md;
+  min-width: $control-md;
+  min-height: $control-md;
+  padding: 0;
+  color: var(--ink-2);
+
+  @include mobile {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+.spinning {
+  animation: config-spin 0.9s linear infinite;
+}
+
+@keyframes config-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.alert {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 10px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px 8px 8px 12px;
+  border-radius: $radius-lg;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-md;
+}
+
+.alertText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
   min-width: 0;
 }
 
-.tabsRow {
+.layoutCompact {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+
+  > :first-child {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-block: 8px;
+    margin-block: -8px;
+    background: var(--rack);
+
+    @include mobile {
+      top: var(--header-height, 52px);
+    }
+  }
+}
+
+.index {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.content {
+  container: cfg-content / inline-size;
   display: flex;
+  flex-direction: column;
   min-width: 0;
-  border-bottom: 1px solid var(--border-color);
+  max-width: 880px;
 }
 
 .panel {
   display: flex;
   flex-direction: column;
+  gap: 24px;
   min-width: 0;
 }
 
-@include mobile {
-  .page {
-    gap: 16px;
+.source {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation-duration: 2.4s;
   }
 }

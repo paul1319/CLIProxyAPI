@@ -19,7 +19,6 @@ import {
   supportsAuthFileWebsockets,
 } from '@/features/authFiles/constants';
 import { providerLabel } from '@/features/dashboard/utils';
-import { PROVIDER_LOGOS } from '@/features/providers/brandLogos';
 import { apiClient } from '@/services/api/client';
 import { oauthApi, type BuiltInOAuthProvider } from '@/services/api/oauth';
 import { classifyModels } from '@/utils/models';
@@ -56,7 +55,7 @@ describe('Muse (Meta) provider and device OAuth', () => {
   test('recognizes both names and quota support without enabling websockets', () => {
     expect(normalizeOAuthProviderKey(' Muse ')).toBe('meta');
     expect(OAUTH_PROVIDER_PRESETS).toContain('meta');
-    expect(getAuthFileIcon('muse', 'dark')).toBe(PROVIDER_LOGOS.meta.src);
+    expect(getAuthFileIcon('muse', 'dark')).toBe(getAuthFileIcon('meta', 'dark'));
     expect(getAuthFileIcon('meta', 'light')).toBeTruthy();
     expect(providerLabel('meta', 'Unknown')).toBe('Muse (Meta)');
     expect(supportsAuthFileManualRefresh('meta')).toBe(true);
@@ -85,7 +84,7 @@ describe('Muse (Meta) provider and device OAuth', () => {
       'userCode: res.user_code'
     );
 
-    // 设备码步骤真实渲染：码本身 + 复制按钮，且没有回调步骤
+    // The device-code step renders for real: the code plus a copy button, and no callback step
     const markup = renderToStaticMarkup(
       createElement(
         I18nextProvider,
@@ -128,7 +127,6 @@ describe('Muse (Meta) provider and device OAuth', () => {
         expect(translations.auth_login[`meta_${suffix}`]).toBeTruthy();
       }
       expect(translations.auth_files.filter_meta).toBe('Muse (Meta)');
-      expect(translations.providersPage.providerNames.meta).toBe('Muse (Meta)');
       expect(translations.auth_login.device_code_label).toBeTruthy();
       expect(translations.auth_login.device_code_copy).toBeTruthy();
     }

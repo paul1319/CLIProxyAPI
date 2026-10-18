@@ -10,31 +10,17 @@ import { formatFileSize } from '@/utils/format';
 import { MAX_AUTH_FILE_SIZE } from '@/utils/constants';
 import { downloadBlob } from '@/utils/download';
 import {
-  getTypeLabel,
-  isProblemAuthFile,
   isRuntimeOnlyAuthFile,
-  normalizeProviderKey,
   supportsAuthFileManualRefresh,
 } from '@/features/authFiles/constants';
 
-type DeleteAllOptions = {
-  filter: string;
-  problemOnly: boolean;
-  disabledOnly: boolean;
-  enabledOnly: boolean;
-  onResetFilterToAll: () => void;
-  onResetProblemOnly: () => void;
-  onResetDisabledOnly: () => void;
-  onResetEnabledOnly: () => void;
-};
-
 export type LoadFilesOptions = {
-  /** 后台刷新：不置 loading（网格保持内容），改用 refreshing 标志。 */
+  /** Background refresh: keeps the list on screen and sets `refreshing` instead of `loading`. */
   background?: boolean;
 };
 
 export type UseAuthFilesDataOptions = {
-  /** 文件集发生变更（上传/删除/手动刷新）后触发，供缓存失效等联动。 */
+  /** Fired after the file set changes (upload/delete/manual refresh) so derived caches can drop entries. */
   onFilesMutated?: (names?: string[]) => void;
 };
 
@@ -47,7 +33,6 @@ export type UseAuthFilesDataResult = {
   error: string;
   uploading: boolean;
   deleting: string | null;
-  deletingAll: boolean;
   statusUpdating: Record<string, boolean>;
   manualRefreshing: Record<string, boolean>;
   refreshingAllCredentials: boolean;
@@ -61,14 +46,12 @@ export type UseAuthFilesDataResult = {
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleDelete: (name: string) => void;
-  handleDeleteAll: (options: DeleteAllOptions) => void;
   handleDownload: (name: string) => Promise<void>;
   handleManualRefresh: (item: AuthFileItem) => Promise<void>;
   handleCooldownReset: (item: AuthFileItem) => void;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
-  invertVisibleSelection: (visibleFiles: AuthFileItem[]) => void;
   deselectAll: () => void;
   batchDownload: (names: string[]) => Promise<void>;
   batchSetStatus: (names: string[], enabled: boolean) => Promise<void>;
@@ -86,7 +69,6 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [manualRefreshing, setManualRefreshing] = useState<Record<string, boolean>>({});
   const [refreshingAllCredentials, setRefreshingAllCredentials] = useState(false);
@@ -103,7 +85,7 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
   const cooldownResetPendingRef = useRef<Set<string>>(new Set());
   const batchStatusPendingRef = useRef(false);
   const statusPendingRef = useRef({ revision: -1, keys: new Set<string>() });
-  /** 列表请求代号：变更操作会使在途响应过期，防止旧轮询复活已删/已改文件。 */
+  /** List request generation: mutations expire in-flight responses so a stale poll cannot resurrect deleted or changed files. */
   const loadRequestIdRef = useRef(0);
   const invalidateInFlightLoads = useCallback(() => {
     loadRequestIdRef.current += 1;
@@ -135,25 +117,6 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       nextSelected.forEach((name) => next.add(name));
-      return next;
-    });
-  }, []);
-
-  const invertVisibleSelection = useCallback((visibleFiles: AuthFileItem[]) => {
-    const visibleNames = visibleFiles
-      .filter((file) => !isRuntimeOnlyAuthFile(file))
-      .map((file) => file.name);
-    if (visibleNames.length === 0) return;
-
-    setSelectedFiles((prev) => {
-      const next = new Set(prev);
-      visibleNames.forEach((name) => {
-        if (next.has(name)) {
-          next.delete(name);
-        } else {
-          next.add(name);
-        }
-      });
       return next;
     });
   }, []);
@@ -223,7 +186,7 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
 
       try {
         const data = await authFilesApi.list();
-        if (!isCurrentRequest()) return; // 已被更新的请求/连接/变更取代
+        if (!isCurrentRequest()) return; // Superseded by a newer request, connection or mutation
         setFiles(data?.files || []);
         setError('');
       } catch (err: unknown) {
@@ -343,162 +306,6 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
       });
     },
     [applyDeletedFiles, showConfirmation, showNotification, t]
-  );
-
-  const handleDeleteAll = useCallback(
-    (deleteAllOptions: DeleteAllOptions) => {
-      const {
-        filter,
-        problemOnly,
-        disabledOnly,
-        enabledOnly,
-        onResetFilterToAll,
-        onResetProblemOnly,
-        onResetDisabledOnly,
-        onResetEnabledOnly,
-      } = deleteAllOptions;
-      const isFiltered = filter !== 'all';
-      const isProblemOnly = problemOnly === true;
-      const isDisabledOnly = disabledOnly === true;
-      const isEnabledOnly = enabledOnly === true;
-      const typeLabel = isFiltered ? getTypeLabel(t, filter) : t('auth_files.filter_all');
-      let confirmMessage = t('auth_files.delete_all_confirm');
-      if (isDisabledOnly || isEnabledOnly) {
-        confirmMessage = t('auth_files.delete_filtered_result_confirm');
-      } else if (isProblemOnly) {
-        confirmMessage = isFiltered
-          ? t('auth_files.delete_problem_filtered_confirm', { type: typeLabel })
-          : t('auth_files.delete_problem_confirm');
-      } else if (isFiltered) {
-        confirmMessage = t('auth_files.delete_filtered_confirm', { type: typeLabel });
-      }
-
-      showConfirmation({
-        title: t('auth_files.delete_all_title', { defaultValue: 'Delete All Files' }),
-        message: confirmMessage,
-        variant: 'danger',
-        confirmText: t('common.confirm'),
-        onConfirm: async () => {
-          setDeletingAll(true);
-          try {
-            if (!isFiltered && !isProblemOnly && !isDisabledOnly && !isEnabledOnly) {
-              await authFilesApi.deleteAll();
-              showNotification(t('auth_files.delete_all_success'), 'success');
-              invalidateInFlightLoads();
-              onFilesMutatedRef.current?.();
-              setFiles((prev) => prev.filter((file) => isRuntimeOnlyAuthFile(file)));
-              deselectAll();
-              notifyAuthFilesChanged();
-            } else {
-              const filesToDelete = files.filter((file) => {
-                if (isRuntimeOnlyAuthFile(file)) return false;
-                if (
-                  isFiltered &&
-                  normalizeProviderKey(String(file.type ?? file.provider ?? '')) !== filter
-                ) {
-                  return false;
-                }
-                if (isProblemOnly && !isProblemAuthFile(file)) return false;
-                if (isDisabledOnly && file.disabled !== true) return false;
-                if (isEnabledOnly && file.disabled === true) return false;
-                return true;
-              });
-
-              if (filesToDelete.length === 0) {
-                let emptyMessage = t('auth_files.delete_filtered_none', { type: typeLabel });
-                if (isDisabledOnly || isEnabledOnly) {
-                  emptyMessage = t('auth_files.delete_filtered_result_none');
-                } else if (isProblemOnly) {
-                  emptyMessage = isFiltered
-                    ? t('auth_files.delete_problem_filtered_none', { type: typeLabel })
-                    : t('auth_files.delete_problem_none');
-                }
-                showNotification(emptyMessage, 'info');
-                setDeletingAll(false);
-                return;
-              }
-
-              const result = await authFilesApi.deleteFiles(filesToDelete.map((file) => file.name));
-              const success = result.deleted;
-              const failed = result.failed.length;
-
-              applyDeletedFiles(result.files);
-              if (result.deleted > 0) notifyAuthFilesChanged();
-
-              if (failed === 0 && (isDisabledOnly || isEnabledOnly)) {
-                showNotification(
-                  t('auth_files.delete_filtered_result_success', { count: success }),
-                  'success'
-                );
-              } else if (failed === 0 && isProblemOnly) {
-                showNotification(
-                  isFiltered
-                    ? t('auth_files.delete_problem_filtered_success', {
-                        count: success,
-                        type: typeLabel,
-                      })
-                    : t('auth_files.delete_problem_success', { count: success }),
-                  'success'
-                );
-              } else if (failed === 0) {
-                showNotification(
-                  t('auth_files.delete_filtered_success', { count: success, type: typeLabel }),
-                  'success'
-                );
-              } else if (isDisabledOnly || isEnabledOnly) {
-                showNotification(
-                  t('auth_files.delete_filtered_result_partial', { success, failed }),
-                  'warning'
-                );
-              } else if (isProblemOnly) {
-                showNotification(
-                  isFiltered
-                    ? t('auth_files.delete_problem_filtered_partial', {
-                        success,
-                        failed,
-                        type: typeLabel,
-                      })
-                    : t('auth_files.delete_problem_partial', { success, failed }),
-                  'warning'
-                );
-              } else {
-                showNotification(
-                  t('auth_files.delete_filtered_partial', { success, failed, type: typeLabel }),
-                  'warning'
-                );
-              }
-
-              if (isFiltered) {
-                onResetFilterToAll();
-              }
-              if (isProblemOnly) {
-                onResetProblemOnly();
-              }
-              if (isDisabledOnly) {
-                onResetDisabledOnly();
-              }
-              if (isEnabledOnly) {
-                onResetEnabledOnly();
-              }
-            }
-          } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : '';
-            showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
-          } finally {
-            setDeletingAll(false);
-          }
-        },
-      });
-    },
-    [
-      applyDeletedFiles,
-      deselectAll,
-      files,
-      invalidateInFlightLoads,
-      showConfirmation,
-      showNotification,
-      t,
-    ]
   );
 
   const handleDownload = useCallback(
@@ -895,7 +702,7 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
         );
       }
 
-      // 与 batchSetStatus 保持一致：批量动作完成后清空选择
+      // Same as batchSetStatus: clear the selection once the bulk action finishes
       deselectAll();
     },
     [deselectAll, showNotification, t]
@@ -951,7 +758,6 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
     error,
     uploading,
     deleting,
-    deletingAll,
     statusUpdating,
     manualRefreshing,
     refreshingAllCredentials,
@@ -965,14 +771,12 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
     handleUploadClick,
     handleFileChange,
     handleDelete,
-    handleDeleteAll,
     handleDownload,
     handleManualRefresh,
     handleCooldownReset,
     handleStatusToggle,
     toggleSelect,
     selectAllVisible,
-    invertVisibleSelection,
     deselectAll,
     batchDownload,
     batchSetStatus,

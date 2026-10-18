@@ -8,8 +8,9 @@ import styles from './CopyButton.module.scss';
 const COPIED_RESET_MS = 1400;
 
 /**
- * 复制按钮：成功时图标就地变成对勾（反馈贴着动作发生，不弹 toast），
- * 失败才走全局通知。屏幕阅读器通过 role=status 听到「已复制」。
+ * Copy button: on success the icon turns into a check in place (feedback stays next to the
+ * action, no toast); only failures use the global notification. Screen readers hear "Copied"
+ * through the role=status region.
  */
 export function CopyButton({
   value,
@@ -46,7 +47,9 @@ export function CopyButton({
   return (
     <button
       type="button"
-      className={showLabel ? styles.labeled : styles.icon}
+      className={
+        showLabel ? `btn btn-secondary ${styles.labeled}` : `btn btn-ghost btn-sm ${styles.icon}`
+      }
       onClick={handleCopy}
       aria-label={showLabel ? undefined : label}
       title={showLabel ? undefined : label}

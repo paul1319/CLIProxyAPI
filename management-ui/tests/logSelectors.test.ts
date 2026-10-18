@@ -3,6 +3,7 @@ import { applyLogPage, emptyLogBuffer } from '../src/features/logs/model/logBuff
 import {
   createLogParserCache,
   filterLogEntries,
+  meetsMinLevel,
   searchLogEntries,
 } from '../src/features/logs/model/logSelectors';
 
@@ -12,7 +13,7 @@ const noFilters = () => ({
   methods: new Set<never>(),
   statuses: new Set<never>(),
   paths: new Set<string>(),
-  level: '',
+  minLevel: '' as const,
 });
 
 describe('log selectors use the whole retained buffer', () => {
@@ -61,8 +62,37 @@ describe('log selectors use the whole retained buffer', () => {
       applyLogPage(emptyLogBuffer(), { lines: [access('/ok'), access('/fail', 500)] })
     );
     expect(
-      filterLogEntries(entries, { ...noFilters(), statuses: new Set(['5xx']), level: 'info' })
+      filterLogEntries(entries, { ...noFilters(), statuses: new Set(['5xx']), minLevel: 'info' })
     ).toEqual([entries[1]]);
     expect(entries).toHaveLength(2);
+  });
+  test('level filter is a severity threshold, not an exact match', () => {
+    const line = (level: string, path: string) =>
+      `[2026-06-15 10:00:00] [abcd1234] [${level}] [gin_logger.go:1] 200 | 1ms | ::1 | GET "${path}"`;
+    const plain = '    at continuation line without a level';
+    const entries = createLogParserCache()(
+      applyLogPage(emptyLogBuffer(), {
+        lines: [
+          line('debug', '/d'),
+          line('info ', '/i'),
+          line('warn ', '/w'),
+          line('error', '/e'),
+          line('fatal', '/f'),
+          plain,
+        ],
+      })
+    );
+    const paths = (minLevel: '' | 'warn' | 'error') =>
+      filterLogEntries(entries, { ...noFilters(), minLevel }).map((entry) => entry.path ?? null);
+    expect(paths('')).toEqual(['/d', '/i', '/w', '/e', '/f', null]);
+    expect(paths('warn')).toEqual(['/w', '/e', '/f']);
+    expect(paths('error')).toEqual(['/e', '/f']);
+  });
+  test('meetsMinLevel treats an empty threshold as all levels', () => {
+    expect(meetsMinLevel(undefined, '')).toBe(true);
+    expect(meetsMinLevel(undefined, 'warn')).toBe(false);
+    expect(meetsMinLevel('info', 'warn')).toBe(false);
+    expect(meetsMinLevel('warn', 'warn')).toBe(true);
+    expect(meetsMinLevel('fatal', 'error')).toBe(true);
   });
 });

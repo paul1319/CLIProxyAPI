@@ -92,17 +92,18 @@ describe('error log viewer state machine', () => {
 });
 
 test('viewer UI derives controls and content from a single discriminated state', () => {
-  const source = readFileSync(
-    new URL('../src/features/logs/LogsPage.tsx', import.meta.url),
-    'utf8'
-  );
-  expect(source).toContain('useReducer(errorLogViewerReducer');
-  expect(source).not.toContain('setSelectedErrorLog');
-  expect(source).toContain("open={errorLogViewer.status !== 'closed'}");
-  expect(source).toContain("disabled={errorLogViewer.status !== 'ready' || !errorLogViewer.text}");
-  expect(source).toContain(
-    "disabled={errorLogViewer.status === 'closed' || errorLogViewer.status === 'loading'}"
-  );
-  expect(source).toContain("errorLogViewer.status === 'ready'");
-  expect(source).toContain("errorLogViewer.status === 'error'");
+  const read = (path: string) =>
+    readFileSync(new URL(`../src/features/logs/${path}`, import.meta.url), 'utf8');
+  const hook = read('hooks/useLogFiles.ts');
+  const sheet = read('components/LogFileSheet.tsx');
+  expect(hook).toContain('useReducer(errorLogViewerReducer');
+  expect(hook).not.toContain('setSelectedErrorLog');
+  // The reader is a right-side sheet, not a modal.
+  expect(sheet).toContain('<Sheet');
+  expect(sheet).not.toContain('<Modal');
+  expect(sheet).toContain("open={viewer.status !== 'closed'}");
+  expect(sheet).toContain("disabled={viewer.status !== 'ready' || !viewer.text}");
+  expect(sheet).toContain("disabled={viewer.status === 'closed' || viewer.status === 'loading'}");
+  expect(sheet).toContain("viewer.status === 'ready'");
+  expect(sheet).toContain("viewer.status === 'error'");
 });

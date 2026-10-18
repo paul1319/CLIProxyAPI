@@ -6,7 +6,6 @@ import i18n from '@/i18n';
 import { DEFAULT_VISUAL_VALUES } from '@/types/visualConfig';
 import { SectionAdvanced } from '@/features/config/components/sections/SectionAdvanced';
 import { SectionNetwork } from '@/features/config/components/sections/SectionNetwork';
-import { SectionOAuthBehavior } from '@/features/config/components/sections/SectionOAuthBehavior';
 import { CodexLiveICEServersEditor } from '@/features/config/components/blocks/CodexLiveICEServersEditor';
 import { CONFIG_SECTION_IDS } from '@/features/config/constants';
 import { CONFIG_FIELD_SEARCH_INDEX } from '@/features/config/searchIndex';
@@ -45,12 +44,13 @@ describe('OAuth behavior configuration UI', () => {
       expect(own).toContain(escapeText(translations.t(entry.hintKey!)));
       expect(entry.yamlKeys?.join('.')).toMatch(/^(routing|multimedia|oauth|upstream|client)\./);
     }
-    const oauth = render(createElement(SectionOAuthBehavior, props));
-    expect(oauth).toContain('<details');
-    expect(oauth).toContain(text('oauthTitle'));
-    expect(oauth).toContain(text('oauthHint'));
-    expect(oauth).not.toContain('cfg-field-claudeHeaderTimezone');
-    expect(oauth).toContain(text('liveRelayHint'));
+    // Provider behavior renders as headed groups (no collapsibles) with the OAuth-only scope note.
+    expect(advanced).not.toContain('<details');
+    expect(advanced).toContain(text('oauthHint'));
+    for (const key of ['claudeTitle', 'codexTitle', 'liveRelayTitle', 'xaiTitle']) {
+      expect(advanced).toMatch(new RegExp(`<h3[^>]*>${text(key)}</h3>`));
+    }
+    expect(advanced).toContain(text('liveRelayHint'));
   });
 
   test('renders labeled multi-line ICE URLs, masked credentials, and indexed removal actions', () => {
@@ -85,7 +85,7 @@ describe('OAuth behavior configuration UI', () => {
 
   test('disables every editor and ICE action when configuration is read-only', () => {
     const values = { ...DEFAULT_VISUAL_VALUES, codexLiveMediaRelayICEServers: [server] };
-    for (const Section of [SectionOAuthBehavior, SectionNetwork, SectionAdvanced]) {
+    for (const Section of [SectionNetwork, SectionAdvanced]) {
       const markup = render(createElement(Section, { ...props, values, disabled: true }));
       const controls = markup.match(/<(?:input|textarea|button)\b[^>]*>/g) ?? [];
       expect(controls.length).toBeGreaterThan(0);
@@ -94,7 +94,7 @@ describe('OAuth behavior configuration UI', () => {
   });
 
   test('preserves blank string inputs and permits negative transient cooldowns', () => {
-    const markup = render(createElement(SectionOAuthBehavior, props));
+    const markup = render(createElement(SectionAdvanced, props));
     for (const input of markup.match(/<input\b[^>]*type="(?:text|number)"[^>]*>/g) ?? []) {
       expect(input).toContain('value=""');
     }
@@ -111,7 +111,7 @@ describe('OAuth behavior configuration UI', () => {
 
   test('renders translated validation errors and associates the ICE error with its controls', () => {
     const markup = render(
-      createElement(SectionOAuthBehavior, {
+      createElement(SectionAdvanced, {
         ...props,
         values: { ...DEFAULT_VISUAL_VALUES, codexLiveMediaRelayICEServers: [server] },
         validationErrors: {

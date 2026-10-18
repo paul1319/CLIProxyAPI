@@ -1,0 +1,76 @@
+// Underline tabs, same spec as Credentials: label flush with the title edge, 13px/500,
+// ink-3 → ink, 2px ink underline; the hairline spans the whole row.
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  min-width: 0;
+  border-bottom: 1px solid var(--rule);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-hover) var(--ease-out-strong);
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: transparent;
+  }
+
+  &:hover {
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.active {
+  color: var(--ink);
+
+  &::after {
+    background: var(--ink);
+  }
+}
+
+.count {
+  color: var(--ink-3);
+  font-family: $font-mono;
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}

@@ -1,26 +1,77 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { IconChevronDown } from '@/components/ui/icons';
 import type { PayloadFilterRule, PayloadRule } from '@/types/visualConfig';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
+import { configGroupDomId, findConfigGroup } from '../../groups';
+import { configFieldDomId, findConfigFieldById } from '../../searchIndex';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
-import { FieldAnchor, FieldStack } from '../fields/FieldPrimitives';
 import { PayloadFilterRulesEditor } from '../blocks/PayloadFilterRulesEditor';
 import { PayloadRulesEditor } from '../blocks/PayloadRulesEditor';
-
-const Icon = CONFIG_TAB_ICONS.payload;
+import { useFieldDirty } from '../fields/settingState';
+import styles from './SectionPayload.module.scss';
 
 export type SectionPayloadProps = ConfigSectionProps & {
-  /** 有载荷校验错误时折叠组带 key 重挂载并强制展开，把错误带到眼前。 */
+  /** With payload validation errors every group remounts open, so the error is in view. */
   hasPayloadValidationErrors: boolean;
 };
 
-/** 06 Payload 配置：默认值 / 原始 JSON / 覆盖 / 过滤 五个规则组。 */
+/**
+ * One payload rule editor as a collapsible panel. The field anchor wraps the native <details>,
+ * so a search jump finds it with el.querySelector('details') and opens it.
+ */
+function PayloadGroup({
+  group,
+  fieldId,
+  description,
+  ruleCount,
+  defaultOpen,
+  children,
+}: {
+  group: string;
+  fieldId: string;
+  description: string;
+  ruleCount: number;
+  defaultOpen: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const dirty = useFieldDirty(fieldId);
+  const title = t(findConfigGroup(group)?.titleKey ?? group);
+  const yamlKey = findConfigFieldById(fieldId)?.yamlKeys?.join('.');
+  return (
+    <section id={configGroupDomId(group)} className={styles.group} aria-label={title}>
+      <div
+        id={configFieldDomId(fieldId)}
+        className={`${styles.panel} ${dirty ? styles.panelDirty : ''}`}
+        data-dirty={dirty || undefined}
+      >
+        <details className={styles.details} open={defaultOpen}>
+          <summary className={styles.summary}>
+            <span className={styles.summaryCopy}>
+              <span className={styles.summaryTitle}>
+                <span className={styles.title}>{title}</span>
+                {yamlKey ? <code className={styles.yamlKey}>{yamlKey}</code> : null}
+              </span>
+              <span className={styles.description}>{description}</span>
+            </span>
+            <span className={`${styles.count} ${ruleCount === 0 ? styles.countEmpty : ''}`}>
+              {ruleCount === 0
+                ? t('config_management.visual.payload_rules.no_rules')
+                : t('config_management.payload_rule_count', { count: ruleCount })}
+            </span>
+            <IconChevronDown size={16} className={styles.chevron} aria-hidden="true" />
+          </summary>
+          <div className={styles.body}>{children}</div>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+/** Payload rules: default, raw default, override, raw override and filter rule groups. */
 export function SectionPayload({
   values,
   disabled,
-  animateIn,
   hasPayloadValidationErrors,
   onChange,
 }: SectionPayloadProps) {
@@ -49,93 +100,85 @@ export function SectionPayload({
   );
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.payload}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.payload.title')}
-      description={t('config_management.visual.sections.payload.description')}
-      animateIn={animateIn}
-    >
-      <FieldStack>
-        <FieldAnchor fieldId="payloadDefaultRules">
-          <Collapsible
-            key={`payloadDefaultRules-${payloadValidationKey}`}
-            label={t('config_management.visual.sections.payload.default_rules')}
-            hint={t('config_management.visual.sections.payload.default_rules_desc')}
-            defaultOpen={hasPayloadValidationErrors}
-          >
-            <PayloadRulesEditor
-              value={values.payloadDefaultRules}
-              disabled={disabled}
-              onChange={handlePayloadDefaultRulesChange}
-            />
-          </Collapsible>
-        </FieldAnchor>
+    <div className={styles.stack}>
+      <PayloadGroup
+        key={`payloadDefaultRules-${payloadValidationKey}`}
+        group="payloadDefault"
+        fieldId="payloadDefaultRules"
+        description={t('config_management.visual.sections.payload.default_rules_desc')}
+        ruleCount={values.payloadDefaultRules.length}
+        defaultOpen={hasPayloadValidationErrors}
+      >
+        <PayloadRulesEditor
+          value={values.payloadDefaultRules}
+          disabled={disabled}
+          onChange={handlePayloadDefaultRulesChange}
+        />
+      </PayloadGroup>
 
-        <FieldAnchor fieldId="payloadDefaultRawRules">
-          <Collapsible
-            key={`payloadDefaultRawRules-${payloadValidationKey}`}
-            label={t('config_management.visual.sections.payload.default_raw_rules')}
-            hint={t('config_management.visual.sections.payload.default_raw_rules_desc')}
-            defaultOpen={hasPayloadValidationErrors}
-          >
-            <PayloadRulesEditor
-              value={values.payloadDefaultRawRules}
-              disabled={disabled}
-              rawJsonValues
-              onChange={handlePayloadDefaultRawRulesChange}
-            />
-          </Collapsible>
-        </FieldAnchor>
+      <PayloadGroup
+        key={`payloadDefaultRawRules-${payloadValidationKey}`}
+        group="payloadDefaultRaw"
+        fieldId="payloadDefaultRawRules"
+        description={t('config_management.visual.sections.payload.default_raw_rules_desc')}
+        ruleCount={values.payloadDefaultRawRules.length}
+        defaultOpen={hasPayloadValidationErrors}
+      >
+        <PayloadRulesEditor
+          value={values.payloadDefaultRawRules}
+          disabled={disabled}
+          rawJsonValues
+          onChange={handlePayloadDefaultRawRulesChange}
+        />
+      </PayloadGroup>
 
-        <FieldAnchor fieldId="payloadOverrideRules">
-          <Collapsible
-            key={`payloadOverrideRules-${payloadValidationKey}`}
-            label={t('config_management.visual.sections.payload.override_rules')}
-            hint={t('config_management.visual.sections.payload.override_rules_desc')}
-            defaultOpen={hasPayloadValidationErrors}
-          >
-            <PayloadRulesEditor
-              value={values.payloadOverrideRules}
-              disabled={disabled}
-              protocolFirst
-              onChange={handlePayloadOverrideRulesChange}
-            />
-          </Collapsible>
-        </FieldAnchor>
+      <PayloadGroup
+        key={`payloadOverrideRules-${payloadValidationKey}`}
+        group="payloadOverride"
+        fieldId="payloadOverrideRules"
+        description={t('config_management.visual.sections.payload.override_rules_desc')}
+        ruleCount={values.payloadOverrideRules.length}
+        defaultOpen={hasPayloadValidationErrors}
+      >
+        <PayloadRulesEditor
+          value={values.payloadOverrideRules}
+          disabled={disabled}
+          protocolFirst
+          onChange={handlePayloadOverrideRulesChange}
+        />
+      </PayloadGroup>
 
-        <FieldAnchor fieldId="payloadOverrideRawRules">
-          <Collapsible
-            key={`payloadOverrideRawRules-${payloadValidationKey}`}
-            label={t('config_management.visual.sections.payload.override_raw_rules')}
-            hint={t('config_management.visual.sections.payload.override_raw_rules_desc')}
-            defaultOpen={hasPayloadValidationErrors}
-          >
-            <PayloadRulesEditor
-              value={values.payloadOverrideRawRules}
-              disabled={disabled}
-              protocolFirst
-              rawJsonValues
-              onChange={handlePayloadOverrideRawRulesChange}
-            />
-          </Collapsible>
-        </FieldAnchor>
+      <PayloadGroup
+        key={`payloadOverrideRawRules-${payloadValidationKey}`}
+        group="payloadOverrideRaw"
+        fieldId="payloadOverrideRawRules"
+        description={t('config_management.visual.sections.payload.override_raw_rules_desc')}
+        ruleCount={values.payloadOverrideRawRules.length}
+        defaultOpen={hasPayloadValidationErrors}
+      >
+        <PayloadRulesEditor
+          value={values.payloadOverrideRawRules}
+          disabled={disabled}
+          protocolFirst
+          rawJsonValues
+          onChange={handlePayloadOverrideRawRulesChange}
+        />
+      </PayloadGroup>
 
-        <FieldAnchor fieldId="payloadFilterRules">
-          <Collapsible
-            key={`payloadFilterRules-${payloadValidationKey}`}
-            label={t('config_management.visual.sections.payload.filter_rules')}
-            hint={t('config_management.visual.sections.payload.filter_rules_desc')}
-            defaultOpen={hasPayloadValidationErrors}
-          >
-            <PayloadFilterRulesEditor
-              value={values.payloadFilterRules}
-              disabled={disabled}
-              onChange={handlePayloadFilterRulesChange}
-            />
-          </Collapsible>
-        </FieldAnchor>
-      </FieldStack>
-    </SectionCard>
+      <PayloadGroup
+        key={`payloadFilterRules-${payloadValidationKey}`}
+        group="payloadFilter"
+        fieldId="payloadFilterRules"
+        description={t('config_management.visual.sections.payload.filter_rules_desc')}
+        ruleCount={values.payloadFilterRules.length}
+        defaultOpen={hasPayloadValidationErrors}
+      >
+        <PayloadFilterRulesEditor
+          value={values.payloadFilterRules}
+          disabled={disabled}
+          onChange={handlePayloadFilterRulesChange}
+        />
+      </PayloadGroup>
+    </div>
   );
 }

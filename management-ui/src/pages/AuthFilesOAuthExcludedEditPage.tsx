@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { IconEyeOff, IconNetwork } from '@/components/ui/icons';
+import { IconNetwork } from '@/components/ui/icons';
 import { OAuthEditorProviderCard } from '@/features/authFiles/components/OAuthEditorProviderCard';
 import {
   ExcludedModelsPicker,
@@ -83,7 +83,7 @@ export function AuthFilesOAuthExcludedEditPage() {
     () => getStringSetSignature(normalizeExcludedRules(excluded[resolvedProviderKey] ?? [])),
     [excluded, resolvedProviderKey]
   );
-  /** 规则集就是选中集本身——「待添加的自定义规则」随 Add 按钮一起消失了。 */
+  /** The rule set is the selection itself — the separate "pending custom rule" went away with the Add button. */
   const effectiveRules = useMemo(() => normalizeExcludedRules(selectedModels), [selectedModels]);
   const effectiveRulesSignature = useMemo(
     () => getStringSetSignature(effectiveRules),
@@ -132,7 +132,7 @@ export function AuthFilesOAuthExcludedEditPage() {
       navigate(-1);
       return;
     }
-    navigate('/auth-files', { replace: true });
+    navigate('/auth-files?tab=rules', { replace: true });
   }, [location.state, navigate]);
 
   const swipeRef = useEdgeSwipeBack({ onBack: handleBack });
@@ -342,7 +342,7 @@ export function AuthFilesOAuthExcludedEditPage() {
       topBarClassName={styles.topBar}
       rightAction={
         <Button size="sm" onClick={handleSave} loading={saving} disabled={!canSave}>
-          {t('oauth_excluded.save')}
+          {t('common.save')}
         </Button>
       }
       isLoading={initialLoading}
@@ -369,15 +369,7 @@ export function AuthFilesOAuthExcludedEditPage() {
         </Card>
       ) : (
         <>
-          <div className={styles.intro}>
-            <span className={styles.introIcon}>
-              <IconEyeOff size={22} aria-hidden="true" />
-            </span>
-            <div>
-              <h1 className={styles.introTitle}>{t('oauth_excluded.title')}</h1>
-              <p className={styles.description}>{t('oauth_excluded.editor_description')}</p>
-            </div>
-          </div>
+          <p className={styles.lead}>{t('oauth_excluded.editor_description')}</p>
 
           <OAuthEditorProviderCard
             provider={provider}
@@ -390,9 +382,6 @@ export function AuthFilesOAuthExcludedEditPage() {
           <Card className={styles.settingsCard}>
             <div className={styles.editorHeader}>
               <div className={styles.sectionHeading}>
-                <span className={styles.stepNumber} aria-hidden="true">
-                  02
-                </span>
                 <div className={styles.headingCopy}>
                   <h2 className={styles.sectionTitle} id="oauth-excluded-models-label">
                     {t('oauth_excluded.models_label')}

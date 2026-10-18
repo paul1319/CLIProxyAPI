@@ -1,324 +1,357 @@
-@use '../styles/variables.scss' as *;
+@use '../styles/mixins' as *;
 
-// 主容器 - 左右分栏布局
-.container {
+// Login: one centered column on the rack — wordmark, a single panel card, version footer.
+// The language switch is a quiet ghost select in the page corner.
+
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 100vh;
-  display: flex;
-  background: var(--bg-secondary);
+  padding: 72px 16px 32px;
+  background: var(--rack);
+  color: var(--ink);
 }
 
-// 左侧品牌展示区
-.brandPanel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+@supports (height: 100dvh) {
+  .page {
+    min-height: 100dvh;
+  }
+}
+
+.corner {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
   align-items: center;
-  background: #000000;
-  padding: $spacing-2xl;
-  position: relative;
-  overflow: hidden;
+  gap: 2px;
+  color: var(--ink-3);
+}
 
-  // 移动端隐藏
-  @media (max-width: $breakpoint-mobile) {
-    display: none;
+.cornerIcon {
+  flex-shrink: 0;
+}
+
+// Local ghost variant of the shared Select trigger.
+.languageSelect > button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+
+  &:hover {
+    border-color: transparent;
+    background: var(--panel-hover);
+    color: var(--ink);
   }
 }
 
-// 品牌文字容器
-.brandContent {
-  position: relative;
-  z-index: 1;
+.column {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 20px;
   width: 100%;
-  padding: 0;
-  gap: 0;
+  max-width: 380px;
 }
 
-// 品牌大字淡入动画
-@keyframes brandFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: var(--target-opacity, 0.9);
-    transform: translateY(0);
-  }
-}
+// ---------- Brand ----------
 
-// 品牌大字
-.brandWord {
-  font-size: 14vw;
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.9);
-  letter-spacing: -0.02em;
-  line-height: 0.85;
-  text-transform: uppercase;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-  text-align: right;
-  padding-right: 0;
-  opacity: 0;
-  animation: brandFadeIn 0.8s ease-out forwards;
-
-  // 不同字有不同的透明度和延迟，从上到下依次显现
-  &:nth-child(1) {
-    --target-opacity: 0.95;
-    animation-delay: 0.1s;
-  }
-
-  &:nth-child(2) {
-    --target-opacity: 0.7;
-    animation-delay: 0.35s;
-  }
-
-  &:nth-child(3) {
-    --target-opacity: 0.45;
-    animation-delay: 0.6s;
-  }
-}
-
-// 右侧功能交互区
-.formPanel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: $spacing-2xl;
-  background: var(--bg-secondary);
-  position: relative;
-
-  @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
-    min-height: 100vh;
-  }
-}
-
-// 右侧内容容器
-.formContent {
-  width: 100%;
-  max-width: 420px;
+.brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $spacing-xl;
-}
-
-// Logo
-.logo {
-  width: 80px;
-  height: 80px;
-  border-radius: $radius-lg;
-  object-fit: cover;
-  box-shadow: var(--shadow-lg);
-  border: 3px solid var(--border-color);
-}
-
-// 登录表单卡片
-.loginCard {
-  width: 100%;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: $radius-lg;
-  box-shadow: var(--shadow-lg);
-  padding: $spacing-xl;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-lg;
-
-  @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
-    box-shadow: none;
-    border: none;
-    background: transparent;
-  }
-}
-
-// 登录头部
-.loginHeader {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
+  gap: 6px;
   text-align: center;
 }
 
-// 标题行
-.titleRow {
+.wordmarkRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-md;
+  border: 1px solid var(--rule);
+}
+
+.wordmark {
+  margin: 0;
+  font-size: $text-xl;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: $text-sm;
+  color: var(--ink-3);
+}
+
+// ---------- Card ----------
+
+.card {
   display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+// Server strip: the detected address in mono with a "Change" text button.
+.serverRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.serverLabel {
+  flex-shrink: 0;
+  font-size: $text-sm;
+  color: var(--ink-3);
+}
+
+.serverValue {
+  flex: 1;
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: $text-sm;
+  color: var(--ink);
+  @include text-ellipsis;
+}
+
+.serverEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.textButton {
+  @include button-reset;
+  flex-shrink: 0;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: $radius-sm;
+  font-size: $text-sm;
+  font-weight: 500;
+  color: var(--focus);
+  cursor: pointer;
+
+  @media (hover: hover) {
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 16px 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fieldLabel {
+  font-size: $text-sm;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.fieldHint {
+  margin: 0;
+  font-size: $text-sm;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.monoInput {
+  font-family: $font-mono;
+  font-size: $text-sm;
+}
+
+.keyControl {
+  position: relative;
+}
+
+.keyInput {
+  padding-right: 40px;
+  font-family: $font-mono;
+  letter-spacing: 0.02em;
+
+  &::placeholder {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+}
+
+.keyToggle {
+  @include button-reset;
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: $spacing-sm;
-  flex-wrap: wrap;
-}
-
-// 标题
-.title {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-// 副标题
-.subtitle {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-// 语言下拉选择
-.languageSelect {
-  min-width: 108px;
-  flex: 0 0 auto;
-}
-
-// 连接信息框
-.connectionBox {
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border-color);
+  width: 28px;
+  height: 28px;
   border-radius: $radius-md;
-  padding: $spacing-md;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-xs;
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    background-color $transition-fast;
 
-  .label {
-    color: var(--text-secondary);
-    font-size: 14px;
+  &:hover {
+    color: var(--ink);
+    background: var(--panel-hover);
   }
 
-  .value {
-    font-weight: 700;
-    color: var(--text-primary);
-    word-break: break-all;
-  }
-
-  .hint {
-    color: var(--text-secondary);
-    font-size: 12px;
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
-// 复选框行
-.toggleAdvanced {
-  display: flex;
-  justify-content: flex-start;
-  width: 100%;
+.checkboxLabel {
+  font-size: $text-md;
+  color: var(--ink-2);
 }
 
-.toggleLabel {
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 500;
+.submit {
+  min-height: $control-lg;
 }
 
-// 错误提示框
-.errorBox {
-  background: rgba($error-color, 0.1);
-  border: 1px solid rgba($error-color, 0.4);
+.error {
+  padding: 8px 12px;
   border-radius: $radius-md;
-  padding: $spacing-sm $spacing-md;
-  color: $error-color;
-  font-size: 14px;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-sm;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-// ========== 启动动画（右侧） ==========
+// ---------- Splash (restoring a saved session) ----------
 
-// 启动动画进入效果
-@keyframes splashEnter {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-// Logo 脉冲效果
-@keyframes splashLogoPulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-// 加载条动画
-@keyframes splashLoading {
-  0% {
-    transform: scaleX(0);
-    transform-origin: left;
-  }
-  50% {
-    transform: scaleX(1);
-    transform-origin: left;
-  }
-  50.01% {
-    transform-origin: right;
-  }
-  100% {
-    transform: scaleX(0);
-    transform-origin: right;
-  }
-}
-
-// 启动动画内容容器
-.splashContent {
+.splash {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $spacing-md;
-  animation: splashEnter 0.6s ease-out;
+  gap: 12px;
+  padding: 24px 0 8px;
 }
 
-// 启动动画 Logo
-.splashLogo {
-  height: 80px;
-  width: auto;
-  border-radius: $radius-lg;
-  box-shadow: $shadow-lg;
-  animation: splashLogoPulse 1.5s ease-in-out infinite;
-}
-
-// 启动动画标题
-.splashTitle {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.5px;
-}
-
-// 启动动画副标题
-.splashSubtitle {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 0;
-  margin-top: -8px;
-}
-
-// 启动动画加载条容器
-.splashLoader {
-  width: 120px;
-  height: 3px;
-  background: var(--border-color);
-  border-radius: $radius-full;
+.progress {
+  position: relative;
+  width: 160px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--well-strong);
   overflow: hidden;
-  margin-top: $spacing-md;
 }
 
-// 启动动画加载条
-.splashLoaderBar {
-  width: 100%;
-  height: 100%;
-  background: var(--primary-color);
-  border-radius: $radius-full;
-  animation: splashLoading 1.2s ease-in-out infinite;
+.progressBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 1px;
+  background: var(--ink);
+  animation: login-progress 1.1s var(--ease-out-strong, ease-out) infinite;
+
+  .progress[data-done='true'] & {
+    width: 100%;
+    background: var(--signal-ok);
+    animation: none;
+  }
+}
+
+@keyframes login-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.splashText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: $text-sm;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------- Footer ----------
+
+.footer {
+  margin: 0;
+  text-align: center;
+  font-family: $font-mono;
+  font-size: $text-xs;
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressBar {
+    animation: none;
+    width: 60%;
+  }
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .page {
+    justify-content: flex-start;
+    padding: 88px 16px 24px;
+  }
+
+  .submit {
+    min-height: 40px;
+  }
+
+  .keyInput,
+  .monoInput {
+    min-height: 40px;
+  }
+
+  .keyToggle {
+    width: 32px;
+    height: 32px;
+  }
 }

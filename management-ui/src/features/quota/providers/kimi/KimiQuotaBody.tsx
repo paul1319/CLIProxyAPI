@@ -1,5 +1,5 @@
 /**
- * Kimi 额度渲染体：用量行水位条。
+ * Kimi quota body: one remaining-capacity meter per usage row.
  */
 
 import { useMemo } from 'react';
@@ -28,7 +28,7 @@ export function KimiQuotaBody({ quota, classes }: QuotaBodyProps<KimiQuotaState>
 
   return (
     <>
-      {rows.map((row, index) => {
+      {rows.map((row) => {
         const limit = row.limit;
         const used = row.used;
         const remaining =
@@ -64,7 +64,7 @@ export function KimiQuotaBody({ quota, classes }: QuotaBodyProps<KimiQuotaState>
                 )}
               </div>
             </div>
-            <QuotaMeter percent={remaining} classes={classes} index={index} />
+            <QuotaMeter percent={remaining} classes={classes} />
           </div>
         );
       })}
