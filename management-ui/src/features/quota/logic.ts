@@ -1,9 +1,10 @@
 /**
- * 额度页纯逻辑：文件归类、tab 过滤、计数、分页。
- * React-free —— 由 tests/quotaPageLogic.test.ts 直接消费。
+ * Quota page pure logic: file classification, tab filtering, counts, sorting
+ * and pagination. React-free, consumed directly by tests/quotaPageLogic.test.ts.
  */
 
 import type { AuthFileItem } from '@/types';
+import { getQuotaCardTitle } from '@/utils/quota/identity';
 import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
 import { CLAUDE_CONFIG } from './providers/claude/data';
 import { CODEX_CONFIG } from './providers/codex/data';
@@ -50,8 +51,9 @@ export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType 
     : (QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null);
 
 /**
- * 把文件列表归类为额度条目：不支持额度或已停用的文件被过滤，
- * 结果按 QUOTA_TAB_ORDER 分组排列（'全部' tab 的卡片顺序即由此决定）。
+ * Classify the file list into quota entries. Files without quota support or
+ * disabled files are dropped; the result is grouped in QUOTA_TAB_ORDER, which
+ * is also the order of the provider sections on the page.
  */
 export function classifyQuotaFiles(files: AuthFileItem[]): QuotaFileEntry[] {
   const groups = new Map<QuotaProviderType, QuotaFileEntry[]>(
@@ -82,36 +84,46 @@ export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string)
 }
 
 /**
- * Order the grid by whichever credential recovers first.
+ * Order the cards.
  *
- * The instant is injected rather than read here: quota lives in the store and
- * arrives asynchronously, and keeping this function store-free is what makes
- * the ordering rules directly testable.
+ * - `name`: provider order, then the card title, so pages stay contiguous runs
+ *   of one provider and the default never reshuffles on a refresh.
+ * - `remaining` / `soonest`: ascending by the injected key (least remaining
+ *   capacity, or soonest capacity return). The key is injected rather than
+ *   read here because quota lives in the store and arrives asynchronously;
+ *   keeping this function store-free makes the ordering directly testable.
  *
- * Credentials with no instant — not loaded yet, failed, or reporting no
- * upcoming reset — sink to the bottom rather than sorting as "now". They keep
- * their incoming provider-grouped order, so the unloaded tail still reads like
- * the default view instead of an arbitrary shuffle. Because loading is
- * click-to-fetch, that tail is most of the list until the user asks for data.
- *
- * The original index is the final tiebreak, making stability an asserted
- * property rather than an assumption about the engine's sort.
+ * Entries without a key — not loaded yet, failed, or (for `soonest`) not
+ * constrained at all — sink to the bottom in their incoming order. The
+ * original index is the final tiebreak, so stability is asserted rather than
+ * assumed of the engine's sort.
  */
 export function sortQuotaEntries(
   entries: QuotaFileEntry[],
   mode: QuotaSortMode,
-  resolveNextRecoveryMs: (entry: QuotaFileEntry) => number | null
+  resolveKey: (entry: QuotaFileEntry) => number | null = () => null
 ): QuotaFileEntry[] {
-  if (mode !== 'soonest') return [...entries];
+  if (mode === 'name') {
+    const providerIndex = (entry: QuotaFileEntry) => QUOTA_TAB_ORDER.indexOf(entry.type);
+    return entries
+      .map((entry, index) => ({ entry, index, title: getQuotaCardTitle(entry.file) }))
+      .sort(
+        (a, b) =>
+          providerIndex(a.entry) - providerIndex(b.entry) ||
+          a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }) ||
+          a.index - b.index
+      )
+      .map((decorated) => decorated.entry);
+  }
 
   // Decorate once — resolving pokes at provider-shaped state per entry.
   return entries
-    .map((entry, index) => ({ entry, index, atMs: resolveNextRecoveryMs(entry) }))
+    .map((entry, index) => ({ entry, index, key: resolveKey(entry) }))
     .sort((a, b) => {
-      if (a.atMs === null && b.atMs === null) return a.index - b.index;
-      if (a.atMs === null) return 1;
-      if (b.atMs === null) return -1;
-      return a.atMs - b.atMs || a.index - b.index;
+      if (a.key === null && b.key === null) return a.index - b.index;
+      if (a.key === null) return 1;
+      if (b.key === null) return -1;
+      return a.key - b.key || a.index - b.index;
     })
     .map((decorated) => decorated.entry);
 }
@@ -139,7 +151,7 @@ export interface QuotaPagination<T> {
   totalPages: number;
 }
 
-/** 页码越界时收敛到有效区间（列表缩短后停留在最后一页而不是空页）。 */
+/** Clamp an out-of-range page (a shortened list stays on its last page, not an empty one). */
 export function paginate<T>(items: T[], page: number, pageSize: number): QuotaPagination<T> {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);

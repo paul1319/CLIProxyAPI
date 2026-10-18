@@ -1,0 +1,190 @@
+/* Left section index of the config page. Sits on the rack; active entry gets an ink rule. */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.list,
+.groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px 6px 12px;
+  border: 0;
+  border-radius: $radius-md;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .item:hover:not(:disabled) {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+}
+
+.itemActive {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule);
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--ink);
+  }
+}
+
+.itemLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.itemMarkers {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dirtyDot,
+.groupErrorDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-warn);
+  flex-shrink: 0;
+}
+
+.groupErrorDot {
+  background: var(--signal-fault);
+}
+
+.errorCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: $radius-sm;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-family: $font-mono;
+  font-size: $text-xs;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Group anchors of the active section. */
+.groups {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 8px 12px;
+  padding-left: 8px;
+  border-left: 1px solid var(--rule);
+}
+
+.groupLink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: $text-sm;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-hover) var(--ease-out-strong);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .groupLink:hover {
+    color: var(--ink);
+  }
+}
+
+.groupLinkActive {
+  color: var(--ink);
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -9px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--ink);
+  }
+}
+
+.groupLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.select {
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .groupLink {
+    transition: none;
+  }
+}

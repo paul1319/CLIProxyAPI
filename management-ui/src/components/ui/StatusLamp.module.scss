@@ -1,0 +1,53 @@
+.lamp {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--signal-idle);
+}
+
+.ok {
+  background: var(--signal-ok);
+  box-shadow: 0 0 0 3px var(--signal-ok-soft);
+}
+
+.warn {
+  background: var(--signal-warn);
+  box-shadow: 0 0 0 3px var(--signal-warn-soft);
+}
+
+.fault {
+  background: var(--signal-fault);
+  box-shadow: 0 0 0 3px var(--signal-fault-soft);
+}
+
+.idle {
+  background: var(--signal-idle);
+}
+
+.live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: lamp-pulse 2s var(--ease-out-strong) infinite;
+}
+
+@keyframes lamp-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live::after {
+    animation: none;
+  }
+}

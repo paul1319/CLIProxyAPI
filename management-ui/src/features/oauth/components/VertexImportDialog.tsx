@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { IconFileText, IconLoader2, IconUpload } from '@/components/ui/icons';
 import type { VertexImportState } from '../hooks/useVertexImport';
-import { DialogTitle, type DialogHeading } from './OAuthFlowDialog';
+import { DialogTitle, ResultView, type DialogHeading } from './OAuthFlowDialog';
 import dialogStyles from './OAuthFlowDialog.module.scss';
 import styles from './VertexImportDialog.module.scss';
 
@@ -33,6 +33,7 @@ export function VertexImportDialog({
 }: VertexImportDialogProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileLabelId = useId();
   const fileHintId = useId();
   const [dragging, setDragging] = useState(false);
   const result = vertex.result;
@@ -52,22 +53,44 @@ export function VertexImportDialog({
       ].filter((row): row is { key: string; value: string } => Boolean(row.value))
     : [];
 
+  const footer = result ? undefined : (
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={onImport}
+      disabled={!vertex.file || vertex.loading}
+    >
+      {vertex.loading && (
+        <IconLoader2 size={14} className={dialogStyles.spinning} aria-hidden="true" />
+      )}
+      {t('vertex_import.import_button')}
+    </button>
+  );
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      width={500}
+      width={520}
       className={dialogStyles.dialog}
       title={<DialogTitle {...heading} />}
+      footer={footer}
     >
       <div className={dialogStyles.view} key={result ? 'result' : 'form'}>
         {result ? (
-          <div className={dialogStyles.result} role="status">
-            <svg className={dialogStyles.successMark} viewBox="0 0 52 52" aria-hidden="true">
-              <circle className={dialogStyles.successRing} cx="26" cy="26" r="24" />
-              <path className={dialogStyles.successCheck} d="M16 27l7 7 14-15" />
-            </svg>
-            <div className={dialogStyles.resultTitle}>{t('vertex_import.result_title')}</div>
+          <ResultView
+            title={t('vertex_import.result_title')}
+            actions={
+              <>
+                <button type="button" className="btn btn-secondary" onClick={onViewAuthFiles}>
+                  {t('auth_login.view_auth_files')}
+                </button>
+                <button type="button" className="btn btn-primary" onClick={onImportAnother}>
+                  {t('vertex_import.import_another')}
+                </button>
+              </>
+            }
+          >
             {resultRows.length > 0 && (
               <dl className={styles.facts}>
                 {resultRows.map((row) => (
@@ -78,21 +101,15 @@ export function VertexImportDialog({
                 ))}
               </dl>
             )}
-            <div className={dialogStyles.resultActions}>
-              <button type="button" className={dialogStyles.secondary} onClick={onViewAuthFiles}>
-                {t('auth_login.view_auth_files')}
-              </button>
-              <button type="button" className={dialogStyles.primary} onClick={onImportAnother}>
-                {t('vertex_import.import_another')}
-              </button>
-            </div>
-          </div>
+          </ResultView>
         ) : (
           <div className={dialogStyles.stack}>
             <p className={dialogStyles.hint}>{t('vertex_import.description')}</p>
 
             <div className={styles.field}>
-              <span className={styles.label}>{t('vertex_import.file_label')}</span>
+              <span className={styles.label} id={fileLabelId}>
+                {t('vertex_import.file_label')}
+              </span>
               <button
                 type="button"
                 className={styles.dropZone}
@@ -105,10 +122,10 @@ export function VertexImportDialog({
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
-                aria-describedby={fileHintId}
+                aria-describedby={`${fileLabelId} ${fileHintId}`}
               >
                 <span className={styles.dropGlyph} aria-hidden="true">
-                  {vertex.file ? <IconFileText size={18} /> : <IconUpload size={18} />}
+                  {vertex.file ? <IconFileText size={16} /> : <IconUpload size={16} />}
                 </span>
                 <span className={styles.dropText}>
                   <span className={vertex.file ? styles.fileName : styles.dropTitle}>
@@ -147,20 +164,6 @@ export function VertexImportDialog({
                 {vertex.error}
               </div>
             )}
-
-            <div>
-              <button
-                type="button"
-                className={dialogStyles.primary}
-                onClick={onImport}
-                disabled={!vertex.file || vertex.loading}
-              >
-                {vertex.loading && (
-                  <IconLoader2 size={14} className={dialogStyles.spinning} aria-hidden="true" />
-                )}
-                {t('vertex_import.import_button')}
-              </button>
-            </div>
           </div>
         )}
       </div>

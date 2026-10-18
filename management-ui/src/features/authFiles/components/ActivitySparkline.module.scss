@@ -1,0 +1,17 @@
+.spark {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.ok {
+  fill: var(--ink-3);
+}
+
+.fail {
+  fill: var(--signal-fault);
+}
+
+.idle {
+  fill: var(--rule-strong);
+}

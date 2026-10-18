@@ -1,77 +1,84 @@
-// 设置行原语：开关 / 输入 / 下拉 / 区块编辑器共用一副骨架，
-// 两列网格的落单补整行逻辑，以及每种行的标签与描述关联。
+// Setting row primitives: toggles, inputs, selects and block editors share one skeleton (one
+// setting per row), show the YAML key from the search index, mark unsaved rows, and wire labels,
+// hints and errors for assistive tech.
 
 import { describe, expect, test } from 'bun:test';
-import { createElement, Fragment } from 'react';
+import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '@/i18n';
 import {
   BlockSetting,
   SelectSetting,
-  SettingList,
+  SettingGroup,
   TextSetting,
   ToggleSetting,
 } from '@/features/config/components/fields/FieldPrimitives';
-import { resolveRowSpans } from '@/features/config/components/fields/rowSpans';
+import { DirtyFieldsContext } from '@/features/config/components/fields/settingState';
 
 const noop = () => {};
-const render = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(element);
+const translations = i18n.cloneInstance({ lng: 'en' });
+const render = (element: ReturnType<typeof createElement>) =>
+  renderToStaticMarkup(createElement(I18nextProvider, { i18n: translations }, element));
 const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1];
+const rowTag = (markup: string, fieldId: string) =>
+  markup.match(new RegExp(`<div id="cfg-field-${fieldId}"[^>]*>`))?.[0] ?? '';
 
-/** 回显 SettingList 注入的 wide，用来观察补整行结果。 */
-function Probe({ name, wide }: { name: string; wide?: boolean }) {
-  return createElement('i', { 'data-name': name, 'data-wide': String(Boolean(wide)) });
-}
-const probe = (name: string, wide?: boolean) => createElement(Probe, { key: name, name, wide });
-const spansOf = (markup: string) =>
-  [...markup.matchAll(/data-name="([^"]+)" data-wide="(true|false)"/g)].map(
-    ([, name, wide]) => `${name}:${wide}`
-  );
-
-describe('two-column row spans', () => {
-  test('pairs rows and lets a trailing orphan fill its row', () => {
-    expect(resolveRowSpans([false, false])).toEqual([false, false]);
-    expect(resolveRowSpans([false, false, false])).toEqual([false, false, true]);
-    expect(resolveRowSpans([false])).toEqual([true]);
-    expect(resolveRowSpans([])).toEqual([]);
-  });
-
-  test('a row left alone before a full-width row spans instead of leaving a hole', () => {
-    // a b / c [wide] / d → c 与 d 都会落单
-    expect(resolveRowSpans([false, false, false, true, false])).toEqual([
-      false,
-      false,
-      true,
-      true,
-      true,
-    ]);
-    // [wide] a b → 显式整行后重新从行首配对
-    expect(resolveRowSpans([true, false, false])).toEqual([true, false, false]);
-  });
-
-  test('SettingList flattens fragments and injects wide only into orphans', () => {
+describe('setting groups', () => {
+  test('render the registry title as a heading above the list, plus description and actions', () => {
     const markup = render(
       createElement(
-        SettingList,
-        null,
-        probe('a'),
-        probe('b'),
-        createElement(Fragment, null, probe('c'), probe('d', true)),
-        null,
-        false,
-        probe('e')
+        SettingGroup,
+        {
+          group: 'tls',
+          description: 'Group hint',
+          actions: createElement('button', { type: 'button' }, 'Act'),
+        },
+        createElement('i', null, 'row')
       )
     );
-    expect(spansOf(markup)).toEqual(['a:false', 'b:false', 'c:true', 'd:true', 'e:true']);
+    expect(markup).toContain('<section id="cfg-group-tls"');
+    expect(markup).toContain('aria-labelledby="cfg-group-tls-title"');
+    expect(markup).toMatch(/<h3 id="cfg-group-tls-title"[^>]*>TLS<\/h3>/);
+    expect(markup).toContain('Group hint');
+    expect(markup).toContain('>Act</button>');
   });
 
-  test('renders an optional group heading above the list', () => {
+  test('an explicit title overrides the registry', () => {
+    const markup = render(createElement(SettingGroup, { group: 'tls', title: 'Custom' }, 'x'));
+    expect(markup).toContain('>Custom</h3>');
+  });
+});
+
+describe('row state', () => {
+  test('rows show their YAML key from the search index', () => {
     const markup = render(
-      createElement(SettingList, { title: 'Codex', description: 'Group hint' }, probe('a'))
+      createElement(TextSetting, { fieldId: 'port', label: 'Port', value: '', onChange: noop })
     );
-    expect(markup).toContain('<h3');
-    expect(markup).toContain('Codex');
-    expect(markup).toContain('Group hint');
-    expect(render(createElement(SettingList, null, probe('a')))).not.toContain('<h3');
+    expect(markup).toContain('>server.port</code>');
+  });
+
+  test('unsaved rows are marked from the dirty field context; others are not', () => {
+    const markup = render(
+      createElement(
+        DirtyFieldsContext.Provider,
+        { value: new Set(['debug']) },
+        createElement(ToggleSetting, {
+          fieldId: 'debug',
+          label: 'Debug',
+          checked: false,
+          onChange: noop,
+        }),
+        createElement(ToggleSetting, {
+          fieldId: 'loggingToFile',
+          label: 'Log to file',
+          checked: false,
+          onChange: noop,
+        })
+      )
+    );
+    expect(rowTag(markup, 'debug')).toContain('data-dirty="true"');
+    expect(rowTag(markup, 'loggingToFile')).not.toContain('data-dirty');
   });
 });
 

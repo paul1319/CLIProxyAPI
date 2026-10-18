@@ -1,7 +1,11 @@
-import { afterEach, expect, spyOn, test } from 'bun:test';
+import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import i18n from '@/i18n';
 import { apiClient } from '@/services/api/client';
-import { loadQuotaEntry } from '@/features/quota/quotaRequests';
+import {
+  isVisibleQuotaLoad,
+  loadQuotaEntry,
+  shouldEnterLoadingState,
+} from '@/features/quota/quotaRequests';
 import { QUOTA_ADAPTERS } from '@/features/quota/providers';
 import { useQuotaStore } from '@/stores/useQuotaStore';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
@@ -180,4 +184,96 @@ test('a saved xAI quota still restores optional plan metadata when the latest qu
   } finally {
     post.mockRestore();
   }
+});
+
+describe('background refresh keeps the visible card steady', () => {
+  const codexPost = (statusFor: (resource: string) => number) =>
+    spyOn(apiClient, 'post').mockImplementation(async (_path, input) => {
+      const resource = (input as { resource: string }).resource;
+      const status = statusFor(resource);
+      return status === 200
+        ? {
+            status_code: 200,
+            body: resource === 'usage' ? payload : { credits: [] },
+            observed_at: observedAt,
+          }
+        : {
+            status_code: status,
+            body: null,
+            error_status: status,
+            retry_at: '2026-10-17T12:15:00Z',
+          };
+    });
+
+  const recordStatuses = () => {
+    const statuses: string[] = [];
+    const unsubscribe = useQuotaStore.subscribe((state) => {
+      const status = state.codexQuota[file.name]?.status;
+      if (status && statuses[statuses.length - 1] !== status) statuses.push(status);
+    });
+    return { statuses, unsubscribe };
+  };
+
+  test('an automatic refresh of an observed card never commits a loading state', async () => {
+    const post = codexPost(() => 200);
+    try {
+      await loadQuotaEntry(file, QUOTA_ADAPTERS.codex, i18n.t, { mode: 'refresh' });
+      const { statuses, unsubscribe } = recordStatuses();
+      await loadQuotaEntry(file, QUOTA_ADAPTERS.codex, i18n.t, {
+        mode: 'refresh',
+        automatic: true,
+      });
+      unsubscribe();
+      expect(statuses).not.toContain('loading');
+      expect(useQuotaStore.getState().codexQuota[file.name].status).toBe('success');
+    } finally {
+      post.mockRestore();
+    }
+  });
+
+  test('an error-only card stays in its error state while polling retries', async () => {
+    const post = codexPost((resource) => (resource === 'usage' ? 401 : 200));
+    try {
+      await expect(
+        loadQuotaEntry(file, QUOTA_ADAPTERS.codex, i18n.t, { mode: 'refresh', automatic: true })
+      ).rejects.toThrow();
+      const first = useQuotaStore.getState().codexQuota[file.name];
+      expect(first).toMatchObject({ status: 'error', errorStatus: 401 });
+      expect(first.retryAt).toBe('2026-10-17T12:15:00Z');
+
+      const { statuses, unsubscribe } = recordStatuses();
+      await expect(
+        loadQuotaEntry(file, QUOTA_ADAPTERS.codex, i18n.t, { mode: 'refresh', automatic: true })
+      ).rejects.toThrow();
+      unsubscribe();
+      expect(statuses).not.toContain('loading');
+    } finally {
+      post.mockRestore();
+    }
+  });
+
+  test('first observation and manual refreshes still show progress', () => {
+    const observed = { status: 'success' as const };
+    expect(shouldEnterLoadingState(undefined, { mode: 'refresh', automatic: true })).toBe(true);
+    expect(shouldEnterLoadingState({ status: 'idle' }, { mode: 'refresh', automatic: true })).toBe(
+      true
+    );
+    expect(shouldEnterLoadingState(observed, { mode: 'refresh', automatic: true })).toBe(false);
+    expect(shouldEnterLoadingState({ status: 'error' }, { mode: 'refresh', automatic: true })).toBe(
+      false
+    );
+    expect(shouldEnterLoadingState(observed, { mode: 'force' })).toBe(true);
+    expect(shouldEnterLoadingState(observed, { mode: 'cached' })).toBe(false);
+  });
+
+  test('only user-initiated network reads drive the toolbar spinner', () => {
+    expect(isVisibleQuotaLoad({ mode: 'force' })).toBe(true);
+    expect(isVisibleQuotaLoad({ mode: 'refresh', automatic: true })).toBe(false);
+    expect(isVisibleQuotaLoad({ mode: 'cached', automatic: true })).toBe(false);
+    const loader = Bun.file('src/features/quota/hooks/useQuotaBatchLoader.ts');
+    return loader.text().then((source) => {
+      expect(source).toContain('const visible = isVisibleQuotaLoad(options);');
+      expect(source).toContain('if (visible) setBatchLoading(true);');
+    });
+  });
 });

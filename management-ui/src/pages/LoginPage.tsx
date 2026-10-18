@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
-import { IconEye, IconEyeOff } from '@/components/ui/icons';
+import { StatusLamp } from '@/components/ui/StatusLamp';
+import { IconEye, IconEyeOff, IconGlobe } from '@/components/ui/icons';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
@@ -15,11 +15,20 @@ import type { ApiError } from '@/types';
 import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
 import styles from './LoginPage.module.scss';
 
-/**
- * 将 API 错误转换为本地化的用户友好消息
- */
 type RedirectState = { from?: { pathname?: string } };
 
+const UI_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+
+/** Host part of a base URL for compact display ("localhost:8317"); falls back to the input. */
+const hostOf = (base: string): string => {
+  try {
+    return new URL(base).host || base;
+  } catch {
+    return base;
+  }
+};
+
+/** Maps an API error to a localized, user-facing message. */
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
   if (error instanceof LegacyBackendError) return t('login.error_legacy_backend');
   const apiError = error as Partial<ApiError>;
@@ -49,7 +58,7 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
     return `HTTP ${status}: ${summary}${backendDetail}`;
   };
 
-  // 根据 HTTP 状态码判断
+  // HTTP status codes first.
   if (status === 401) {
     return withHttpStatus(t('login.error_unauthorized'));
   }
@@ -63,7 +72,7 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
     return withHttpStatus(t('login.error_server'));
   }
 
-  // 根据 axios 错误码判断
+  // Then axios error codes.
   if (code === 'ECONNABORTED' || message.toLowerCase().includes('timeout')) {
     return t('login.error_timeout');
   }
@@ -74,12 +83,12 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
     return t('login.error_ssl');
   }
 
-  // 检查 CORS 错误
+  // CORS failures.
   if (message.toLowerCase().includes('cors') || message.toLowerCase().includes('cross-origin')) {
     return t('login.error_cors');
   }
 
-  // 默认错误消息
+  // Generic fallback.
   return withHttpStatus(t('login.error_invalid'));
 }
 
@@ -107,6 +116,11 @@ export function LoginPage() {
   const [autoLoginSuccess, setAutoLoginSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const serverInputId = useId();
+  const serverHintId = useId();
+  const keyInputId = useId();
+  const errorId = useId();
+
   const detectedBase = useMemo(() => detectApiBaseFromLocation(), []);
   const languageOptions = useMemo(
     () =>
@@ -132,7 +146,7 @@ export function LoginPage() {
         const autoLoggedIn = await restoreSession();
         if (autoLoggedIn) {
           setAutoLoginSuccess(true);
-          // 延迟跳转，让用户看到成功动画
+          // Hold the "connected" state briefly before redirecting.
           setTimeout(() => {
             const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
             navigate(redirect, { replace: true });
@@ -143,7 +157,7 @@ export function LoginPage() {
           setRememberPassword(storedRememberPassword || Boolean(storedKey));
         }
       } finally {
-        // 自动登录成功时 showSplash 仍由 autoLoginSuccess 维持，可无条件结束 loading
+        // On auto-login success the splash stays up via autoLoginSuccess.
         setAutoLoading(false);
       }
     };
@@ -170,9 +184,8 @@ export function LoginPage() {
       showNotification(t('common.connected_status'), 'success');
       navigate('/', { replace: true });
     } catch (err: unknown) {
-      const message = getLocalizedErrorMessage(err, t);
-      setError(message);
-      showNotification(`${t('notification.login_failed')}: ${message}`, 'error');
+      // Shown inline under the button; a toast would only repeat it.
+      setError(getLocalizedErrorMessage(err, t));
     } finally {
       setLoading(false);
     }
@@ -187,146 +200,164 @@ export function LoginPage() {
     t,
   ]);
 
-  const handleSubmitKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      if (event.key === 'Enter' && !loading) {
-        event.preventDefault();
-        handleSubmit();
-      }
-    },
-    [loading, handleSubmit]
-  );
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!loading) void handleSubmit();
+  };
+
+  const resetServer = () => {
+    setApiBase(detectedBase);
+    setShowCustomBase(false);
+  };
 
   if (isAuthenticated && !autoLoading && !autoLoginSuccess) {
     const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
     return <Navigate to={redirect} replace />;
   }
 
-  // 显示启动动画（自动登录中或自动登录成功）
+  // Splash while restoring a saved session (and briefly after it succeeds).
   const showSplash = autoLoading || autoLoginSuccess;
+  const currentBase = apiBase || storedBase || detectedBase;
+  const keyToggleLabel = showKey ? t('login.hide_key') : t('login.show_key');
 
   return (
-    <div className={styles.container}>
-      {/* 左侧品牌展示区 */}
-      <div className={styles.brandPanel}>
-        <div className={styles.brandContent}>
-          <span className={styles.brandWord}>CLI</span>
-          <span className={styles.brandWord}>PROXY</span>
-          <span className={styles.brandWord}>API</span>
-        </div>
+    <div className={styles.page}>
+      <div className={styles.corner}>
+        <IconGlobe size={14} className={styles.cornerIcon} aria-hidden="true" />
+        <Select
+          className={styles.languageSelect}
+          value={language}
+          options={languageOptions}
+          onChange={handleLanguageChange}
+          fullWidth={false}
+          size="sm"
+          ariaLabel={t('language.switch')}
+        />
       </div>
 
-      {/* 右侧功能交互区 */}
-      <div className={styles.formPanel}>
+      <main className={styles.column}>
+        <header className={styles.brand}>
+          <div className={styles.wordmarkRow}>
+            <img src={INLINE_LOGO_JPEG} alt="" width={28} height={28} className={styles.logo} />
+            <h1 className={styles.wordmark}>CLIProxyAPI</h1>
+          </div>
+          <p className={styles.subtitle}>{t('login.subtitle')}</p>
+        </header>
+
         {showSplash ? (
-          /* 启动动画 */
-          <div className={styles.splashContent}>
-            <img src={INLINE_LOGO_JPEG} alt="CPAMC" className={styles.splashLogo} />
-            <h1 className={styles.splashTitle}>{t('splash.title')}</h1>
-            <p className={styles.splashSubtitle}>{t('splash.subtitle')}</p>
-            <div className={styles.splashLoader}>
-              <div className={styles.splashLoaderBar} />
+          <div className={styles.splash} role="status" aria-live="polite">
+            <div className={styles.progress} data-done={autoLoginSuccess}>
+              <span className={styles.progressBar} />
             </div>
+            <p className={styles.splashText}>
+              {autoLoginSuccess && <StatusLamp state="ok" size={6} />}
+              <span>
+                {t(autoLoginSuccess ? 'login.connected_to' : 'login.connecting_to', {
+                  host: hostOf(storedBase || detectedBase),
+                })}
+              </span>
+            </p>
           </div>
         ) : (
-          /* 登录表单 */
-          <div className={styles.formContent}>
-            {/* Logo */}
-            <img src={INLINE_LOGO_JPEG} alt="Logo" className={styles.logo} />
-
-            {/* 登录表单卡片 */}
-            <div className={styles.loginCard}>
-              <div className={styles.loginHeader}>
-                <div className={styles.titleRow}>
-                  <div className={styles.title}>{t('title.login')}</div>
-                  <Select
-                    className={styles.languageSelect}
-                    value={language}
-                    options={languageOptions}
-                    onChange={handleLanguageChange}
-                    fullWidth={false}
-                    ariaLabel={t('language.switch')}
-                  />
+          <form className={styles.card} onSubmit={handleFormSubmit} noValidate>
+            {showCustomBase ? (
+              <div className={styles.serverEdit}>
+                <div className={styles.fieldHead}>
+                  <label className={styles.fieldLabel} htmlFor={serverInputId}>
+                    {t('login.server_input_label')}
+                  </label>
+                  <button type="button" className={styles.textButton} onClick={resetServer}>
+                    {t('login.server_reset')}
+                  </button>
                 </div>
-                <div className={styles.subtitle}>{t('login.subtitle')}</div>
-              </div>
-
-              <div className={styles.connectionBox}>
-                <div className={styles.label}>{t('login.connection_current')}</div>
-                <div className={styles.value}>{apiBase || detectedBase}</div>
-                <div className={styles.hint}>{t('login.connection_auto_hint')}</div>
-              </div>
-
-              <div className={styles.toggleAdvanced}>
-                <SelectionCheckbox
-                  checked={showCustomBase}
-                  onChange={setShowCustomBase}
-                  ariaLabel={t('login.custom_connection_label')}
-                  label={t('login.custom_connection_label')}
-                  labelClassName={styles.toggleLabel}
-                />
-              </div>
-
-              {showCustomBase && (
-                <Input
-                  label={t('login.custom_connection_label')}
-                  placeholder={t('login.custom_connection_placeholder')}
+                <input
+                  id={serverInputId}
+                  className={`input ${styles.monoInput}`}
                   value={apiBase}
-                  onChange={(e) => setApiBase(e.target.value)}
-                  hint={t('login.custom_connection_hint')}
+                  onChange={(event) => setApiBase(event.target.value)}
+                  placeholder={t('login.custom_connection_placeholder')}
+                  aria-describedby={serverHintId}
+                  autoComplete="url"
+                  spellCheck={false}
+                  autoFocus
                 />
-              )}
+                <p className={styles.fieldHint} id={serverHintId}>
+                  {t('login.custom_connection_hint')}
+                </p>
+              </div>
+            ) : (
+              <div className={styles.serverRow}>
+                <span className={styles.serverLabel}>{t('login.server_label')}</span>
+                <span className={styles.serverValue} title={currentBase}>
+                  {currentBase}
+                </span>
+                <button
+                  type="button"
+                  className={styles.textButton}
+                  onClick={() => setShowCustomBase(true)}
+                  aria-label={t('login.server_change_aria')}
+                >
+                  {t('login.server_change')}
+                </button>
+              </div>
+            )}
 
-              <Input
-                autoFocus
-                label={t('login.management_key_label')}
-                placeholder={t('login.management_key_placeholder')}
-                type={showKey ? 'text' : 'password'}
-                name="cpa-management-key"
-                autoComplete="current-password"
-                value={managementKey}
-                onChange={(e) => setManagementKey(e.target.value)}
-                onKeyDown={handleSubmitKeyDown}
-                rightElement={
+            <div className={styles.fields}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor={keyInputId}>
+                  {t('login.key_label')}
+                </label>
+                <div className={styles.keyControl}>
+                  <input
+                    id={keyInputId}
+                    className={`input ${styles.keyInput}`}
+                    type={showKey ? 'text' : 'password'}
+                    name="cpa-management-key"
+                    autoComplete="current-password"
+                    placeholder={t('login.management_key_placeholder')}
+                    value={managementKey}
+                    onChange={(event) => setManagementKey(event.target.value)}
+                    aria-invalid={Boolean(error) || undefined}
+                    aria-describedby={error ? errorId : undefined}
+                    autoFocus={!showCustomBase}
+                  />
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className={styles.keyToggle}
                     onClick={() => setShowKey((prev) => !prev)}
-                    aria-label={
-                      showKey
-                        ? t('login.hide_key', { defaultValue: '隐藏密钥' })
-                        : t('login.show_key', { defaultValue: '显示密钥' })
-                    }
-                    title={
-                      showKey
-                        ? t('login.hide_key', { defaultValue: '隐藏密钥' })
-                        : t('login.show_key', { defaultValue: '显示密钥' })
-                    }
+                    aria-label={keyToggleLabel}
+                    title={keyToggleLabel}
+                    aria-pressed={showKey}
                   >
                     {showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
                   </button>
-                }
-              />
-
-              <div className={styles.toggleAdvanced}>
-                <SelectionCheckbox
-                  checked={rememberPassword}
-                  onChange={setRememberPassword}
-                  ariaLabel={t('login.remember_password_label')}
-                  label={t('login.remember_password_label')}
-                  labelClassName={styles.toggleLabel}
-                />
+                </div>
               </div>
 
-              <Button fullWidth onClick={handleSubmit} loading={loading}>
-                {loading ? t('login.submitting') : t('login.submit_button')}
+              <SelectionCheckbox
+                checked={rememberPassword}
+                onChange={setRememberPassword}
+                label={t('login.remember_device')}
+                labelClassName={styles.checkboxLabel}
+              />
+
+              <Button type="submit" fullWidth loading={loading} className={styles.submit}>
+                {loading ? t('login.submitting') : t('login.connect_button')}
               </Button>
 
-              {error && <div className={styles.errorBox}>{error}</div>}
+              {error && (
+                <div className={styles.error} id={errorId} role="alert">
+                  {error}
+                </div>
+              )}
             </div>
-          </div>
+          </form>
         )}
-      </div>
+
+        {UI_VERSION && (
+          <p className={styles.footer}>{t('login.ui_version', { version: UI_VERSION })}</p>
+        )}
+      </main>
     </div>
   );
 }

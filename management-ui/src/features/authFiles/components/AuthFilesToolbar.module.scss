@@ -1,294 +1,418 @@
 @use '../../../styles/mixins' as *;
 
-/* 工作区工具栏：高频操作区，无入场动画，反馈即时 */
-
 .toolbar {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
 }
 
-/* ---------- 搜索 ---------- */
+.primaryGroup,
+.secondaryGroup,
+.viewGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.primaryGroup {
+  flex: 1 1 360px;
+}
+
+.secondaryGroup {
+  flex: 0 1 auto;
+  gap: 12px;
+}
+
+/* ---------- Generic control (menu triggers, select-mode) ---------- */
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: $control-md;
+  padding: 0 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: $radius-md;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-hover) var(--ease-out-strong),
+    background-color var(--dur-hover) var(--ease-out-strong);
+
+  &:hover {
+    border-color: var(--rule-ink);
+    background: var(--panel-hover);
+  }
+
+  &[aria-expanded='true'] {
+    border-color: var(--rule-ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.controlActive {
+  border-color: var(--rule-ink);
+  background: var(--well);
+}
+
+.controlIcon,
+.controlChevron {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.controlLabel {
+  max-width: 140px;
+  @include text-ellipsis;
+}
+
+.controlCount {
+  color: var(--ink-3);
+  font-family: $font-mono;
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+.providerTrigger {
+  padding-left: 6px;
+}
+
+.selectModeButton {
+  display: none;
+}
+
+/* ---------- Search ---------- */
 
 .search {
-  flex: 1 1 220px;
-  min-width: 180px;
-  max-width: 340px;
-
-  /* Input 组件外层是 .form-group，去掉其默认下边距 */
-  :global(.form-group) {
-    margin-bottom: 0;
-  }
-
-  :global(.input) {
-    height: 36px;
-    border-radius: 10px;
-    font-size: 13px;
-  }
+  position: relative;
+  flex: 0 1 280px;
+  min-width: 140px;
 }
 
 .searchIcon {
-  color: var(--text-quaternary);
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
-/* ---------- 状态分段控件 ---------- */
+.searchInput {
+  width: 100%;
+  height: $control-md;
+  padding-left: 30px !important;
+  padding-right: 30px !important;
+
+  &::-webkit-search-cancel-button {
+    appearance: none;
+  }
+}
+
+.searchClear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--well-strong);
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+/* ---------- Status segmented control ---------- */
 
 .segmented {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  height: $control-md;
   padding: 2px;
-  border-radius: $radius-full;
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
+  border-radius: $radius-md;
+  background: var(--well);
 }
 
 .segment {
-  border: 0;
-  background: none;
-  cursor: pointer;
-  padding: 5px 12px;
-  border-radius: $radius-full;
-  font-size: 12px;
-  font-weight: 550;
-  line-height: 1.3;
-  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
   white-space: nowrap;
+  cursor: pointer;
   transition:
-    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    box-shadow var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out);
+    color var(--dur-hover) var(--ease-out-strong),
+    background-color var(--dur-hover) var(--ease-out-strong);
 
-  &:active {
-    transform: scale(0.96);
+  &:hover {
+    color: var(--ink);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: -1px;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .segment:hover:not(.segmentActive) {
-    color: var(--text-primary);
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
 .segmentActive {
-  color: var(--text-primary);
-  font-weight: 650;
-  background: var(--floating-surface, var(--bg-primary));
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 1px 2px rgba(0, 0, 0, 0.08);
+  border-color: var(--rule-strong);
+  background: var(--panel);
+  color: var(--ink);
 }
 
-.segmentProblem.segmentActive {
-  color: var(--danger-color);
-  background: color-mix(
-    in srgb,
-    var(--danger-color) 12%,
-    var(--floating-surface, var(--bg-primary))
-  );
-  box-shadow:
-    0 1px 3px color-mix(in srgb, var(--danger-color) 20%, transparent),
-    0 1px 2px rgba(0, 0, 0, 0.06);
-}
-
-/* ---------- 排序 ---------- */
-
-.sort {
-  min-width: 120px;
-}
-
-/* ---------- 显示设置 ---------- */
-
-.display {
-  position: relative;
-}
-
-.displayButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: $radius-full;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  transition:
-    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out);
-
-  &:active {
-    transform: scale(0.96);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 1px;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .displayButton:hover {
-    color: var(--text-primary);
-    border-color: var(--border-hover);
-  }
-}
-
-.displayButtonActive {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  background: var(--bg-primary);
-}
-
-.popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: $z-dropdown;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 216px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--floating-surface);
-  box-shadow: var(--floating-shadow);
-  transform-origin: top right;
-  animation: toolbar-popover-in var(--dur-hover, 200ms) var(--ease-out-strong, ease-out) both;
-}
-
-@keyframes toolbar-popover-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
-
-.popoverRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.pageSizeInput {
-  width: 64px;
-  height: 30px;
-  padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+.segmentCount {
+  color: var(--ink-3);
   font-family: $font-mono;
-  font-size: 12.5px;
+  font-size: $text-sm;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+}
 
-  &:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-10);
+/* ---------- Sort + density ---------- */
+
+.sortTrigger {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+  padding: 0 8px;
+
+  &:hover {
+    border-color: transparent;
+    background: var(--panel-hover);
+    color: var(--ink);
   }
 }
 
-/* ---------- 删除筛选结果（工具栏右端的 ghost danger） ---------- */
+.density {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: $radius-md;
+  background: var(--well);
+}
 
-.deleteAction {
-  margin-left: auto;
+.densityButton {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: $radius-full;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid transparent;
-  background: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-3);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--danger-color);
-  white-space: nowrap;
-  transition:
-    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out);
 
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.96);
+  &:hover {
+    color: var(--ink);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--danger-color);
-    outline-offset: 1px;
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .deleteAction:hover:not(:disabled) {
-    background: var(--destructive-10);
-    border-color: var(--destructive-30);
+.densityActive {
+  border-color: var(--rule-strong);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+/* ---------- Contextual selection bar ---------- */
+
+.selectionBar {
+  background: var(--well);
+}
+
+.selectionInfo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
+}
+
+.selectionCount {
+  color: var(--ink);
+  font-size: $text-md;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  border-radius: $radius-sm;
+  background: none;
+  color: var(--focus);
+  font: inherit;
+  font-size: $text-md;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
-/* ---------- 响应式 ---------- */
+.selectionActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 
-@media (max-width: 900px) {
-  .search {
-    flex-basis: 100%;
-    max-width: none;
-  }
+.deleteButton {
+  color: var(--signal-fault-ink) !important;
 
-  .deleteAction {
-    margin-left: 0;
+  svg {
+    color: var(--signal-fault);
   }
 }
+
+/* ---------- Mobile ---------- */
 
 @include mobile {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .primaryGroup,
+  .secondaryGroup {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .searchInput {
+    height: 36px;
+  }
+
+  .control {
+    height: 36px;
+  }
+
+  .providerTrigger .controlLabel {
+    display: none;
+  }
+
+  .selectModeButton {
+    display: inline-flex;
+  }
+
+  .secondaryGroup {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   .segmented {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 36px;
     overflow-x: auto;
-    max-width: 100%;
     scrollbar-width: none;
 
     &::-webkit-scrollbar {
       display: none;
     }
   }
+
+  .segment {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: $text-sm;
+  }
+
+  // The page header already carries the counts; keep every status reachable without scrolling.
+  .segmentCount {
+    display: none;
+  }
+
+  .sortLabel,
+  .sortTrigger .controlChevron,
+  .density {
+    display: none;
+  }
+
+  .sortTrigger {
+    width: 36px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .selectionBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .selectionActions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+
+    :global(.btn) {
+      min-height: 36px;
+      padding: 0 6px;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .segment,
-  .displayButton,
-  .deleteAction {
+  .control,
+  .segment {
     transition: none;
-  }
-
-  .segment:active,
-  .displayButton:active,
-  .deleteAction:active:not(:disabled) {
-    transform: none;
-  }
-
-  .popover {
-    animation: none;
   }
 }

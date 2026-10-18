@@ -11,6 +11,8 @@ export interface QuotaReadOptions {
   stale?: boolean;
   errorStatus?: number;
   persistenceError?: boolean;
+  /** When the server will next try the upstream read (primary resources only). */
+  retryAt?: string;
 }
 
 interface QuotaResponse {
@@ -20,6 +22,7 @@ interface QuotaResponse {
   server_time?: string;
   stale?: boolean;
   error_status?: number;
+  retry_at?: string;
   persistence_error?: boolean;
 }
 
@@ -52,6 +55,8 @@ export const quotaApi = {
         options.observedAt = response.observed_at;
       options.stale ||= response.stale === true;
       options.errorStatus ||= response.error_status || undefined;
+      if (response.retry_at && !response.retry_at.startsWith('0001-'))
+        options.retryAt = response.retry_at;
     }
     options.persistenceError ||= response.persistence_error === true;
     return {

@@ -1,6 +1,6 @@
 /**
- * xAI 额度渲染体：套餐 chip 行（SuperGrok Heavy / 付费档=金卡）、
- * 周/月账单水位条、按量付费余额。
+ * xAI quota body: plan chip row (SuperGrok Heavy / paid tiers = premium tier),
+ * weekly/monthly billing meters and the pay-as-you-go balance.
  */
 
 import { useMemo } from 'react';
@@ -223,9 +223,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               )}
             </div>
           </div>
-          {weeklyRemaining !== null && (
-            <QuotaMeter percent={weeklyRemaining} classes={classes} index={0} />
-          )}
+          {weeklyRemaining !== null && <QuotaMeter percent={weeklyRemaining} classes={classes} />}
         </div>
       )}
       {billing.productUsage.length > 0 && (
@@ -251,7 +249,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               <span className={classes.quotaAmount}>{onDemandAmountLabel}</span>
             </div>
           </div>
-          <QuotaMeter percent={onDemandRemaining} classes={classes} index={1} />
+          <QuotaMeter percent={onDemandRemaining} classes={classes} />
         </div>
       )}
       {hasMonthlyData && (
@@ -266,7 +264,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               )}
             </div>
           </div>
-          <QuotaMeter percent={remaining} classes={classes} index={2} />
+          <QuotaMeter percent={remaining} classes={classes} />
         </div>
       )}
     </>

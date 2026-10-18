@@ -1,22 +1,14 @@
-import type { ComponentType } from 'react';
-import {
-  IconCode,
-  IconKey,
-  IconNetwork,
-  IconSatellite,
-  IconScrollText,
-  IconShield,
-  IconSlidersHorizontal,
-  type IconProps,
-} from '@/components/ui/icons';
 import type { VisualConfigFieldPath } from '@/types/visualConfig';
 import type { VisualSectionId } from './searchIndex';
 
-/** 编辑模式：可视化表单 or YAML 源码。 */
+/** Editor mode: visual form or YAML source. */
 export type ConfigEditorMode = 'visual' | 'source';
 
-/** 顶部 tabs：'common'（常用，原简单模式的继任者）+ 6 个正典分区。 */
-export type ConfigTabId = 'common' | VisualSectionId;
+/**
+ * Section ids shown in the left section index. The former "Common" alias tab was removed:
+ * every field now lives in exactly one section, so dirty/error bookkeeping has a single home.
+ */
+export type ConfigTabId = VisualSectionId;
 
 export const CONFIG_SECTION_IDS = [
   'connectivity',
@@ -27,41 +19,14 @@ export const CONFIG_SECTION_IDS = [
   'payload',
 ] as const satisfies readonly VisualSectionId[];
 
-export const CONFIG_TAB_IDS: readonly ConfigTabId[] = ['common', ...CONFIG_SECTION_IDS];
+export const CONFIG_TAB_IDS: readonly ConfigTabId[] = CONFIG_SECTION_IDS;
 
-/** 分区序号（01–06）。常用 tab 是别名视图，不占序号。 */
-export const SECTION_INDEX_LABELS: Record<VisualSectionId, string> = {
-  connectivity: '01',
-  network: '02',
-  logging: '03',
-  streaming: '04',
-  advanced: '05',
-  payload: '06',
-};
-
-export const CONFIG_TAB_ICONS: Record<ConfigTabId, ComponentType<IconProps>> = {
-  common: IconSlidersHorizontal,
-  connectivity: IconKey,
-  network: IconNetwork,
-  logging: IconScrollText,
-  streaming: IconSatellite,
-  advanced: IconShield,
-  payload: IconCode,
-};
-
-/** 常用 tab 的 6 个字段（原简单模式），渲染源与正典分区共享（fields/sharedFields.tsx）。 */
-export const COMMON_FIELD_IDS = [
-  'host',
-  'port',
-  'apiKeys',
-  'proxyUrl',
-  'debug',
-  'loggingToFile',
-] as const;
+/** Section shown when nothing valid is persisted. */
+export const DEFAULT_CONFIG_SECTION: ConfigTabId = 'connectivity';
 
 /**
- * 每个分区承载的校验字段路径（tab 错误徽章的分桶依据）。
- * payload 的校验不走字段路径，由 hasPayloadValidationErrors 旗标补记。
+ * Validation field paths owned by each section (buckets for the section error counts).
+ * Payload validation has no field path; it is counted through hasPayloadValidationErrors.
  */
 export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualConfigFieldPath[]> =
   {
@@ -95,9 +60,9 @@ export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualC
   };
 
 /**
- * fieldId → useVisualConfig dirtyFields 的键（= VisualConfigValues 叶值键，streaming 用点号叶）。
- * 与搜索索引一一对应；三方对账由 tests/configFieldParity.test.ts 守护 ——
- * 增删字段时漏改任何一边（索引 / 本表 / 分区 JSX）都会红。
+ * fieldId -> useVisualConfig dirtyFields keys (VisualConfigValues leaf keys; streaming uses dotted leaves).
+ * Mirrors the search index one-to-one; tests/configFieldParity.test.ts checks the three-way parity
+ * (index / this table / section JSX), so forgetting any side when adding or removing a field fails CI.
  */
 export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   routingSessionAffinitySubagents: ['routingSessionAffinitySubagents'],
@@ -203,12 +168,12 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   payloadFilterRules: ['payloadFilterRules'],
 };
 
-/** tab / tabpanel 的 DOM id：单点定义，ConfigTabs 与页面侧面板用同一函数生成 aria 关联。 */
+/** DOM ids for a section index entry and its content region (aria wiring). */
 export const configTabDomId = (id: ConfigTabId) => `config-tab-${id}`;
 export const configPanelDomId = (id: ConfigTabId) => `config-panel-${id}`;
 
-/** localStorage 键：mode 沿用旧键（'visual' | 'source' 值域不变）；section 为新键。 */
+/** localStorage keys: mode keeps the legacy key ('visual' | 'source'); section is the newer key. */
 export const CONFIG_MODE_STORAGE_KEY = 'config-management:tab';
 export const CONFIG_SECTION_STORAGE_KEY = 'config-management:section';
-/** 旧「简单/完整」双模式的持久化键，模式轴已删除；挂载时清理。 */
+/** Persisted key of the retired simple/full editor mode; cleared on mount. */
 export const LEGACY_EDITOR_MODE_STORAGE_KEY = 'config-management:editor-mode';

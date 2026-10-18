@@ -25,6 +25,19 @@ export function getQuotaDisplayName(file: AuthFileItem): string {
   return identity ? `${file.name} · ${identity}` : file.name;
 }
 
+/**
+ * Card title: the account email when known, otherwise the display name without
+ * the `.json` extension or a generated `claude-<8 hex>-` style prefix.
+ * Never falls back to `account`, which holds the API key for key-based files.
+ */
+export function getQuotaCardTitle(file: AuthFileItem): string {
+  const email = typeof file.email === 'string' ? file.email.trim() : '';
+  if (email) return email;
+  return getQuotaDisplayName(file)
+    .replace(/\.json(?=$| · )/i, '')
+    .replace(/^(?:claude|codex|xai)-[a-f\d]{8}-/i, '');
+}
+
 /** Resolve a cache identity back to the physical filename used by file mutations. */
 export function getQuotaCacheFileName(key: string): string {
   const separatorIndex = key.indexOf(QUOTA_IDENTITY_SEPARATOR);

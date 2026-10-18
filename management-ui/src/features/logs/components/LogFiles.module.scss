@@ -1,0 +1,273 @@
+// Error request files (table) and the shared right-side log reader.
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+}
+
+.hint {
+  margin: 0;
+  min-width: 0;
+  font-size: $text-sm;
+  color: var(--ink-3);
+}
+
+.count {
+  margin-right: 8px;
+  padding-right: 8px;
+  border-right: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.inlineError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 8px 12px;
+  border-radius: $radius-md;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-md;
+}
+
+.retry {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    border-radius: 2px;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.tableSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 16px;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+
+  span {
+    display: block;
+    height: 10px;
+    border-radius: $radius-sm;
+    background: var(--well-strong);
+  }
+}
+
+.tableWrap {
+  flex: none;
+}
+
+.table {
+  th {
+    white-space: nowrap;
+  }
+
+  td {
+    vertical-align: middle;
+  }
+}
+
+.cellName {
+  min-width: 0;
+}
+
+.fileName {
+  display: block;
+  font-family: $font-mono;
+  font-size: $text-sm;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.fileMetaMobile {
+  display: none;
+}
+
+.cellNum {
+  font-family: $font-mono;
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.cellMeta {
+  font-size: $text-sm;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.unknown {
+  color: var(--ink-4);
+}
+
+.cellActions {
+  white-space: nowrap;
+  width: 1%;
+
+  > * {
+    vertical-align: middle;
+  }
+}
+
+.iconAction {
+  display: inline-grid;
+  place-items: center;
+  width: $control-sm;
+  height: $control-sm;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: $radius-md;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    background-color $transition-fast;
+
+  &:hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--panel-hover);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// ---------------------------------------------------------------------------
+// Sheet reader
+// ---------------------------------------------------------------------------
+
+.sheetTitle {
+  display: block;
+  font-family: $font-mono;
+  font-size: $text-md;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sheetContent {
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--well);
+  color: var(--ink);
+  font-family: $font-mono;
+  font-size: $text-sm;
+  line-height: 20px;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.sheetSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--well);
+
+  span {
+    display: block;
+    height: 10px;
+    border-radius: $radius-sm;
+    background: var(--well-strong);
+  }
+}
+
+.sheetError {
+  padding: 10px 12px;
+  border-radius: $radius-md;
+  background: var(--signal-fault-soft);
+  color: var(--signal-fault-ink);
+  font-size: $text-md;
+  line-height: 1.5;
+}
+
+.sheetEmpty {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-md;
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .head {
+    align-items: flex-start;
+  }
+
+  .colSize,
+  .colModified {
+    display: none;
+  }
+
+  .fileMetaMobile {
+    display: block;
+    margin-top: 2px;
+    font-size: $text-xs;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .iconAction {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sheetContent {
+    padding: 10px;
+    font-size: $text-xs;
+  }
+}

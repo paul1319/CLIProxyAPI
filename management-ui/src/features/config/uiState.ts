@@ -1,22 +1,23 @@
-// 配置页 UI 状态的纯函数层：状态机、徽章分桶、脏字段归属、localStorage 读取。
-// 全部无副作用，由 tests/configUiState.test.ts 覆盖。
+// Pure UI-state layer of the config page: status machine, section badge buckets, dirty-field
+// ownership and localStorage readers. Side-effect free; covered by tests/configUiState.test.ts.
 
 import type { VisualConfigValidationErrors } from '@/types/visualConfig';
 import {
-  COMMON_FIELD_IDS,
   CONFIG_SECTION_IDS,
   CONFIG_TAB_IDS,
+  DEFAULT_CONFIG_SECTION,
   FIELD_VALUE_KEYS,
   SECTION_VALIDATION_FIELDS,
   type ConfigEditorMode,
   type ConfigTabId,
 } from './constants';
+import { CONFIG_SECTION_GROUPS } from './groups';
 import { CONFIG_FIELD_SEARCH_INDEX, type VisualSectionId } from './searchIndex';
 
-/** 可视化编辑器暴露的配置项总数（头部 meta 行的「N 项配置」）。 */
+/** Number of settings exposed by the visual editor. */
 export const CONFIG_FIELD_COUNT = CONFIG_FIELD_SEARCH_INDEX.length;
 
-/** 叶值键（= useVisualConfig dirtyFields 的键）→ fieldId 反查表。 */
+/** Leaf value key (= useVisualConfig dirtyFields key) -> fieldId reverse map. */
 const VALUE_KEY_TO_FIELD_ID: ReadonlyMap<string, string> = (() => {
   const map = new Map<string, string>();
   for (const [fieldId, valueKeys] of Object.entries(FIELD_VALUE_KEYS)) {
@@ -29,27 +30,50 @@ const FIELD_ID_TO_SECTION: ReadonlyMap<string, VisualSectionId> = new Map(
   CONFIG_FIELD_SEARCH_INDEX.map((entry) => [entry.fieldId, entry.sectionId])
 );
 
-const COMMON_FIELD_ID_SET: ReadonlySet<string> = new Set<string>(COMMON_FIELD_IDS);
-
-/** 常用 tab 渲染的字段对应的叶值键集合（校验错误归属常用 tab 时用）。 */
-const COMMON_VALUE_KEYS: ReadonlySet<string> = new Set(
-  COMMON_FIELD_IDS.flatMap((fieldId) => [...(FIELD_VALUE_KEYS[fieldId] ?? [])])
+/** Page order of field ids (section → group → row); used to list changes and errors. */
+const FIELD_ORDER: ReadonlyMap<string, number> = new Map(
+  CONFIG_SECTION_IDS.flatMap((sectionId) =>
+    CONFIG_SECTION_GROUPS[sectionId].flatMap((group) => group.fields)
+  ).map((fieldId, index) => [fieldId, index])
 );
 
-/** 脏字段集合 → 点亮脏点的 tabs。常用字段同时点亮 common 与其正典分区（两处都渲染它）。 */
-export function resolveDirtyTabs(dirtyFields: ReadonlySet<string>): ReadonlySet<ConfigTabId> {
-  const tabs = new Set<ConfigTabId>();
+const byFieldOrder = (a: string, b: string) =>
+  (FIELD_ORDER.get(a) ?? Number.MAX_SAFE_INTEGER) - (FIELD_ORDER.get(b) ?? Number.MAX_SAFE_INTEGER);
+
+/** Dirty value keys -> dirty field ids (setting rows), in page order. */
+export function resolveDirtyFieldIds(dirtyFields: ReadonlySet<string>): string[] {
+  const fieldIds = new Set<string>();
   for (const valueKey of dirtyFields) {
     const fieldId = VALUE_KEY_TO_FIELD_ID.get(valueKey);
-    if (!fieldId) continue;
+    if (fieldId) fieldIds.add(fieldId);
+  }
+  return [...fieldIds].sort(byFieldOrder);
+}
+
+/** Validation errors -> field ids that currently show an error, in page order. */
+export function resolveErrorFieldIds(
+  validationErrors: VisualConfigValidationErrors | undefined
+): string[] {
+  const fieldIds = new Set<string>();
+  for (const [valueKey, error] of Object.entries(validationErrors ?? {})) {
+    if (!error) continue;
+    const fieldId = VALUE_KEY_TO_FIELD_ID.get(valueKey);
+    if (fieldId) fieldIds.add(fieldId);
+  }
+  return [...fieldIds].sort(byFieldOrder);
+}
+
+/** Dirty value keys -> sections that show an unsaved dot. */
+export function resolveDirtyTabs(dirtyFields: ReadonlySet<string>): ReadonlySet<ConfigTabId> {
+  const tabs = new Set<ConfigTabId>();
+  for (const fieldId of resolveDirtyFieldIds(dirtyFields)) {
     const sectionId = FIELD_ID_TO_SECTION.get(fieldId);
     if (sectionId) tabs.add(sectionId);
-    if (COMMON_FIELD_ID_SET.has(fieldId)) tabs.add('common');
   }
   return tabs;
 }
 
-/** 每个 tab 的校验错误数（错误徽章）。payload 的校验以旗标计 1。 */
+/** Validation error count per section. Payload validation counts as one. */
 export function countSectionErrors(
   validationErrors: VisualConfigValidationErrors | undefined,
   hasPayloadValidationErrors: boolean
@@ -65,14 +89,10 @@ export function countSectionErrors(
     );
   }
   if (hasPayloadValidationErrors) counts.payload += 1;
-  counts.common = Object.entries(validationErrors ?? {}).reduce(
-    (total, [field, error]) => total + (error && COMMON_VALUE_KEYS.has(field) ? 1 : 0),
-    0
-  );
   return counts;
 }
 
-/** 全页校验错误总数（头部 meta 行）。 */
+/** Total validation error count (header meta and save bar). */
 export function countTotalErrors(
   validationErrors: VisualConfigValidationErrors | undefined,
   hasPayloadValidationErrors: boolean
@@ -95,9 +115,10 @@ export type ConfigStatusTone = 'error' | 'warning' | 'busy' | 'muted' | 'ok';
 
 export type ConfigStatus = {
   key: ConfigStatusKey;
-  /** 完整状态文案的 i18n 键。 */
+  /** i18n key of the full status label. */
   labelKey: string;
-  /** 移动端短文案的 i18n 键。validation_blocked 的短键在 config_management 顶层（历史路径 bug 的修正）。 */
+  /** i18n key of the short label. validation_blocked's short key lives at the config_management
+   *  top level (fix for a historical path bug). */
   shortLabelKey: string;
   tone: ConfigStatusTone;
 };
@@ -112,7 +133,7 @@ export type ConfigStatusInput = {
   dirty: boolean;
 };
 
-/** 悬浮保存栏 / 状态文案的状态机。优先级自上而下，与旧页 getStatusText 分支序一致。 */
+/** Status machine for the header meta and save bar. Precedence runs top-down. */
 export function resolveStatus(input: ConfigStatusInput): ConfigStatus {
   if (input.disconnected) {
     return {
@@ -194,8 +215,9 @@ export type HeaderMetaInput = {
 };
 
 /**
- * 头部 ▍mono meta 行直接消费页面状态机，避免 Header 与保存栏各自推导连接/加载状态。
- * 字段总数常驻；阻断状态优先，编辑状态再补充待保存和校验错误数量。
+ * Header meta segments derived from the page status machine, so the header and the save bar never
+ * derive connection/loading state separately. Blocking states win; editing states then add the
+ * unsaved and validation error counts. The field count segment comes first.
  */
 export function buildHeaderMeta(input: HeaderMetaInput): HeaderMetaSegment[] {
   const segments: HeaderMetaSegment[] = [
@@ -256,7 +278,7 @@ export function buildHeaderMeta(input: HeaderMetaInput): HeaderMetaSegment[] {
   return segments;
 }
 
-/** localStorage 读取：非法/陈旧值回退默认。 */
+/** localStorage readers: invalid or stale values fall back to defaults. */
 export function readSavedMode(raw: string | null): ConfigEditorMode {
   return raw === 'source' ? 'source' : 'visual';
 }
@@ -264,5 +286,5 @@ export function readSavedMode(raw: string | null): ConfigEditorMode {
 export function readSavedSection(raw: string | null): ConfigTabId {
   return raw !== null && (CONFIG_TAB_IDS as readonly string[]).includes(raw)
     ? (raw as ConfigTabId)
-    : 'common';
+    : DEFAULT_CONFIG_SECTION;
 }

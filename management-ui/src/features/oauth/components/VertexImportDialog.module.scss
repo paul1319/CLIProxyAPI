@@ -1,18 +1,20 @@
 @use '../../../styles/mixins' as *;
 
+// Vertex import: file dropzone + optional region, primary action in the footer.
+
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .label {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: $text-sm;
+  font-weight: 500;
+  color: var(--ink-2);
 }
 
-/* 选文件 + 拖放落点：虚线 → 悬停/拖入变实线（与额度卡 idle 落点同语汇） */
+// The one legitimate dashed border: a drop target. Solid once a file is chosen or dragged over.
 .dropZone {
   @include button-reset;
   display: flex;
@@ -21,83 +23,75 @@
   width: 100%;
   min-height: 64px;
   padding: 12px 14px;
-  border: 1px dashed var(--border-primary);
-  border-radius: 12px;
-  background: var(--bg-secondary);
+  border: 1px dashed var(--rule-strong);
+  border-radius: $radius-lg;
+  background: var(--well);
   text-align: left;
+  cursor: pointer;
   transition:
-    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
-    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+    border-color $transition-fast,
+    background-color $transition-fast;
 
   &:focus {
     outline: none;
   }
 
   &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
   }
 
-  &:active {
-    transform: scale(0.99);
+  &:hover {
+    border-color: var(--rule-ink);
   }
 
   &[data-dragging='true'] {
     border-style: solid;
-    border-color: var(--text-primary);
-    background: var(--bg-tertiary);
+    border-color: var(--focus);
+    background: var(--panel-hover);
   }
 
   &[data-filled='true'] {
     border-style: solid;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .dropZone:hover {
-    border-style: solid;
-    border-color: var(--border-hover);
+    border-color: var(--rule-strong);
   }
 }
 
 .dropGlyph {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: $radius-md;
+  background: var(--well-strong);
+  color: var(--ink-2);
 }
 
 .dropText {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .dropTitle {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: $text-md;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .fileName {
   font-family: $font-mono;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: $text-md;
+  font-weight: 500;
+  color: var(--ink);
   @include text-ellipsis;
 }
 
 .dropHint {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-tertiary);
+  font-size: $text-sm;
+  color: var(--ink-3);
 }
 
 .locationField {
@@ -106,64 +100,48 @@
   }
 
   :global(.input) {
-    height: 36px;
-    padding: 0 12px;
-    border-radius: 10px;
     font-family: $font-mono;
-    font-size: 12.5px;
-  }
-
-  :global(.form-group label) {
-    font-size: 13.5px;
-  }
-
-  :global(.hint) {
-    font-size: 12px;
-    color: var(--text-tertiary);
   }
 }
 
-/* 导入结果：发丝分隔的键值行 */
+// Import result: label / value pairs, values in mono (ids, emails, file names).
 .facts {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  margin: 12px 0 0;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  text-align: left;
+  margin: 0;
+  border: 1px solid var(--rule);
+  border-radius: $radius-md;
   overflow: hidden;
 }
 
 .fact {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
   gap: 12px;
-  padding: 9px 14px;
+  padding: 8px 12px;
+  font-size: $text-sm;
 
   & + & {
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--rule);
   }
 
   dt {
-    font-size: 12px;
-    color: var(--text-tertiary);
+    color: var(--ink-3);
   }
 
   dd {
     margin: 0;
+    min-width: 0;
     font-family: $font-mono;
-    font-size: 12px;
-    color: var(--text-primary);
+    color: var(--ink);
     overflow-wrap: anywhere;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dropZone {
-    transition: none;
-  }
-
-  .dropZone:active {
-    transform: none;
+@media (max-width: $breakpoint-mobile) {
+  .fact {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 }

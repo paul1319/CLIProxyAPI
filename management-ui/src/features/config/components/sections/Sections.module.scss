@@ -1,0 +1,30 @@
+/* Section-level bits shared by the visual editor sections. */
+
+/* Sponsor link inside the Proxy URL description: plain, muted, never louder than the setting. */
+.sponsorLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 2px;
+  transition:
+    color var(--dur-hover) var(--ease-out-strong),
+    text-decoration-color var(--dur-hover) var(--ease-out-strong);
+
+  &:hover {
+    color: var(--ink);
+    text-decoration-color: var(--rule-ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+
+  svg {
+    color: var(--ink-4);
+  }
+}

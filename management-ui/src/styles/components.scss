@@ -1,60 +1,91 @@
-@use 'sass:color';
 @use './variables.scss' as *;
 
+// ---------------------------------------------------------------------------
+// Buttons — ink is the action color; one primary per view.
+//   md: 32px · 0 12px · 6px radius · 13px/500     sm: 28px · 0 10px · 12px/500
+// ---------------------------------------------------------------------------
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: $spacing-sm;
+  gap: 6px;
+  min-height: $control-md;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: $radius-md;
-  padding: 10px 14px;
-  font-weight: 600;
+  font-size: $text-md;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all $transition-fast;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
+  user-select: none;
+  background-color: var(--panel);
+  color: var(--ink);
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast,
+    color $transition-fast,
+    transform var(--dur-press) var(--ease-out-strong);
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
 
   &.btn-primary {
-    background-color: var(--primary-color);
-    color: var(--primary-contrast, #fff);
-    border-color: var(--primary-color);
+    background-color: var(--ink);
+    border-color: var(--ink);
+    color: var(--ink-inverse);
 
-    &:hover {
+    &:hover:not(:disabled) {
       background-color: var(--primary-hover);
       border-color: var(--primary-hover);
     }
   }
 
   &.btn-secondary {
-    background-color: var(--bg-tertiary);
-    border-color: var(--border-color);
-    color: var(--text-primary);
+    background-color: var(--panel);
+    border-color: var(--rule-strong);
+    color: var(--ink);
 
-    &:hover {
-      background-color: var(--bg-hover, var(--bg-tertiary));
-      border-color: var(--border-hover);
+    &:hover:not(:disabled) {
+      background-color: var(--panel-hover);
+      border-color: var(--rule-ink);
     }
   }
 
   &.btn-ghost {
     background: transparent;
     border-color: transparent;
-    color: var(--text-secondary);
+    color: var(--ink-2);
 
-    &:hover {
-      color: var(--text-primary);
-      background: var(--bg-tertiary);
+    &:hover:not(:disabled) {
+      color: var(--ink);
+      background: var(--panel-hover);
     }
   }
 
   &.btn-danger {
-    background-color: $error-color;
-    border-color: $error-color;
+    background-color: var(--signal-fault);
+    border-color: var(--signal-fault);
     color: #fff;
 
-    &:hover {
-      background-color: color.adjust($error-color, $lightness: -5%);
+    &:hover:not(:disabled) {
+      background-color: color-mix(in srgb, var(--signal-fault) 88%, #000);
     }
   }
 
@@ -63,69 +94,90 @@
   }
 
   &.btn-sm {
-    padding: 8px 10px;
-    font-size: 14px;
+    min-height: $control-sm;
+    padding: 0 10px;
+    font-size: $text-sm;
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.45;
     cursor: not-allowed;
   }
 }
 
-[data-theme='dark'] {
-  .btn {
-    color: #fff;
-  }
-
-  .btn.btn-secondary,
-  .btn.btn-ghost {
-    color: #fff;
-  }
-}
-
+// ---------------------------------------------------------------------------
+// Inputs — inset wells.
+// ---------------------------------------------------------------------------
 .input,
 textarea {
   width: 100%;
-  border: 1px solid var(--border-color);
+  min-height: $control-md;
+  border: 1px solid var(--rule-strong);
   border-radius: $radius-md;
-  padding: 10px 12px;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: $text-md;
+  background-color: var(--well);
+  color: var(--ink);
   transition:
     border-color $transition-fast,
-    box-shadow $transition-fast;
+    box-shadow $transition-fast,
+    background-color $transition-fast;
+
+  &::placeholder {
+    color: var(--ink-4);
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: var(--rule-ink);
+  }
 
   &:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba($primary-color, 0.18);
+    border-color: var(--focus);
+    background-color: var(--panel);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
   }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--signal-fault);
+  }
+}
+
+textarea {
+  line-height: 1.5;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: 6px;
   margin-bottom: $spacing-md;
 
   label {
-    font-weight: 600;
-    color: var(--text-primary);
+    font-size: $text-sm;
+    font-weight: 500;
+    color: var(--ink-2);
   }
 
   .hint {
-    color: var(--text-secondary);
-    font-size: 13px;
+    color: var(--ink-3);
+    font-size: $text-sm;
   }
 }
 
+// ---------------------------------------------------------------------------
+// Panels
+// ---------------------------------------------------------------------------
 .card {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background-color: var(--panel);
+  border: 1px solid var(--rule);
   border-radius: $radius-lg;
-  box-shadow: var(--shadow);
-  padding: $spacing-lg;
+  padding: $spacing-md;
 }
 
 .card-header {
@@ -134,7 +186,7 @@ textarea {
   justify-content: space-between;
   gap: $spacing-sm;
   flex-wrap: wrap;
-  margin-bottom: $spacing-md;
+  margin-bottom: 12px;
 
   > * {
     min-width: 0;
@@ -143,74 +195,83 @@ textarea {
   .title {
     flex: 1 1 auto;
     min-width: 0;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: $text-lg;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
 }
 
+// ---------------------------------------------------------------------------
+// Badges
+// ---------------------------------------------------------------------------
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border-radius: $radius-full;
-  font-size: 13px;
-  border: 1px solid var(--border-color);
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: $radius-sm;
+  font-size: $text-sm;
+  font-weight: 500;
+  background: var(--signal-idle-soft);
+  color: var(--ink-2);
   margin-bottom: $spacing-md;
 
-  // 确保后续内容换行显示
   + * {
     display: block;
   }
 
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
   &.success {
-    color: $success-color;
-    border-color: rgba($success-color, 0.35);
-    background: rgba($success-color, 0.08);
+    color: var(--signal-ok-ink);
+    background: var(--signal-ok-soft);
   }
 
   &.warning {
-    color: $warning-color;
-    border-color: rgba($warning-color, 0.35);
-    background: rgba($warning-color, 0.08);
+    color: var(--signal-warn-ink);
+    background: var(--signal-warn-soft);
   }
 
   &.error {
-    color: $error-color;
-    border-color: rgba($error-color, 0.35);
-    background: rgba($error-color, 0.08);
+    color: var(--signal-fault-ink);
+    background: var(--signal-fault-soft);
   }
 
   &.muted {
-    color: var(--text-secondary);
+    color: var(--ink-3);
   }
 }
 
 .pill {
-  padding: 4px 10px;
-  border-radius: $radius-full;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: $radius-sm;
+  background: var(--well-strong);
+  color: var(--ink-2);
+  font-size: $text-xs;
+  font-weight: 500;
 }
 
+// ---------------------------------------------------------------------------
+// Spinner
+// ---------------------------------------------------------------------------
 .loading-spinner {
-  // Fallback: legacy white spinner (in case color-mix is unsupported)
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  animation: spin 0.8s linear infinite;
-}
-
-@supports (color: color-mix(in srgb, currentColor 22%, transparent)) {
-  .loading-spinner {
-    border-color: color-mix(in srgb, currentColor 22%, transparent);
-    border-top-color: currentColor;
-  }
+  width: 14px;
+  height: 14px;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
@@ -222,10 +283,13 @@ textarea {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Modal
+// ---------------------------------------------------------------------------
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,11 +297,11 @@ textarea {
   padding: $spacing-lg;
 
   &.modal-overlay-entering {
-    animation: modal-overlay-fade-in 0.25s ease-out forwards;
+    animation: modal-overlay-fade-in 160ms var(--ease-out-strong) forwards;
   }
 
   &.modal-overlay-closing {
-    animation: modal-overlay-fade-out 0.35s ease-in forwards;
+    animation: modal-overlay-fade-out 140ms ease-out forwards;
   }
 }
 
@@ -260,32 +324,29 @@ textarea {
 }
 
 .modal {
-  background: var(--bg-primary);
-  border-radius: $radius-lg;
-  border: 1px solid var(--border-color);
-  box-shadow: $shadow-lg;
+  background: var(--panel-raised);
+  border-radius: $radius-xl;
+  box-shadow: var(--shadow-overlay);
   max-width: 100%;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
-  // 关闭按钮中心位置: right 12px + 16px = 28px, top 12px + 16px = 28px
-  transform-origin: calc(100% - 28px) 28px;
 
   &.modal-entering {
-    animation: modal-scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: modal-scale-in 200ms var(--ease-out-strong) forwards;
   }
 
   &.modal-closing {
-    animation: modal-collapse-to-close 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: modal-scale-out 140ms ease-out forwards;
   }
 }
 
 @keyframes modal-scale-in {
   from {
     opacity: 0;
-    transform: scale(0.85) translateY(20px);
+    transform: scale(0.97) translateY(4px);
   }
   to {
     opacity: 1;
@@ -293,14 +354,14 @@ textarea {
   }
 }
 
-@keyframes modal-collapse-to-close {
-  0% {
+@keyframes modal-scale-out {
+  from {
     opacity: 1;
     transform: scale(1);
   }
-  100% {
+  to {
     opacity: 0;
-    transform: scale(0);
+    transform: scale(0.98);
   }
 }
 
@@ -308,21 +369,20 @@ textarea {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  color: var(--ink-3);
   cursor: pointer;
-  border-radius: $radius-full;
+  border-radius: $radius-md;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition:
-    color 0.15s ease,
-    background-color 0.15s ease,
-    transform 0.15s ease;
+    color $transition-fast,
+    background-color $transition-fast;
   z-index: 10;
 
   svg {
@@ -330,96 +390,102 @@ textarea {
   }
 
   &:hover {
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-    transform: scale(1.1);
+    color: var(--ink);
+    background: var(--panel-hover);
   }
 
   &:active {
     transform: scale(0.95);
   }
 
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
-    transform: none;
+    opacity: 0.45;
   }
 
   &:disabled:hover {
-    color: var(--text-secondary);
-    background: var(--bg-secondary);
-    transform: none;
+    color: var(--ink-3);
+    background: transparent;
   }
 }
 
 .modal-header {
   display: flex;
   align-items: center;
-  padding: $spacing-md $spacing-lg;
-  border-bottom: 1px solid var(--border-color);
+  min-height: 52px;
+  padding: 12px 52px 12px 20px;
+  border-bottom: 1px solid var(--rule);
 
   .modal-title {
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--text-primary);
+    font-weight: 600;
+    font-size: $text-lg;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
 }
 
 .modal-body {
-  padding: $spacing-lg;
+  padding: 20px;
   overflow: auto;
   max-height: 65vh;
 }
 
 .modal-footer {
-  padding: $spacing-md $spacing-lg;
-  border-top: 1px solid var(--border-color);
+  padding: 12px 20px;
+  border-top: 1px solid var(--rule);
   display: flex;
   justify-content: flex-end;
   gap: $spacing-sm;
-  background: var(--bg-primary);
+  background: var(--panel-raised);
 }
 
 @media (max-width: $breakpoint-mobile) {
   .modal-overlay {
-    padding: $spacing-md;
+    padding: 0;
+    align-items: flex-end;
   }
 
   .modal {
-    max-height: calc(100vh - #{$spacing-md * 2});
-    border-radius: $radius-md;
+    width: 100% !important;
+    max-height: calc(100vh - 24px);
+    border-radius: $radius-xl $radius-xl 0 0;
   }
 
   @supports (height: 100dvh) {
     .modal {
-      max-height: calc(100dvh - #{$spacing-md * 2});
+      max-height: calc(100dvh - 24px);
     }
   }
 
   .modal-header {
-    padding: $spacing-md;
-    padding-right: 52px;
+    padding: 12px 52px 12px 16px;
   }
 
   .modal-body {
     padding: $spacing-md;
-    max-height: min(60vh, calc(100vh - 180px));
+    max-height: min(70vh, calc(100vh - 160px));
   }
 
   @supports (height: 100dvh) {
     .modal-body {
-      max-height: min(60dvh, calc(100dvh - 180px));
+      max-height: min(70dvh, calc(100dvh - 160px));
     }
   }
 
   .modal-footer {
-    padding: $spacing-md;
+    padding: 12px $spacing-md calc(12px + env(safe-area-inset-bottom));
     flex-direction: column-reverse;
     align-items: stretch;
   }
 
   .modal-footer .btn {
     width: 100%;
+    min-height: $control-lg;
   }
 }
 
@@ -434,11 +500,14 @@ textarea {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Empty state — quiet, never dashed.
+// ---------------------------------------------------------------------------
 .empty-state {
-  border: 1px dashed var(--border-color);
+  border: 1px solid var(--rule);
   border-radius: $radius-lg;
-  padding: $spacing-lg;
-  background: var(--bg-secondary);
+  padding: 20px;
+  background: var(--panel);
   display: flex;
   justify-content: space-between;
   gap: $spacing-md;
@@ -447,44 +516,53 @@ textarea {
   .empty-content {
     display: flex;
     align-items: center;
-    gap: $spacing-md;
+    gap: 14px;
+    min-width: 0;
   }
 
   .empty-icon {
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
-    border-radius: $radius-full;
-    border: 2px solid var(--border-color);
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: $radius-md;
+    background: var(--well-strong);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 0;
-    color: var(--text-secondary);
+    color: var(--ink-3);
 
     svg {
       display: block;
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
     }
   }
 
   .empty-title {
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: $text-md;
+    font-weight: 600;
+    color: var(--ink);
   }
 
   .empty-desc {
-    color: var(--text-secondary);
-    margin-top: 4px;
+    font-size: $text-md;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+
+  .empty-action {
+    display: flex;
+    gap: $spacing-sm;
+    flex-shrink: 0;
   }
 
   .empty-action .btn > span {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     line-height: 1;
   }
 
@@ -492,64 +570,101 @@ textarea {
     display: block;
     flex-shrink: 0;
   }
+
+  @media (max-width: $breakpoint-mobile) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
+// ---------------------------------------------------------------------------
+// Lists
+// ---------------------------------------------------------------------------
 .item-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--panel);
+  overflow: hidden;
 }
 
 .item-row {
-  border: 1px solid var(--border-color);
-  border-radius: $radius-md;
-  padding: $spacing-md;
-  background: var(--bg-primary);
+  padding: 10px 14px;
+  background: var(--panel);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: $spacing-md;
   flex-wrap: wrap;
 
+  & + & {
+    border-top: 1px solid var(--rule);
+  }
+
   .item-meta {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
+    min-width: 0;
   }
 
   .item-title {
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: $text-md;
+    font-weight: 600;
+    color: var(--ink);
   }
 
   .item-subtitle {
-    color: var(--text-secondary);
-    font-family:
-      ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-      'Courier New', monospace;
+    font-size: $text-sm;
+    color: var(--ink-3);
+    font-family: $font-mono;
     word-break: break-all;
   }
 
   .item-actions {
     display: flex;
-    gap: $spacing-sm;
+    gap: 4px;
   }
 }
 
 .error-box {
-  background: rgba($error-color, 0.1);
-  border: 1px solid rgba($error-color, 0.4);
+  background: var(--signal-fault-soft);
   border-radius: $radius-md;
-  padding: $spacing-sm $spacing-md;
-  color: $error-color;
+  padding: 8px 12px;
+  font-size: $text-md;
+  color: var(--signal-fault-ink);
 }
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: $spacing-md;
 }
 
 .hint {
-  color: var(--text-secondary);
+  color: var(--ink-3);
+}
+
+// Small uppercase label used above values and table columns.
+.overline {
+  font-size: $text-xs;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: $font-mono;
+}
+
+.confirmation-message {
+  font-size: $text-md;
+  line-height: 1.55;
+  color: var(--ink-2);
 }

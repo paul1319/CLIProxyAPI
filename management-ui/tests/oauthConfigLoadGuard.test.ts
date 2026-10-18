@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import '../src/i18n/index';
+import i18n from '../src/i18n/index';
 import { OAuthExcludedCard } from '../src/features/authFiles/components/OAuthExcludedCard';
 import { OAuthModelAliasCard } from '../src/features/authFiles/components/OAuthModelAliasCard';
 
@@ -23,7 +23,8 @@ describe('OAuth configuration load guards', () => {
     );
 
     expect(markup).toContain('disabled=""');
-    expect(markup).toContain('empty-action');
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain(i18n.t('credentials.retry'));
   });
 
   test('disables model-alias writes and exposes retry after a load failure', () => {
@@ -48,6 +49,7 @@ describe('OAuth configuration load guards', () => {
     );
 
     expect(markup).toContain('disabled=""');
-    expect(markup).toContain('empty-action');
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain(i18n.t('credentials.retry'));
   });
 });

@@ -1,0 +1,85 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: $text-xl;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: $text-sm;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.dot {
+  color: var(--ink-4);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tabs {
+  min-width: 0;
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .header {
+    margin-bottom: 16px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    align-self: stretch;
+
+    // Optically align a leading text-only action with the title edge.
+    > :global(.btn-ghost:first-child) {
+      margin-left: -10px;
+    }
+  }
+
+  // Wrapped meta lines would leave dangling separators; use spacing instead.
+  .meta {
+    column-gap: 12px;
+  }
+
+  .dot {
+    display: none;
+  }
+}

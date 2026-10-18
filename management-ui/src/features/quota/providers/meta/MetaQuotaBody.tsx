@@ -31,7 +31,7 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
       {data.windows.every((window) => window.usedPercent === null) && (
         <div className={classes.quotaMessage}>{t('meta_quota.empty_data')}</div>
       )}
-      {data.windows.map((window, index) => {
+      {data.windows.map((window) => {
         const remaining = window.usedPercent === null ? null : 100 - window.usedPercent;
         const resetDisplay = buildResetDisplay(
           null,
@@ -68,7 +68,7 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
               aria-valuemax={remaining === null ? undefined : 100}
               aria-valuenow={remaining ?? undefined}
             >
-              <QuotaMeter percent={remaining} classes={classes} index={index} />
+              <QuotaMeter percent={remaining} classes={classes} />
             </div>
           </div>
         );

@@ -1,45 +1,48 @@
 @use '../../styles/mixins' as *;
 
-/* Responsive quota workspace. */
-
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
   min-width: 0;
-}
 
-/* Responsive quota workspace. */
-
-.workbench {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
-/* Responsive quota workspace. */
-
-.tabsRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-
-  > :first-child {
-    flex: 1 1 auto;
-    min-width: 0;
+  /* PageHeader brings its own bottom margin; the page gap owns spacing here. */
+  > header:first-child {
+    margin-bottom: 0;
   }
 }
+
+.spinning {
+  animation: quota-page-spin 0.9s linear infinite;
+}
+
+@keyframes quota-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toolbar: provider filter · search · sort */
 
 .toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 8px 12px;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+/* With provider tabs the whole row sits on one hairline; the active underline covers it. */
+.toolbarTabs {
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.filters {
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
   min-width: 0;
 }
 
@@ -47,24 +50,27 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 340px;
+  flex: 0 1 280px;
   min-width: 0;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  height: $control-md;
+  border: 1px solid var(--rule-strong);
+  border-radius: $radius-md;
+  background: var(--well);
+  color: var(--ink-3);
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast;
 
   &:focus-within {
-    border-color: var(--border-hover);
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
+    border-color: var(--focus);
+    background: var(--panel);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
   }
 }
 
 .searchIcon {
   position: absolute;
-  left: 11px;
+  left: 10px;
   pointer-events: none;
 }
 
@@ -72,18 +78,18 @@
   width: 100%;
   min-width: 0;
   height: 100%;
-  padding: 0 42px 0 35px;
+  padding: 0 34px 0 30px;
   border: 0;
   border-radius: inherit;
   outline: none;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--ink);
   font: inherit;
-  font-size: 13px;
+  font-size: $text-md;
   appearance: none;
 
   &::placeholder {
-    color: var(--text-tertiary);
+    color: var(--ink-4);
   }
 
   &::-webkit-search-cancel-button,
@@ -93,23 +99,20 @@
 }
 
 .clearSearch {
+  @include button-reset;
   position: absolute;
   right: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-sm;
+  color: var(--ink-3);
   cursor: pointer;
 
   &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: -2px;
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 
   &:active {
@@ -119,44 +122,215 @@
 
 .sort {
   flex: 0 0 auto;
-  min-width: 148px;
-  max-width: 100%;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
+}
 
-  button[aria-haspopup='listbox'] {
-    height: 36px;
-    border-color: transparent;
-    border-radius: 10px;
-    background: transparent;
-    box-shadow: none;
-    color: var(--text-secondary);
+/* "Sort: Name ▾" in one quiet button, like the credentials toolbar. */
+.sortTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  height: $control-md;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: $text-md;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong);
 
-    &:focus-visible,
-    &[aria-expanded='true'] {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-    }
+  &[aria-expanded='true'] {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &:disabled {
+    color: var(--ink-4);
+    cursor: default;
   }
 }
 
+.sortIcon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.sortValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* Provider sections */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.glyph {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: $radius-sm;
+  color: var(--ink-2);
+  font-size: $text-xs;
+  font-weight: 600;
+
+  img {
+    display: block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+}
+
+.groupTitle {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--ink);
+  font-size: $text-md;
+  font-weight: 600;
+}
+
+.groupMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+
+  > span::before {
+    content: '·';
+    margin-right: 6px;
+    color: var(--ink-4);
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  /* Cards span four subgrid rows; their own bottom margin separates card rows,
+     so no parent row gap leaks into a card's inner tracks. */
+  column-gap: 16px;
+  row-gap: 0;
+  align-items: stretch;
+  margin-bottom: -16px;
+}
+
+/* Pagination */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageInfo {
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .clearSearch:hover,
-  .sort button[aria-haspopup='listbox']:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+  .search:hover:not(:focus-within) {
+    border-color: var(--rule-ink);
+  }
+
+  .clearSearch:hover {
+    background: var(--panel-hover);
+    color: var(--ink);
+  }
+
+  .sortTrigger:hover:not(:disabled) {
+    background: var(--panel-hover);
+    color: var(--ink);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+
   .clearSearch:active {
     transform: none;
+  }
+
+  .sortTrigger {
+    transition: none;
   }
 }
 
 @include mobile {
+  .refreshAll {
+    min-height: 40px;
+  }
+
+  .toolbar {
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  /* Tabs take their own row on mobile, so the hairline moves under the tabs. */
+  .toolbarTabs {
+    box-shadow: none;
+  }
+
+  .filters {
+    flex-basis: 100%;
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
+
   .search {
-    flex: 1 1 220px;
+    flex: 1 1 200px;
     height: 40px;
   }
 
@@ -165,52 +339,16 @@
     height: 36px;
   }
 
-  .sort button[aria-haspopup='listbox'] {
+  .sortTrigger {
     height: 40px;
   }
-}
 
-.errorBanner {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--danger-color);
-  background: var(--bg-error-light);
-  border: 1px solid var(--warning-border);
-  border-radius: 10px;
-  padding: 9px 12px;
-  overflow-wrap: anywhere;
-}
+  .groups {
+    gap: 20px;
+  }
 
-/* Responsive quota workspace. */
-
-.grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  align-items: stretch;
-}
-
-/* Responsive quota workspace. */
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.pageInfo {
-  font-family: $font-mono;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-}
-
-@include mobile {
-  .page {
-    gap: 16px;
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: -12px;
   }
 }

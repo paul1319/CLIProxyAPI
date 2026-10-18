@@ -32,7 +32,7 @@ export function DevinQuotaBody({ quota, classes }: QuotaBodyProps<DevinQuotaStat
           )}
         </div>
       )}
-      {quota.windows.map((window, index) => {
+      {quota.windows.map((window) => {
         const reset = buildResetDisplay(null, window.resetAtMs, now, locale);
         const soon = window.id === urgentRow;
         const label = t(`devin_quota.${window.id}`);
@@ -60,7 +60,7 @@ export function DevinQuotaBody({ quota, classes }: QuotaBodyProps<DevinQuotaStat
               aria-valuemax={window.remainingPercent === null ? undefined : 100}
               aria-valuenow={window.remainingPercent ?? undefined}
             >
-              <QuotaMeter percent={window.remainingPercent} classes={classes} index={index} />
+              <QuotaMeter percent={window.remainingPercent} classes={classes} />
             </div>
           </div>
         );

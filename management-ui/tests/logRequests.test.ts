@@ -174,9 +174,15 @@ describe('logs controller lifecycle wiring', () => {
     new URL('../src/features/logs/hooks/useLogStream.ts', import.meta.url),
     'utf8'
   );
+  // Error files and the shared file viewer moved out of the page into their own hook.
+  const files = readFileSync(
+    new URL('../src/features/logs/hooks/useLogFiles.ts', import.meta.url),
+    'utf8'
+  );
 
   test('invalidates synchronously on connection identity/config changes and unmount', () => {
-    for (const owner of [page, source]) {
+    expect(page).toContain('useLogFiles({');
+    for (const owner of [files, source]) {
       expect(owner).toContain('useAuthStore.subscribe');
       expect(owner).toContain('next.apiBase === previous.apiBase');
       expect(owner).toContain('next.managementKey === previous.managementKey');
@@ -187,7 +193,7 @@ describe('logs controller lifecycle wiring', () => {
       );
     }
     expect(source).toContain('next.config?.loggingToFile !== previous.config?.loggingToFile');
-    expect(page).toContain('next.config?.requestLog !== previous.config?.requestLog');
+    expect(files).toContain('next.config?.requestLog !== previous.config?.requestLog');
   });
 
   test('queued reloads read current stores and delayed confirmations check their session', () => {

@@ -1,0 +1,76 @@
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: $text-sm;
+}
+
+.label {
+  color: var(--ink-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--well-strong);
+  overflow: hidden;
+}
+
+// An exhausted window has no visible fill; tint the track so "0" still reads as a fault.
+.trackFault {
+  background: var(--signal-fault-soft);
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  border-radius: inherit;
+  transition: transform 240ms var(--ease-out-strong);
+}
+
+.neutral {
+  background: var(--ink-3);
+}
+
+.ok {
+  background: var(--signal-ok);
+}
+
+.warn {
+  background: var(--signal-warn);
+}
+
+.fault {
+  background: var(--signal-fault);
+}
+
+.idle {
+  background: var(--signal-idle);
+}
+
+.caption {
+  font-size: $text-xs;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}

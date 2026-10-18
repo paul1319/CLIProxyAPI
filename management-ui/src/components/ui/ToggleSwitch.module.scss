@@ -1,3 +1,4 @@
+// Switch: 32×18 track, 14px thumb; "on" is ink (actions are ink, state lives in lamps).
 .root {
   position: relative;
   display: inline-flex;
@@ -24,47 +25,69 @@
 }
 
 .track {
-  width: 44px;
-  height: 24px;
-  background: var(--border-color);
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  background: var(--well-strong);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
   border-radius: $radius-full;
   position: relative;
-  transition: background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    box-shadow var(--dur-hover) var(--ease-out-strong);
+
+  // Extend the hit area to ~40px without changing layout.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -11px -4px;
+  }
 }
 
-/* 隐藏的原生 checkbox 仍是焦点载体：键盘聚焦时把焦点环画到轨道上。 */
+.root:hover input:not(:disabled) + .track {
+  box-shadow: inset 0 0 0 1px var(--rule-ink);
+}
+
+// The hidden native checkbox keeps focus; draw the ring on the track.
 .root input:focus-visible + .track {
-  outline: 2px solid var(--text-primary);
-  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
 .disabled .track {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .thumb {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
   background: #fff;
   border-radius: $radius-full;
-  box-shadow: $shadow-sm;
-  transition: transform var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform var(--dur-hover) var(--ease-out-strong);
 }
 
 .root input:checked + .track {
-  background: var(--primary-color);
+  background: var(--ink);
+  box-shadow: none;
 }
 
 .root input:checked + .track .thumb {
-  transform: translateX(20px);
+  transform: translateX(14px);
+}
+
+[data-theme='dark'] .root input:checked + .track .thumb {
+  background: var(--ink-inverse);
 }
 
 .label {
-  color: var(--text-primary);
-  font-weight: 600;
+  color: var(--ink-2);
+  font-size: $text-md;
+  font-weight: 500;
 }
 
 @media (prefers-reduced-motion: reduce) {

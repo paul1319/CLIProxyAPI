@@ -1,43 +1,43 @@
 /**
- * 额度水位条（原 QuotaProgressBar 的类型化后继）。
+ * Remaining-capacity bar for the provider bodies in the credential sheet.
  *
- * dataviz 语法：细轨道退居背景，填充按剩余量三档着色（≥70 绿 / ≥30 琥珀 / <30 红），
- * percent === null 渲染空轨道 —— 未知不着色（Medium 类在 width 0 下不可见，行为与旧版一致）。
- * `index` 写入 `--meter-index`，供全页外衣做逐行入场级差；紧凑外衣不消费该变量。
+ * The host supplies the track geometry (`quotaBar` / `quotaBarFill`); the fill
+ * color follows the console-wide meter rule (`toneForRemaining`): healthy
+ * capacity stays neutral, low is warn, exhausted is fault. `percent === null`
+ * renders an empty track — unknown is never colored. The fill keeps an inline
+ * width so the rendered markup states the remaining direction.
  */
 
 import type { CSSProperties } from 'react';
+import type { MeterTone } from '@/components/ui/meterTone';
 import type { QuotaClassMap } from '../types';
+import { percentToFraction, toneForPercent } from '../windowRows';
 
-export const QUOTA_PROGRESS_HIGH_THRESHOLD = 70;
-export const QUOTA_PROGRESS_MEDIUM_THRESHOLD = 30;
+/** Same colors as the shared `<Meter>`. */
+const FILL_COLOR: Record<MeterTone, string> = {
+  neutral: 'var(--ink-3)',
+  ok: 'var(--signal-ok)',
+  warn: 'var(--signal-warn)',
+  fault: 'var(--signal-fault)',
+  idle: 'var(--signal-idle)',
+};
 
 export interface QuotaMeterProps {
   percent: number | null;
   classes: QuotaClassMap;
-  index?: number;
 }
 
-export function QuotaMeter({ percent, classes, index }: QuotaMeterProps) {
-  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-  const normalized = percent === null ? null : clamp(percent, 0, 100);
-  const fillClass =
-    normalized === null
-      ? classes.quotaBarFillMedium
-      : normalized >= QUOTA_PROGRESS_HIGH_THRESHOLD
-        ? classes.quotaBarFillHigh
-        : normalized >= QUOTA_PROGRESS_MEDIUM_THRESHOLD
-          ? classes.quotaBarFillMedium
-          : classes.quotaBarFillLow;
-  const widthPercent = Math.round((normalized ?? 0) * 100) / 100;
-  const style: CSSProperties & { '--meter-index'?: number } = { width: `${widthPercent}%` };
-  if (index !== undefined) {
-    style['--meter-index'] = index;
-  }
+export function QuotaMeter({ percent, classes }: QuotaMeterProps) {
+  const fraction = percentToFraction(percent);
+  const tone = toneForPercent(percent);
+  const style: CSSProperties = {
+    width: `${Math.round((fraction ?? 0) * 10000) / 100}%`,
+    background: FILL_COLOR[tone],
+  };
 
   return (
     <div className={classes.quotaBar}>
-      <div className={`${classes.quotaBarFill} ${fillClass}`} style={style} />
+      <div className={classes.quotaBarFill} data-tone={tone} style={style} />
     </div>
   );
 }

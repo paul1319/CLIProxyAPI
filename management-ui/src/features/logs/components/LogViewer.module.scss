@@ -1,0 +1,513 @@
+// Terminal-like log surface: a --well panel, 12px Plex Mono, 20px row pitch, aligned grid columns.
+
+.surface {
+  container: log-surface / inline-size;
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: $radius-lg;
+  background: var(--well);
+}
+
+.scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-block: 6px;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--focus) 55%, transparent);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rows
+// ---------------------------------------------------------------------------
+
+// Column widths are in `ch`, so they track the mono font exactly.
+.list {
+  --log-cols: [time] 8ch [level] 5ch [status] 3ch [latency] 8ch [method] 7ch [path] minmax(0, 1fr)
+    [rid] 8ch [source] 22ch [copy] 20px [end];
+  min-width: 100%;
+  font-family: $font-mono;
+  font-size: $text-sm;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+.withIp {
+  --log-cols: [time] 8ch [level] 5ch [status] 3ch [latency] 8ch [ip] 15ch [method] 7ch [path]
+    minmax(0, 1fr) [rid] 8ch [source] 22ch [copy] 20px [end];
+}
+
+.noSource {
+  --log-cols: [time] 8ch [level] 5ch [status] 3ch [latency] 8ch [method] 7ch [path] minmax(0, 1fr)
+    [rid] 8ch [copy] 20px [end];
+}
+
+.withIp.noSource {
+  --log-cols: [time] 8ch [level] 5ch [status] 3ch [latency] 8ch [ip] 15ch [method] 7ch [path]
+    minmax(0, 1fr) [rid] 8ch [copy] 20px [end];
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--log-cols);
+  column-gap: 12px;
+  align-items: baseline;
+  min-height: 20px;
+  padding: 0 8px 0 12px;
+  color: var(--ink);
+
+  > * {
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &:hover,
+  &:focus-within {
+    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+}
+
+.rowFault {
+  background: var(--signal-fault-soft);
+}
+
+.cTime {
+  grid-column-start: time;
+  color: var(--ink-3);
+}
+
+.cLevel {
+  grid-column-start: level;
+  font-weight: 500;
+}
+
+.cStatus {
+  grid-column-start: status;
+}
+
+.cLatency {
+  grid-column-start: latency;
+  text-align: right;
+  color: var(--ink-3);
+}
+
+.cIp {
+  grid-column-start: ip;
+  color: var(--ink-3);
+}
+
+.cMethod {
+  grid-column-start: method;
+  color: var(--ink-2);
+}
+
+.cPath {
+  grid-column-start: path;
+}
+
+// Plain application messages span from the status column to the request-id column.
+.cMessage {
+  grid-column: status / rid;
+  color: var(--ink);
+}
+
+.trail {
+  color: var(--ink-3);
+}
+
+.cRid {
+  grid-column-start: rid;
+  overflow: visible;
+}
+
+.cSource {
+  grid-column-start: source;
+  color: var(--ink-3);
+}
+
+.cCopy {
+  grid-column-start: copy;
+  overflow: visible;
+  align-self: center;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.toneQuiet {
+  color: var(--ink-3);
+}
+
+.toneDim {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.toneWarn {
+  color: var(--signal-warn-ink);
+  font-weight: 500;
+}
+
+.toneFault {
+  color: var(--signal-fault-ink);
+  font-weight: 600;
+}
+
+.hit {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--focus) 24%, transparent);
+  color: inherit;
+}
+
+.rid {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--focus);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--focus);
+  }
+}
+
+.copy {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: $radius-sm;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    color: var(--ink);
+    background: var(--well-strong);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus);
+  }
+}
+
+.row:hover .copy {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .copy {
+    opacity: 0.4;
+  }
+}
+
+// Wrapped mode: long paths and messages flow onto extra lines inside their column.
+.wrapped .row > * {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.wrapped .cPath,
+.wrapped .cMessage {
+  white-space: pre-wrap;
+}
+
+// ---------------------------------------------------------------------------
+// Raw text
+// ---------------------------------------------------------------------------
+
+.raw {
+  margin: 0;
+  padding: 0 12px;
+  font-family: $font-mono;
+  font-size: $text-sm;
+  line-height: 20px;
+  color: var(--ink);
+  white-space: pre;
+  width: max-content;
+  min-width: 100%;
+}
+
+.rawWrapped {
+  width: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rawLine {
+  display: block;
+}
+
+// ---------------------------------------------------------------------------
+// Chrome inside the surface
+// ---------------------------------------------------------------------------
+
+.earlier {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 12px 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+  font-size: $text-sm;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.earlierButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--rule-ink);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: 2px;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.newPill {
+  position: absolute;
+  right: 16px;
+  bottom: 40px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: $control-sm;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: $radius-md;
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font: inherit;
+  font-size: $text-sm;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  animation: pill-in 160ms var(--ease-out-strong);
+  transition: transform var(--dur-press) var(--ease-out-strong);
+
+  &:hover {
+    border-color: var(--rule-ink);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-float), var(--focus-ring);
+  }
+}
+
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.statusBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px 16px;
+  min-height: 28px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--rule);
+  font-size: $text-sm;
+  line-height: 1.4;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusLines {
+  white-space: nowrap;
+}
+
+.statusNotice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--signal-warn-ink);
+}
+
+.statusEnd {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+  flex: 1;
+}
+
+.skeletonLine {
+  display: block;
+  height: 10px;
+  border-radius: $radius-sm;
+  background: var(--well-strong);
+}
+
+// Quiet centered empty state inside the surface: icon tile, one sentence, one action.
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  border-radius: $radius-md;
+  background: var(--well-strong);
+  color: var(--ink-3);
+}
+
+.emptyText {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: $text-md;
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.emptyDetail {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.emptyAction {
+  margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newPill {
+    animation: none;
+  }
+}
+
+// Columns follow the surface width, not the viewport: the sidebar can take a lot of it.
+// Medium: drop the source column (and the optional IP column) before the path gets squeezed.
+@container log-surface (max-width: 960px) {
+  .list,
+  .withIp,
+  .noSource,
+  .withIp.noSource {
+    --log-cols: [time] 8ch [level] 5ch [status] 3ch [latency] 8ch [method] 7ch [path] minmax(0, 1fr)
+      [rid] 8ch [copy] 20px [end];
+  }
+
+  .cIp,
+  .cSource {
+    display: none;
+  }
+}
+
+// Narrow (phones): also drop latency and the per-row copy button; raw mode keeps text
+// selectable and the request sheet has its own Copy action.
+@container log-surface (max-width: 600px) {
+  .list,
+  .withIp,
+  .noSource,
+  .withIp.noSource {
+    --log-cols: [time] 8ch [level] 5ch [status] 3ch [method] 6ch [path] minmax(0, 1fr) [rid] 8ch
+      [end];
+    font-size: $text-xs;
+  }
+
+  .cCopy {
+    display: none;
+  }
+
+  .row {
+    column-gap: 8px;
+    padding: 0 6px 0 8px;
+  }
+
+  .cLatency {
+    display: none;
+  }
+
+  .raw {
+    padding: 0 8px;
+    font-size: $text-xs;
+  }
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .statusBar {
+    padding: 4px 8px;
+  }
+
+  .newPill {
+    right: 8px;
+    height: 36px;
+  }
+
+  .empty {
+    padding: 24px 16px;
+  }
+}

@@ -1,11 +1,11 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ModelMappingDiagram, type ModelMappingDiagramRef } from '@/components/modelAlias';
-import { IconChevronUp } from '@/components/ui/icons';
+import { IconChevronUp, IconPlus } from '@/components/ui/icons';
 import type { OAuthModelAliasEntry } from '@/types';
 import type { AuthFileModelItem, OAuthConfigLoadError } from '@/features/authFiles/constants';
+import { OAuthRulePanel } from './OAuthRulePanel';
 import styles from './OAuthConfigPanels.module.scss';
 
 type ViewMode = 'diagram' | 'list';
@@ -33,6 +33,7 @@ export type OAuthModelAliasCardProps = {
   onDeleteAlias: (aliasName: string) => void;
 };
 
+/** Provider-wide OAuth model aliases, as a list or as the mapping diagram. */
 export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
   const { t } = useTranslation();
   const diagramRef = useRef<ModelMappingDiagramRef | null>(null);
@@ -53,114 +54,87 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
     onRenameAlias,
     onDeleteAlias,
   } = props;
+  const hasAliases = Object.keys(modelAlias).length > 0;
+  const controlsDisabled = disableControls || modelAliasError !== null;
 
   return (
-    <section className={styles.panel}>
-      <header className={styles.panelHead}>
-        <h3 className={styles.panelTitle}>{t('oauth_model_alias.title')}</h3>
-        <div className={styles.panelExtra}>
-          <div className={styles.viewModeSwitch}>
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('list')}
-              disabled={disableControls || modelAliasError !== null}
-              aria-pressed={viewMode === 'list'}
-            >
-              {t('oauth_model_alias.view_mode_list')}
-            </Button>
-            <Button
-              variant={viewMode === 'diagram' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('diagram')}
-              disabled={disableControls || modelAliasError !== null}
-              aria-pressed={viewMode === 'diagram'}
-            >
-              {t('oauth_model_alias.view_mode_diagram')}
-            </Button>
-          </div>
-          <Button size="sm" onClick={onAdd} disabled={disableControls || modelAliasError !== null}>
-            {t('oauth_model_alias.add')}
-          </Button>
-        </div>
-      </header>
-      <div className={styles.panelBody}>
-        {modelAliasError === 'unsupported' ? (
-          <EmptyState
-            title={t('oauth_model_alias.upgrade_required_title')}
-            description={t('oauth_model_alias.upgrade_required_desc')}
-          />
-        ) : modelAliasError === 'load' ? (
-          <EmptyState
-            title={t('notification.refresh_failed')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void onRetry()}>
-                {t('common.refresh')}
-              </Button>
-            }
-          />
-        ) : modelAliasError === 'loading' ? (
-          <EmptyState title={t('common.loading')} />
-        ) : viewMode === 'diagram' ? (
-          Object.keys(modelAlias).length === 0 ? (
-            <EmptyState title={t('oauth_model_alias.list_empty_all')} />
-          ) : (
-            <div className={styles.aliasChartSection}>
-              <div className={styles.aliasChartHeader}>
-                <h4 className={styles.aliasChartTitle}>{t('oauth_model_alias.chart_title')}</h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => diagramRef.current?.collapseAll()}
-                  disabled={disableControls || modelAliasError !== null}
-                  title={t('oauth_model_alias.diagram_collapse')}
-                  aria-label={t('oauth_model_alias.diagram_collapse')}
-                >
-                  <IconChevronUp size={16} />
-                </Button>
-              </div>
-              <ModelMappingDiagram
-                ref={diagramRef}
-                modelAlias={modelAlias}
-                allProviderModels={allProviderModels}
-                onUpdate={onUpdate}
-                onDeleteLink={onDeleteLink}
-                onToggleFork={onToggleFork}
-                onRenameAlias={onRenameAlias}
-                onDeleteAlias={onDeleteAlias}
-                onEditProvider={onEditProvider}
-                onDeleteProvider={onDeleteProvider}
-                className={styles.aliasChart}
-              />
-            </div>
-          )
-        ) : Object.keys(modelAlias).length === 0 ? (
-          <EmptyState title={t('oauth_model_alias.list_empty_all')} />
-        ) : (
-          <div className={styles.list}>
-            {Object.entries(modelAlias).map(([provider, mappings]) => (
-              <div key={provider} className={styles.item}>
-                <div className={styles.itemInfo}>
-                  <div className={styles.itemProvider}>{provider}</div>
-                  <div className={styles.itemCount}>
-                    {mappings?.length
-                      ? t('oauth_model_alias.model_count', { count: mappings.length })
-                      : t('oauth_model_alias.no_models')}
-                  </div>
-                </div>
-                <div className={styles.itemActions}>
-                  <Button variant="secondary" size="sm" onClick={() => onEditProvider(provider)}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => onDeleteProvider(provider)}>
-                    {t('oauth_model_alias.delete')}
-                  </Button>
-                </div>
-              </div>
+    <OAuthRulePanel
+      title={t('credentials.rules_alias_title')}
+      description={t('credentials.rules_alias_desc')}
+      actions={
+        <>
+          <div
+            className={styles.viewModeSwitch}
+            role="group"
+            aria-label={t('credentials.rules_view_mode')}
+          >
+            {(['list', 'diagram'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={`${styles.viewModeButton} ${viewMode === mode ? styles.viewModeActive : ''}`}
+                onClick={() => onViewModeChange(mode)}
+                disabled={controlsDisabled}
+                aria-pressed={viewMode === mode}
+              >
+                {t(`oauth_model_alias.view_mode_${mode}`)}
+              </button>
             ))}
           </div>
-        )}
-      </div>
-    </section>
+          <Button variant="secondary" size="sm" onClick={onAdd} disabled={controlsDisabled}>
+            <IconPlus size={14} />
+            {t('credentials.rules_add_alias')}
+          </Button>
+        </>
+      }
+      loadError={modelAliasError}
+      upgradeTitle={t('oauth_model_alias.upgrade_required_title')}
+      upgradeDescription={t('oauth_model_alias.upgrade_required_desc')}
+      emptyText={t('credentials.rules_alias_empty')}
+      rows={Object.entries(modelAlias).map(([provider, mappings]) => ({
+        provider,
+        count: mappings?.length ?? 0,
+        preview: (mappings ?? []).map((entry) => `${entry.name} → ${entry.alias}`),
+      }))}
+      countLabel={(count) =>
+        count ? t('credentials.rules_alias_count', { count }) : t('oauth_model_alias.no_models')
+      }
+      deleteLabel={t('oauth_model_alias.delete')}
+      disableControls={disableControls}
+      onRetry={onRetry}
+      onEdit={onEditProvider}
+      onDelete={onDeleteProvider}
+    >
+      {viewMode === 'diagram' && hasAliases ? (
+        <div className={styles.aliasChartSection}>
+          <div className={styles.aliasChartHeader}>
+            <h3 className={styles.aliasChartTitle}>{t('oauth_model_alias.chart_title')}</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => diagramRef.current?.collapseAll()}
+              disabled={controlsDisabled}
+              title={t('oauth_model_alias.diagram_collapse')}
+              aria-label={t('oauth_model_alias.diagram_collapse')}
+            >
+              <IconChevronUp size={16} />
+            </Button>
+          </div>
+          <ModelMappingDiagram
+            ref={diagramRef}
+            modelAlias={modelAlias}
+            allProviderModels={allProviderModels}
+            onUpdate={onUpdate}
+            onDeleteLink={onDeleteLink}
+            onToggleFork={onToggleFork}
+            onRenameAlias={onRenameAlias}
+            onDeleteAlias={onDeleteAlias}
+            onEditProvider={onEditProvider}
+            onDeleteProvider={onDeleteProvider}
+            className={styles.aliasChart}
+          />
+        </div>
+      ) : undefined}
+    </OAuthRulePanel>
   );
 }

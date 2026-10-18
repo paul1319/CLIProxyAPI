@@ -1,10 +1,10 @@
 // Search index for the visual config editor's global "jump to field" search.
 //
 // IMPORTANT: this index is maintained by hand and is NOT what drives field
-// rendering — it only powers search. When you add, remove, or move a field in
-// components/sections/*.tsx (or fields/sharedFields.tsx), update the matching
-// entry here, wrap the field's JSX in <FieldAnchor fieldId="..."> with the same
-// `fieldId`, and map it in constants.ts FIELD_VALUE_KEYS.
+// rendering — it powers search and the YAML key shown on each setting row. When you
+// add, remove, or move a field in components/sections/*.tsx, update the matching
+// entry here, render it with the same literal `fieldId="..."`, add it to its group
+// in groups.ts, and map it in constants.ts FIELD_VALUE_KEYS.
 // tests/configFieldParity.test.ts enforces the three-way parity — a missing or
 // extra entry anywhere fails CI.
 
@@ -324,7 +324,7 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     sectionId: 'connectivity',
     labelKey: L('sections.tls.enable'),
     hintKey: L('sections.tls.enable_desc'),
-    yamlKeys: ['server', 'tls'],
+    yamlKeys: ['server', 'tls', 'enable'],
     keywords: ['tls', 'ssl', 'https'],
   },
   {
@@ -552,7 +552,7 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     sectionId: 'advanced',
     labelKey: L('sections.system.plugins_enabled'),
     hintKey: L('sections.system.plugins_enabled_desc'),
-    yamlKeys: ['plugins'],
+    yamlKeys: ['plugins', 'enabled'],
   },
   {
     fieldId: 'pluginStoreSources',

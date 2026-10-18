@@ -1,6 +1,6 @@
 /**
- * Codex 额度渲染体：套餐 chip 行（elite=Pro 20x 液态铂金 / premium=金卡）、
- * 重置积分明细、用量窗口水位条。
+ * Codex quota body: plan chip row (elite = Pro 20x, premium = paid tiers),
+ * reset-credit details and usage-window meters.
  */
 
 import { useMemo } from 'react';
@@ -24,7 +24,7 @@ import { collectQuotaRowInstants, pickUrgentRowId, resetCreditRowId } from '../.
 import type { QuotaBodyProps, QuotaClassMap } from '../../types';
 
 const getPlanValueClass = (planType: string | null, classes: QuotaClassMap): string => {
-  // elite/premium 顺序契约由 resolvePlanTier 承载（tests/quotaPlanTier.test.ts 守护）。
+  // The elite/premium ordering contract lives in resolvePlanTier (guarded by tests/quotaPlanTier.test.ts).
   const tier = resolvePlanTier(planType);
   if (tier === 'elite') return classes.elitePlanValue;
   if (tier === 'premium') return classes.premiumPlanValue;
@@ -174,7 +174,7 @@ export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaStat
       {windows.length === 0 ? (
         <div className={classes.quotaMessage}>{t('codex_quota.empty_windows')}</div>
       ) : (
-        windows.map((window, index) => {
+        windows.map((window) => {
           const used = window.usedPercent;
           const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
           const remaining =
@@ -202,7 +202,7 @@ export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaStat
                   )}
                 </div>
               </div>
-              <QuotaMeter percent={remaining} classes={classes} index={index} />
+              <QuotaMeter percent={remaining} classes={classes} />
             </div>
           );
         })

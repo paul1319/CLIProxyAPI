@@ -12,6 +12,20 @@ import type {
 import { normalizePlanType, parseIsoToMs, resolveResetMs } from '@/utils/quota';
 import type { QuotaProviderType } from './providers/types';
 import type { QuotaCardState } from './providers';
+import {
+  resolveAntigravityBucketLabelKey,
+  resolveAntigravityGroupLabelKey,
+} from './providers/antigravity/labels';
+
+/**
+ * How far a window's exhaustion reaches.
+ *
+ * - `gating`: the account stops serving when it runs out (Codex 5-hour/weekly,
+ *   Claude 5-hour/7-day, every Antigravity bucket, Devin/Kimi/Meta rows).
+ * - `scoped`: only one model or feature stops (code review, Spark, Sonnet, Opus…).
+ * - `spend`: a money cap (extra usage, pay-as-you-go), never a rate limit.
+ */
+export type LimitScope = 'gating' | 'scoped' | 'spend';
 
 export interface AccountLimit {
   id: string;
@@ -20,6 +34,9 @@ export interface AccountLimit {
   resetAtMs: number | null;
   resetLabel?: string;
   amount?: string;
+  scope: LimitScope;
+  /** Model pool sharing this window (Antigravity/plugin groups). */
+  pool?: string;
 }
 export interface AccountOverview {
   plan: string | null;
@@ -27,7 +44,70 @@ export interface AccountOverview {
   renewalAtMs: number | null;
   limits: AccountLimit[];
   notes: string[];
+  /** The most constrained gating window — the card's focal figure. */
+  heroLimitId: string | null;
+  /**
+   * Whether the account can serve right now according to its gating windows.
+   * Pooled providers serve while any pool has capacity. Null when no gating
+   * window reports a value.
+   */
+  available: boolean | null;
 }
+
+/** Codex windows that stop the whole account; everything else is model- or feature-scoped. */
+const CODEX_GATING_IDS = new Set(['five-hour', 'weekly', 'monthly']);
+/** Claude windows that stop the whole account; per-model 7-day windows are scoped. */
+const CLAUDE_GATING_IDS = new Set(['five-hour', 'seven-day']);
+const POOLED_PROVIDERS = new Set<QuotaProviderType>(['antigravity', 'plugin']);
+
+/**
+ * Pick the window that best answers "how much can this account still do".
+ *
+ * Only gating windows qualify. The lowest remaining value wins; among
+ * exhausted windows the one that resets last wins, because the account only
+ * serves again once every exhausted window has reset. Remaining ties otherwise
+ * keep list order, which puts the shorter window first.
+ */
+export function pickHeroLimit(limits: readonly AccountLimit[]): AccountLimit | null {
+  let best: AccountLimit | null = null;
+  for (const limit of limits) {
+    if (limit.scope !== 'gating' || limit.remaining === null) continue;
+    if (best === null || best.remaining === null || limit.remaining < best.remaining) {
+      best = limit;
+      continue;
+    }
+    if (
+      limit.remaining === best.remaining &&
+      limit.remaining <= 0 &&
+      (limit.resetAtMs ?? -Infinity) > (best.resetAtMs ?? -Infinity)
+    ) {
+      best = limit;
+    }
+  }
+  return best;
+}
+
+/** Serving state from gating windows; pooled providers serve while any pool has room. */
+export function resolveAvailability(
+  type: QuotaProviderType,
+  limits: readonly AccountLimit[]
+): boolean | null {
+  const gating = limits.filter((limit) => limit.scope === 'gating' && limit.remaining !== null);
+  if (gating.length === 0) return null;
+  if (!POOLED_PROVIDERS.has(type)) return gating.every((limit) => (limit.remaining ?? 0) > 0);
+  const pools = new Map<string, boolean>();
+  for (const limit of gating) {
+    const key = limit.pool ?? '';
+    pools.set(key, (pools.get(key) ?? true) && (limit.remaining ?? 0) > 0);
+  }
+  return [...pools.values()].some(Boolean);
+}
+
+const finalize = (type: QuotaProviderType, overview: AccountOverview): AccountOverview => {
+  overview.heroLimitId = pickHeroLimit(overview.limits)?.id ?? null;
+  overview.available = resolveAvailability(type, overview.limits);
+  return overview;
+};
 
 /** Presentation only: provider adapters continue to own upstream normalization. */
 export function buildAccountOverview(
@@ -42,8 +122,21 @@ export function buildAccountOverview(
     renewalAtMs: null,
     limits: [],
     notes: [],
+    heroLimitId: null,
+    available: null,
   };
   if (!state) return result;
+  buildLimits(type, state, t, locale, result);
+  return finalize(type, result);
+}
+
+function buildLimits(
+  type: QuotaProviderType,
+  state: QuotaCardState,
+  t: TFunction,
+  locale: string | undefined,
+  result: AccountOverview
+): void {
   const number = (value: number) =>
     new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
   const money = (value: number | null, currency = 'USD') =>
@@ -54,7 +147,8 @@ export function buildAccountOverview(
     used === null ? null : Math.max(0, Math.min(100, 100 - used));
   if (type === 'codex' || type === 'claude') {
     const quota = state as CodexQuotaState | ClaudeQuotaState;
-    result.limits = (quota.windows ?? []).map((window) => ({
+    const gatingIds = type === 'codex' ? CODEX_GATING_IDS : CLAUDE_GATING_IDS;
+    result.limits = (quota.windows ?? []).map((window): AccountLimit => ({
       id: window.id,
       label: window.labelKey
         ? t(window.labelKey, ('labelParams' in window ? window.labelParams : {}) ?? {})
@@ -62,6 +156,7 @@ export function buildAccountOverview(
       remaining: remaining(window.usedPercent),
       resetAtMs: window.resetAtMs ?? null,
       resetLabel: window.resetLabel,
+      scope: gatingIds.has(String(window.id).replace(/_/g, '-')) ? 'gating' : 'scoped',
     }));
     if (type === 'codex') {
       const codex = state as CodexQuotaState;
@@ -101,7 +196,11 @@ export function buildAccountOverview(
         : null;
       for (const balance of claude.dollarWindows ?? []) {
         result.credits.push({
-          label: balance.key.replace(/_/g, ' '),
+          // Upstream keys are internal code names; only the known one gets a specific label.
+          label:
+            balance.key === 'iguana_necktie'
+              ? t('claude_quota.cloud_session_credits')
+              : t('account_quota.credits'),
           value: money(balance.remainingDollars),
           detail: t('claude_quota.usage_spent_limit', {
             spent: money(balance.usedDollars),
@@ -112,9 +211,11 @@ export function buildAccountOverview(
       }
       const extra = claude.extraUsage;
       if (extra) {
-        result.notes.push(
-          `${t('claude_quota.extra_usage_label')}: ${t(extra.isEnabled === null ? 'claude_quota.plan_unknown' : extra.isEnabled ? 'claude_quota.extra_usage_enabled' : 'claude_quota.extra_usage_disabled')}`
-        );
+        // An enabled cap already shows up as its own row; only a disabled one needs words.
+        if (extra.isEnabled === false)
+          result.notes.push(
+            `${t('claude_quota.extra_usage_label')}: ${t('claude_quota.extra_usage_disabled')}`
+          );
         if (extra.userDisabled) result.notes.push(t('claude_quota.extra_usage_user_disabled'));
         if (extra.spendLimitReached)
           result.notes.push(t('claude_quota.extra_usage_spend_limit_reached'));
@@ -128,6 +229,7 @@ export function buildAccountOverview(
             label: t('claude_quota.extra_usage_label'),
             remaining: remaining(extra.utilization),
             resetAtMs: null,
+            scope: 'spend',
             amount: t('claude_quota.usage_spent_limit', {
               spent: money(
                 extra.usedCredits === null ? null : extra.usedCredits / 100,
@@ -141,16 +243,10 @@ export function buildAccountOverview(
           });
         }
       }
-      if (claude.stale)
-        result.notes.push(
-          t('claude_quota.stale_snapshot', {
-            time: claude.observedAt ? new Date(claude.observedAt).toLocaleString(locale) : '—',
-          })
-        );
     }
   } else if (type === 'xai') {
     const billing = (state as XaiQuotaState).billing;
-    if (!billing) return result;
+    if (!billing) return;
     result.plan =
       billing.planLabel ??
       (billing.mode === 'paid-health'
@@ -176,6 +272,7 @@ export function buildAccountOverview(
           ),
           remaining: remaining(billing.usagePercent),
           resetAtMs: billing.resetAtMs ?? null,
+          scope: 'gating',
         });
       }
       if (billing.monthlyLimitCents !== null)
@@ -184,6 +281,7 @@ export function buildAccountOverview(
           label: t('xai_quota.monthly_credits'),
           remaining: remaining(billing.usedPercent),
           resetAtMs: parseIsoToMs(billing.billingPeriodEnd),
+          scope: 'gating',
           amount: t('claude_quota.usage_spent_limit', {
             spent: money(
               billing.includedUsedCents === null ? null : billing.includedUsedCents / 100
@@ -197,6 +295,7 @@ export function buildAccountOverview(
           label: t('xai_quota.pay_as_you_go_label'),
           remaining: remaining(billing.onDemandUsedPercent),
           resetAtMs: parseIsoToMs(billing.billingPeriodEnd),
+          scope: 'spend',
           amount: t('claude_quota.usage_spent_limit', {
             spent: money(
               billing.onDemandUsedCents === null ? null : billing.onDemandUsedCents / 100
@@ -213,14 +312,24 @@ export function buildAccountOverview(
     const quota = state as AntigravityQuotaState;
     const subscription = quota.subscription;
     result.plan = subscription?.tierName || subscription?.tierId || subscription?.plan || null;
-    result.limits = (quota.groups ?? []).flatMap((group) =>
-      group.buckets.map((bucket) => ({
-        id: `${group.id}:${bucket.id}`,
-        label: `${group.label} · ${bucket.label}`,
-        remaining: Math.max(0, Math.min(100, bucket.remainingFraction * 100)),
-        resetAtMs: bucket.resetAtMs ?? parseIsoToMs(bucket.resetTime),
-      }))
-    );
+    result.limits = (quota.groups ?? []).flatMap((group) => {
+      const groupKey = type === 'antigravity' ? resolveAntigravityGroupLabelKey(group.label) : null;
+      const pool = groupKey ? t(`antigravity_quota.${groupKey}`) : group.label;
+      return group.buckets.map((bucket): AccountLimit => {
+        const bucketKey =
+          type === 'antigravity'
+            ? resolveAntigravityBucketLabelKey(bucket.label, bucket.window)
+            : null;
+        return {
+          id: `${group.id}:${bucket.id}`,
+          label: bucketKey ? t(`antigravity_quota.${bucketKey}`) : bucket.label,
+          remaining: Math.max(0, Math.min(100, bucket.remainingFraction * 100)),
+          resetAtMs: bucket.resetAtMs ?? parseIsoToMs(bucket.resetTime),
+          scope: 'gating',
+          pool,
+        };
+      });
+    });
     if (type === 'plugin')
       for (const metric of (state as PluginQuotaState).summary ?? [])
         result.credits.push({
@@ -236,6 +345,7 @@ export function buildAccountOverview(
       label: t(`devin_quota.${window.id}`),
       remaining: window.remainingPercent,
       resetAtMs: window.resetAtMs,
+      scope: 'gating',
     }));
   } else if (type === 'kimi') {
     result.limits = (state as KimiQuotaState).rows.map((row) => ({
@@ -245,6 +355,7 @@ export function buildAccountOverview(
       resetAtMs: row.resetAtMs ?? null,
       resetLabel: row.resetHint,
       amount: `${number(row.used)} / ${number(row.limit)}`,
+      scope: 'gating',
     }));
   } else if (type === 'meta') {
     const data = (state as MetaQuotaState).data;
@@ -254,9 +365,9 @@ export function buildAccountOverview(
       label: t(`meta_quota.${window.id === 'weekly' ? 'weekly' : 'window'}`),
       remaining: remaining(window.usedPercent),
       resetAtMs: window.resetAt == null ? null : window.resetAt * 1000,
+      scope: 'gating',
     }));
   }
-  return result;
 }
 
 /** Expired and spent credits must not supply the nearest expiry. */

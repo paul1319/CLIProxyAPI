@@ -1,5 +1,6 @@
 @use '../../styles/variables' as *;
 
+// Checkbox: 16px box, 4px radius; checked = ink. Hit area extended to ~32px.
 .root {
   position: relative;
   display: inline-flex;
@@ -11,7 +12,7 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.45;
 }
 
 .input {
@@ -28,13 +29,14 @@
 }
 
 .box {
-  width: 22px;
-  height: 22px;
+  position: relative;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  border-radius: 7px;
-  border: 1px solid var(--border-color);
-  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-  color: var(--primary-contrast, #fff);
+  border-radius: $radius-sm;
+  border: 1px solid var(--rule-ink);
+  background: var(--panel);
+  color: var(--ink-inverse);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -43,20 +45,24 @@
     background-color $transition-fast,
     box-shadow $transition-fast,
     transform $transition-fast;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
 }
 
 .root:hover .box {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 16%, transparent);
+  border-color: var(--ink-2);
 }
 
 .root:active .box {
-  transform: scale(0.95);
+  transform: scale(0.94);
 }
 
 .disabled:hover .box {
-  border-color: var(--border-color);
-  box-shadow: none;
+  border-color: var(--rule-ink);
 }
 
 .disabled:active .box {
@@ -64,24 +70,27 @@
 }
 
 .input:focus-visible + .box {
-  border-color: var(--primary-color);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--primary-color) 16%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--primary-color) 50%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .boxChecked {
-  border-color: var(--primary-color);
-  background: var(--primary-color);
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.root:hover .boxChecked {
+  border-color: var(--ink);
 }
 
 .boxChecked svg {
   display: block;
-  stroke-width: 2.4;
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
 }
 
 .label {
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  color: var(--ink-2);
+  font-size: $text-md;
+  font-weight: 400;
 }

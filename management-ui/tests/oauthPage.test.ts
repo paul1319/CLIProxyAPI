@@ -12,9 +12,15 @@ import ru from '@/i18n/locales/ru.json';
 import ko from '@/i18n/locales/ko.json';
 import vi from '@/i18n/locales/vi.json';
 import { OAuthPage } from '@/features/oauth/OAuthPage';
+import { OAuthFlowDialog } from '@/features/oauth/components/OAuthFlowDialog';
 import { resolveCallbackUrl, XAI_CALLBACK_URL } from '@/features/oauth/callbackUrl';
 import { resolveFlowView, splitAuthUrl } from '@/features/oauth/flowView';
 import { buildPluginOAuthProviderCards, OAUTH_PROVIDERS } from '@/features/oauth/providers';
+import {
+  connectedCountFor,
+  countCredentialsByProvider,
+  credentialProviderKey,
+} from '@/features/oauth/connectedCounts';
 import {
   KIMI_CHINESE_AFFILIATE_URL,
   KIMI_INTERNATIONAL_AFFILIATE_URL,
@@ -24,13 +30,13 @@ import type { PluginListEntry } from '@/types';
 describe('OAuth dialog view resolution', () => {
   test('maps every flow state to exactly one view', () => {
     expect(resolveFlowView({})).toBe('idle');
-    // 正在生成链接：已进入步骤视图（骨架占位）
+    // Generating the link: already in the step view (placeholder)
     expect(resolveFlowView({ status: 'waiting' })).toBe('flow');
     expect(resolveFlowView({ status: 'waiting', url: 'https://a.test' })).toBe('flow');
     expect(resolveFlowView({ status: 'success' })).toBe('success');
-    // 轮询网络失败但链接仍在：留在步骤视图，手动回调仍可恢复
+    // Polling failed but the link is still valid: stay in the step view, a manual callback can recover
     expect(resolveFlowView({ status: 'error', url: 'https://a.test' })).toBe('flow');
-    // 链接已失效（启动失败 / Devin 终态失败）：失败视图
+    // The link is gone (start failed / Devin terminal failure): failed view
     expect(resolveFlowView({ status: 'error', error: 'denied' })).toBe('failed');
   });
 
@@ -119,50 +125,102 @@ describe('plugin OAuth tiles', () => {
   });
 });
 
-describe('OAuth provider gallery', () => {
+describe('connected credential counts', () => {
+  test('groups credentials by normalized provider and keeps Kimi sites apart', () => {
+    const counts = countCredentialsByProvider([
+      { provider: 'codex' },
+      { provider: 'codex' },
+      { provider: 'claude' },
+      { type: 'anthropic' },
+      { provider: 'kimi' },
+      { provider: 'kimi_ai' },
+      { provider: 'x-ai' },
+      { type: 'grok' },
+      { provider: 'vertex' },
+      { provider: '' },
+      {},
+    ]);
+    expect(counts).toEqual({ codex: 2, claude: 2, kimi: 1, 'kimi-ai': 1, xai: 2, vertex: 1 });
+  });
+
+  test('maps OAuth provider ids onto credential provider keys', () => {
+    const counts = countCredentialsByProvider([{ provider: 'claude' }, { provider: 'acme' }]);
+    // Sign-in uses `anthropic`, credentials are stored as `claude`.
+    expect(connectedCountFor(counts, 'anthropic')).toBe(1);
+    expect(connectedCountFor(counts, 'acme')).toBe(1);
+    expect(connectedCountFor(counts, 'devin')).toBe(0);
+    expect(credentialProviderKey({ provider: ' XAI ' })).toBe('xai');
+  });
+});
+
+const renderPage = async (lng: string, translation: object) => {
+  const i18n = createInstance();
+  await i18n.init({ lng, resources: { [lng]: { translation } } });
+  const markup = renderToStaticMarkup(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(MemoryRouter, null, createElement(OAuthPage))
+    )
+  );
+  return { i18n, markup };
+};
+
+describe('Add account picker', () => {
   const locales = { en, 'zh-CN': zhCN, 'zh-TW': zhTW, ru, ko, vi } as const;
 
   for (const [lng, translation] of Object.entries(locales)) {
-    test(`renders every provider tile without raw keys (${lng})`, async () => {
-      const i18n = createInstance();
-      await i18n.init({ lng, resources: { [lng]: { translation } } });
-      const markup = renderToStaticMarkup(
-        createElement(
-          I18nextProvider,
-          { i18n },
-          createElement(MemoryRouter, null, createElement(OAuthPage))
-        )
-      );
+    test(`renders every provider row without raw keys (${lng})`, async () => {
+      const { i18n, markup } = await renderPage(lng, translation);
       for (const provider of OAUTH_PROVIDERS) {
         const label =
           typeof provider.label === 'string' ? provider.label : i18n.t(provider.label.key);
         expect(markup).toContain(label);
       }
       expect(markup).toContain('Vertex AI');
+      expect(markup).toContain(i18n.t('auth_login.credential_file_title'));
       expect(markup).not.toMatch(/auth_login\.|vertex_import\./);
-      // 每个磁贴都是打开对话框的按钮
+      // One dialog-opening button per provider site, plus the Vertex import.
+      // The credential-file row is a plain link and must not claim a dialog.
       expect(markup.match(/aria-haspopup="dialog"/g)?.length).toBe(OAUTH_PROVIDERS.length + 1);
     });
   }
 
-  test('merges both Kimi sites into one sponsor card with per-site entries', async () => {
-    const i18n = createInstance();
-    await i18n.init({ lng: 'zh-CN', resources: { 'zh-CN': { translation: zhCN } } });
-    const markup = renderToStaticMarkup(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(MemoryRouter, null, createElement(OAuthPage))
-      )
+  test('uses the shared page header and two picker groups', async () => {
+    const { markup } = await renderPage('en', en);
+    expect(markup).toContain(`<h1`);
+    expect(markup).toContain(en.nav.oauth);
+    expect(markup).toContain(en.auth_login.page_meta);
+    expect(markup).toContain(en.auth_login.group_sign_in);
+    expect(markup).toContain(en.auth_login.group_import);
+    // The old "N providers" headline carried no information.
+    expect(markup).not.toContain('8 providers');
+  });
+
+  test('names each Connect button after its provider and links file import to Credentials', async () => {
+    const { markup } = await renderPage('en', en);
+    // Visible label stays a short verb; aria-labelledby appends the provider name.
+    const connectButtons = markup.match(/<button[^>]*aria-labelledby="[^"]+ [^"]+"[^>]*>/g) ?? [];
+    const regular = OAUTH_PROVIDERS.filter((provider) => !provider.sponsor);
+    expect(connectButtons.length).toBe(regular.length + 1);
+    expect(markup.match(new RegExp(`>${en.auth_login.connect}</button>`, 'g'))?.length).toBe(
+      regular.length
     );
-    // 一张品牌卡（role=group），卡内两个站点登录入口 + 两个开放平台注册链接
+    expect(markup).toMatch(/<a[^>]*href="\/auth-files"[^>]*>/);
+    expect(markup).toContain(en.auth_login.credential_file_action);
+  });
+
+  test('keeps both Kimi sites in one sponsored row with per-site entries', async () => {
+    const { markup } = await renderPage('zh-CN', zhCN);
+    // One sponsored row (role=group) with two site sign-in buttons and two affiliate links
     expect(markup.match(/role="group"/g)?.length).toBe(1);
-    const card = markup.slice(markup.indexOf('role="group"'));
-    expect(card).toContain('aria-label="Kimi 国内站"');
-    expect(card).toContain('aria-label="Kimi 国际站"');
-    expect(card).toContain('>国内站</button>');
-    expect(card).toContain('>国际站</button>');
-    expect(card.match(/aria-label="注册开放平台 · Kimi /g)?.length).toBe(2);
+    const row = markup.slice(markup.indexOf('role="group"'));
+    expect(row).toContain('aria-label="Kimi 国内站"');
+    expect(row).toContain('aria-label="Kimi 国际站"');
+    expect(row).toContain('>国内站</button>');
+    expect(row).toContain('>国际站</button>');
+    expect(row).toContain(`>${zhCN.auth_login.sponsored}<`);
+    expect(row.match(/aria-label="注册开放平台 · Kimi /g)?.length).toBe(2);
   });
 
   test('keeps each visible Kimi site name inside its accessible name', () => {
@@ -175,41 +233,79 @@ describe('OAuth provider gallery', () => {
         const name = messages[nameKey.replace('auth_login.', '')];
         const region = messages[provider.sponsor!.siteKey.replace('auth_login.', '')];
         expect(region).toBeTruthy();
-        // label-in-name：语音控制说出可见文字就能命中按钮
+        // label-in-name: saying the visible text in voice control hits the button
         expect(name.toLowerCase()).toContain(region.toLowerCase());
       }
       expect(messages.sponsor_kimi_caption).toBeTruthy();
       expect(messages.sponsor_sign_up).toBeTruthy();
+      expect(messages.sponsored).toBeTruthy();
     }
   });
 
-  test('overrides per-pool animations with equal specificity under reduced motion', () => {
-    const styles = readFileSync('src/features/oauth/components/SponsorCard.module.scss', 'utf8');
-    const reducedMotionStart = styles.indexOf('@media (prefers-reduced-motion: reduce)');
-    const poolAnimationStart = styles.indexOf(".pool[data-pool='#{$name}']");
-    expect(poolAnimationStart).toBeGreaterThanOrEqual(0);
-    expect(reducedMotionStart).toBeGreaterThan(poolAnimationStart);
-    // 属性选择器与每个光池的动画规则保持同等优先级；仅 .pool 无法覆盖动画。
-    expect(styles.slice(reducedMotionStart)).toMatch(
-      /\.pool\[data-pool\]\s*,[^{}]*\{\s*animation:\s*none;/
-    );
+  test('keeps the sponsored row static and on system tokens', () => {
+    const styles = readFileSync('src/features/oauth/components/ProviderPicker.module.scss', 'utf8');
+    // The sponsor is labelled, not animated: no light pools, no keyframes, no brand tint.
+    expect(styles).not.toMatch(/@keyframes|animation\s*:/);
+    expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(styles).not.toContain('pool');
   });
 
   test('keeps both Kimi registration links as safe external links', async () => {
-    const i18n = createInstance();
-    await i18n.init({ lng: 'en', resources: { en: { translation: en } } });
-    const markup = renderToStaticMarkup(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(MemoryRouter, null, createElement(OAuthPage))
-      )
-    );
+    const { markup } = await renderPage('en', en);
     for (const url of [KIMI_CHINESE_AFFILIATE_URL, KIMI_INTERNATIONAL_AFFILIATE_URL]) {
       const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;');
       expect(markup).toMatch(
         new RegExp(`href="${escaped}" target="_blank" rel="noopener noreferrer"`)
       );
     }
+  });
+
+  test('tells the truth about background sign-in', () => {
+    // Flows poll while the page is mounted; leaving the page stops them.
+    for (const translation of Object.values(locales)) {
+      expect(translation.auth_login.waiting_background_hint).toBeTruthy();
+    }
+    expect(en.auth_login.waiting_background_hint).toMatch(/keep this page open/i);
+    expect(en.auth_login.waiting_background_hint).not.toMatch(/won't stop/i);
+  });
+});
+
+describe('sign-in dialog', () => {
+  test('renders numbered steps, the emphasized host and a live status line', async () => {
+    const i18n = createInstance();
+    await i18n.init({ lng: 'en', resources: { en: { translation: en } } });
+    const markup = renderToStaticMarkup(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(OAuthFlowDialog, {
+          open: true,
+          providerId: 'codex',
+          heading: { title: en.auth_login.codex_oauth_title, caption: 'Browser sign-in', icon: '' },
+          state: {
+            status: 'waiting',
+            url: 'https://auth.openai.com/oauth/authorize?client_id=x',
+            state: 'st',
+          },
+          text: (suffix: string) => i18n.t(`auth_login.codex_${suffix}`),
+          supportsCallback: true,
+          onStart: () => {},
+          onCancel: () => {},
+          onCallbackChange: () => {},
+          onCallbackSubmit: () => {},
+          onViewAuthFiles: () => {},
+          onClose: () => {},
+        })
+      )
+    );
+    // Step 1 (open page) and step 3 (callback); no device code for Codex.
+    expect(markup.match(/<li/g)?.length).toBe(2);
+    expect(markup).toContain('>auth.openai.com</span>');
+    expect(markup).toContain(en.auth_login.codex_open_link);
+    expect(markup).toContain(en.auth_login.codex_copy_link);
+    expect(markup).not.toContain(en.auth_login.step_enter_device_code);
+    expect(markup).toContain(en.auth_login.codex_oauth_status_waiting);
+    expect(markup).toContain(en.auth_login.waiting_background_hint);
+    expect(markup).toMatch(/role="status" aria-live="polite"/);
   });
 });
