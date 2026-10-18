@@ -36,7 +36,7 @@ import {
   IconX,
 } from '@/components/ui/icons';
 import { StatusLamp, type LampState } from '@/components/ui/StatusLamp';
-import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import { INLINE_LOGO_PNG } from '@/assets/logoInline';
 import {
   useAuthStore,
   useConfigStore,
@@ -838,8 +838,8 @@ export function MainLayout() {
           {sidebarOpen ? <IconX size={18} /> : <IconMenu size={18} />}
         </button>
         <NavLink to="/" className="mobile-bar-brand" onClick={closeDrawer}>
-          <img src={INLINE_LOGO_JPEG} alt="" className="sidebar-brand-logo" />
-          <span>CLIProxyAPI</span>
+          <img src={INLINE_LOGO_PNG} alt="" className="sidebar-brand-logo" />
+          <span>Account Poller</span>
         </NavLink>
         {poolSummary ? (
           <NavLink to="/auth-files" className="mobile-bar-pool" onClick={closeDrawer}>
@@ -865,9 +865,9 @@ export function MainLayout() {
           className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
         >
           <div className="sidebar-header">
-            <NavLink to="/" className="sidebar-brand" onClick={closeDrawer} title="CLIProxyAPI">
-              <img src={INLINE_LOGO_JPEG} alt="" className="sidebar-brand-logo" />
-              {showSidebarLabels && <span className="sidebar-brand-title">CLIProxyAPI</span>}
+            <NavLink to="/" className="sidebar-brand" onClick={closeDrawer} title="Account Poller">
+              <img src={INLINE_LOGO_PNG} alt="" className="sidebar-brand-logo" />
+              {showSidebarLabels && <span className="sidebar-brand-title">Account Poller</span>}
             </NavLink>
             <button
               type="button"

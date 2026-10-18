@@ -10,7 +10,7 @@ import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
-import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import { INLINE_LOGO_PNG } from '@/assets/logoInline';
 import type { ApiError } from '@/types';
 import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
 import styles from './LoginPage.module.scss';
@@ -238,8 +238,8 @@ export function LoginPage() {
       <main className={styles.column}>
         <header className={styles.brand}>
           <div className={styles.wordmarkRow}>
-            <img src={INLINE_LOGO_JPEG} alt="" width={28} height={28} className={styles.logo} />
-            <h1 className={styles.wordmark}>CLIProxyAPI</h1>
+            <img src={INLINE_LOGO_PNG} alt="" width={28} height={28} className={styles.logo} />
+            <h1 className={styles.wordmark}>Account Poller</h1>
           </div>
           <p className={styles.subtitle}>{t('login.subtitle')}</p>
         </header>
