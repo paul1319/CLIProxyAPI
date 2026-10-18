@@ -106,6 +106,7 @@ export function QuotaCard({
   return (
     <article
       className={`${styles.card} ${delay === null ? '' : styles.cardEnter}`}
+      aria-busy={loading}
       style={delay === null ? undefined : ({ '--card-delay': `${delay}ms` } as CSSProperties)}
     >
       <header className={styles.head}>
@@ -193,7 +194,8 @@ export function QuotaCard({
             {t(`${adapter.i18nPrefix}.idle`)}
           </button>
         )}
-        {loading && (
+        {/* Refreshes keep the previous data in place; the header spinner shows progress. */}
+        {loading && !showData && (
           <div role="status" className={styles.muted} aria-busy="true">
             {t(`${adapter.i18nPrefix}.loading`)}
           </div>

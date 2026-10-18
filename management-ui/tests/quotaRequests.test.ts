@@ -100,6 +100,61 @@ test('an embedded provider error displays the saved snapshot and reports a faile
   }
 });
 
+test('refreshing a visible xAI card never commits a state without its enriched plan', async () => {
+  const xaiFile = { ...file, type: 'xai' };
+  const key = getQuotaCacheKey(xaiFile);
+  useQuotaStore.getState().setXaiQuota({
+    [key]: {
+      status: 'success',
+      hasData: true,
+      observedAt,
+      billing: {
+        mode: 'billing',
+        periodType: 'monthly',
+        usagePercent: 25,
+        productUsage: [],
+        monthlyLimitCents: 10000,
+        usedCents: 2500,
+        includedUsedCents: 2500,
+        onDemandCapCents: null,
+        onDemandUsedCents: null,
+        onDemandUsedPercent: null,
+        usedPercent: 25,
+        planLabel: 'SuperGrok Heavy',
+      },
+    },
+  });
+  const post = spyOn(apiClient, 'post').mockImplementation(async (_path, input) => {
+    const resource = (input as { resource: string }).resource;
+    return {
+      status_code: 200,
+      body:
+        resource === 'weekly' || resource === 'monthly'
+          ? { config: { monthlyLimit: { val: 10000 }, used: { val: 3000 } } }
+          : { subscription_tier_display: 'SuperGrok Heavy' },
+      observed_at: observedAt,
+    };
+  });
+  const plans: (string | undefined)[] = [];
+  const unsubscribe = useQuotaStore.subscribe((state) =>
+    plans.push(state.xaiQuota[key]?.billing?.planLabel)
+  );
+  try {
+    await loadQuotaEntry(xaiFile, QUOTA_ADAPTERS.xai, i18n.t, { mode: 'refresh' });
+    for (let index = 0; index < 15; index++) await Promise.resolve();
+    expect(useQuotaStore.getState().xaiQuota[key]).toMatchObject({ status: 'success' });
+    expect(plans.length).toBeGreaterThan(1);
+    expect(plans.every((plan) => plan === 'SuperGrok Heavy')).toBe(true);
+    // Enrichment ran inline, so the background pass must not repeat the plan reads.
+    expect(
+      post.mock.calls.filter((call) => (call[1] as { resource: string }).resource === 'settings')
+    ).toHaveLength(1);
+  } finally {
+    unsubscribe();
+    post.mockRestore();
+  }
+});
+
 test('a saved xAI quota still restores optional plan metadata when the latest quota refresh failed', async () => {
   const post = spyOn(apiClient, 'post').mockImplementation(async (_path, input) => {
     const resource = (input as { resource: string }).resource;

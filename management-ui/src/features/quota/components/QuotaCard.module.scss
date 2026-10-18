@@ -1,12 +1,19 @@
 @use '../../../styles/mixins' as *;
 
-/* Cards stretch to the tallest content-sized card in their grid row. */
+/*
+ * Each card spans one page-grid row per top-level block (header, overview, schedule,
+ * limits, notes, manual resets) and shares those rows through subgrid, so matching
+ * blocks line up across every card in the same grid row.
+ */
 .card {
   width: 100%;
   max-width: 420px;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-row: span 6;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0;
   padding: 16px;
   border: 1px solid var(--border-color);
   border-radius: 16px;
@@ -216,6 +223,7 @@
   color: var(--text-primary);
 }
 .notes {
+  align-self: start;
   margin: 0 0 12px;
   padding: 8px 10px;
   border-radius: 10px;
