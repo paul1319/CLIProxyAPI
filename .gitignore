@@ -43,7 +43,7 @@ AGENTS.override.md
 .codex/*
 .claude/*
 !.claude/skills/
-.taste-skill/
+!.claude/commands/
 .gemini/*
 .serena/*
 .agent/*
