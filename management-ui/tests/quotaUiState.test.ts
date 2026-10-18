@@ -68,6 +68,20 @@ describe('quota ui state', () => {
     expect(readQuotaUiState()).toEqual({ tab: undefined, sortMode: undefined });
   });
 
+  test('keeps pinned overview windows per provider and drops unknown ones', () => {
+    writeQuotaUiState({ sortMode: 'remaining' });
+    writeQuotaUiState({ focal: { claude: 'seven-day-fable' } });
+    expect(readQuotaUiState()).toEqual({
+      sortMode: 'remaining',
+      focal: { claude: 'seven-day-fable' },
+    });
+
+    storage.setItem(KEY, JSON.stringify({ focal: { claude: 7, nope: 'weekly', codex: 'weekly' } }));
+    expect(readQuotaUiState()?.focal).toEqual({ codex: 'weekly' });
+    storage.setItem(KEY, JSON.stringify({ focal: 'weekly' }));
+    expect(readQuotaUiState()?.focal).toBeUndefined();
+  });
+
   test('survives absent, malformed, and non-object payloads', () => {
     expect(readQuotaUiState()).toBeNull();
 

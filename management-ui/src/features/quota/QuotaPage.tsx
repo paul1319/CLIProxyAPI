@@ -1,38 +1,26 @@
-/** Quota: pool capacity summary and per-provider account cards with session-scoped loading. */
+/** Quota: provider overview strip and per-provider credential tables with session-scoped loading. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
-import { PageHeader } from '@/components/common/PageHeader';
+import { MetaDot, PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import {
-  IconArrowUpDown,
-  IconChevronDown,
-  IconRefreshCw,
-  IconSearch,
-  IconX,
-} from '@/components/ui/icons';
+import { IconArrowUpDown, IconChevronDown, IconRefreshCw } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { StatusLamp, type LampState } from '@/components/ui/StatusLamp';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNow } from '@/hooks/useNow';
-import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
-import type { AuthFileItem, ClaudeQuotaState, ResolvedTheme } from '@/types';
+import { useAuthStore, useQuotaStore } from '@/stores';
+import type { AuthFileItem, ClaudeQuotaState } from '@/types';
 import { getQuotaCacheKey, getQuotaCardTitle } from '@/utils/quota/identity';
 import { getCredentialLampState } from '@/components/layout/poolRail';
 import { ActionMenu, type ActionMenuItem } from '@/features/authFiles/components/ActionMenu';
-import {
-  getAuthFileIcon,
-  getThemeSurfaceIconBackground,
-  getTypeLabel,
-  isThemeSurfaceIconProvider,
-} from '@/features/authFiles/constants';
 import { cooldownRemainingSeconds, summarizeCooldowns } from '@/features/authFiles/cooldowns';
-import { ProviderTabs } from './components/ProviderTabs';
-import { QuotaCard } from './components/QuotaCard';
-import { QuotaSummary } from './components/QuotaSummary';
+import { ProviderOverview } from './components/ProviderOverview';
+import { QuotaRow } from './components/QuotaRow';
+import { QuotaSection } from './components/QuotaSection';
 import {
-  QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
   type QuotaSortMode,
@@ -42,9 +30,6 @@ import {
   buildTabCounts,
   canRefreshQuotaAfterList,
   classifyQuotaFiles,
-  filterEntriesByTab,
-  filterEntriesBySearch,
-  paginate,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
@@ -55,7 +40,8 @@ import {
   snapshotAccount,
   type AccountSnapshot,
 } from './poolSummary';
-import { formatCompactDuration } from './format';
+import { buildProviderSummary, findLimit } from './providerSummary';
+import { MAX_TABLE_SLOTS, buildWindowColumns } from './tableColumns';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import { hasClaudeUsageData } from './providers/claude/data';
 import type { QuotaProviderType } from './providers/types';
@@ -65,9 +51,12 @@ import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
 import styles from './QuotaPage.module.scss';
 
-const SKELETON_CARD_COUNT = 3;
+const SKELETON_ROW_COUNT = 3;
 
 const entryKey = (entry: QuotaFileEntry) => `${entry.type}:${getQuotaCacheKey(entry.file)}`;
+
+const supportsManualReset = (type: QuotaProviderType) =>
+  type === 'claude' || Boolean(QUOTA_ADAPTERS[type].resetQuota);
 
 /** Remaining cooldown on the whole credential plus the number of paused models. */
 function readCooldown(file: AuthFileItem, nowMs: number) {
@@ -88,7 +77,6 @@ export function QuotaPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage;
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
-  const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,9 +85,11 @@ export function QuotaPage() {
   const [sortMode, setSortMode] = useState<QuotaSortMode>(
     () => readQuotaUiState()?.sortMode ?? 'name'
   );
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [focalPins, setFocalPins] = useState<Partial<Record<QuotaProviderType, string>>>(
+    () => readQuotaUiState()?.focal ?? {}
+  );
+  // Names stay blurred until revealed; the choice lives only as long as the page.
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
 
   const disableControls = connectionStatus !== 'connected';
 
@@ -185,7 +175,7 @@ export function QuotaPage() {
     [quotaByType]
   );
 
-  /* Per-account model: overview → snapshot. Shared by the summary, sections, sort and cards. */
+  /* Per-account model: overview → snapshot. Shared by the header, strip, tables and sort. */
 
   const now = useNow();
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
@@ -204,7 +194,7 @@ export function QuotaPage() {
     return map;
   }, [entries, getQuota, t, locale]);
 
-  // Claude reset grants are read per card, so cards report their counts upward.
+  // Claude reset grants are read per row, so rows report their counts upward.
   const [resetCounts, setResetCounts] = useState<Record<string, number | null>>({});
   const handleResetCount = useCallback((key: string, count: number | null) => {
     setResetCounts((previous) =>
@@ -244,74 +234,139 @@ export function QuotaPage() {
     [snapshots, now]
   );
 
-  /* Filters, sorting and pagination. */
+  /* Providers: focal windows come from the stable list order, so sorting can't flip them. */
 
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
-  const tabTypes = useMemo(
-    () => ['all', ...QUOTA_TAB_ORDER.filter((type) => (tabCounts[type] ?? 0) > 0)],
+  const providerTypes = useMemo(
+    () => QUOTA_TAB_ORDER.filter((type) => (tabCounts[type] ?? 0) > 0),
     [tabCounts]
   );
   // A single provider needs no filter at all.
-  const showTabs = tabTypes.length > 2;
+  const filterable = providerTypes.length > 1;
   // A remembered provider with no accounts left falls back to all accounts.
-  const activeTab: QuotaTabId = tab === 'all' || (tabCounts[tab] ?? 0) > 0 ? tab : 'all';
-  const filteredEntries = useMemo(
-    () => filterEntriesBySearch(filterEntriesByTab(entries, activeTab), search),
-    [entries, activeTab, search]
-  );
-  const handleSearchChange = useCallback((value: string) => {
-    setSearch(value);
-    setPage(1);
-  }, []);
+  const activeTab: QuotaTabId =
+    filterable && tab !== 'all' && (tabCounts[tab] ?? 0) > 0 ? tab : 'all';
+
+  const snapshotsByType = useMemo(() => {
+    const map = new Map<QuotaProviderType, AccountSnapshot[]>();
+    for (const entry of entries) {
+      const snapshot = snapshots.get(entryKey(entry));
+      if (!snapshot) continue;
+      map.set(entry.type, [...(map.get(entry.type) ?? []), snapshot]);
+    }
+    return map;
+  }, [entries, snapshots]);
+
+  const focalByType = useMemo(() => {
+    const map = new Map<QuotaProviderType, string | null>();
+    for (const type of providerTypes) {
+      const summary = buildProviderSummary(
+        type,
+        snapshotsByType.get(type) ?? [],
+        focalPins[type],
+        now
+      );
+      map.set(type, summary.focal?.id ?? null);
+    }
+    return map;
+  }, [focalPins, now, providerTypes, snapshotsByType]);
+
+  /* Sorting: by the provider's focal window. */
 
   const resolveSortKey = useCallback(
     (entry: QuotaFileEntry): number | null => {
       const snapshot = snapshots.get(entryKey(entry));
-      if (!snapshot) return null;
-      if (sortMode === 'remaining') return snapshot.hero?.remaining ?? null;
-      return snapshot.recoverAtMs;
+      const limit = findLimit(snapshot?.overview ?? null, focalByType.get(entry.type) ?? null);
+      if (!limit || limit.remaining === null) return null;
+      if (sortMode === 'remaining') return limit.remaining;
+      // A full window has nothing to bring back.
+      return limit.remaining < 100 ? limit.resetAtMs : null;
     },
-    [snapshots, sortMode]
+    [focalByType, snapshots, sortMode]
   );
-  // Sort before pagination to rank all matching accounts.
   const sortedEntries = useMemo(
-    () => sortQuotaEntries(filteredEntries, sortMode, resolveSortKey),
-    [filteredEntries, sortMode, resolveSortKey]
+    () => sortQuotaEntries(entries, sortMode, resolveSortKey),
+    [entries, sortMode, resolveSortKey]
   );
 
-  const { pageItems, currentPage, totalPages } = useMemo(
-    () => paginate(sortedEntries, page, QUOTA_PAGE_SIZE),
-    [sortedEntries, page]
+  // Segments follow the table order.
+  const providerSummaries = useMemo(
+    () =>
+      providerTypes.map((type) =>
+        buildProviderSummary(
+          type,
+          sortedEntries
+            .filter((entry) => entry.type === type)
+            .map((entry) => snapshots.get(entryKey(entry)))
+            .filter((snapshot): snapshot is AccountSnapshot => Boolean(snapshot)),
+          focalByType.get(type),
+          now
+        )
+      ),
+    [focalByType, now, providerTypes, snapshots, sortedEntries]
+  );
+
+  const groups = useMemo(() => {
+    const visible =
+      activeTab === 'all'
+        ? sortedEntries
+        : sortedEntries.filter((entry) => entry.type === activeTab);
+    return QUOTA_TAB_ORDER.flatMap((type) => {
+      const groupEntries = visible.filter((entry) => entry.type === type);
+      if (groupEntries.length === 0) return [];
+      const groupOverviews = groupEntries.map((entry) => overviews.get(entryKey(entry)) ?? null);
+      return [
+        {
+          type,
+          entries: groupEntries,
+          columns: buildWindowColumns(type, groupOverviews, focalByType.get(type) ?? null),
+          showResets:
+            supportsManualReset(type) &&
+            groupEntries.some((entry) => (resetCounts[getQuotaCacheKey(entry.file)] ?? 0) > 0),
+        },
+      ];
+    });
+  }, [activeTab, focalByType, overviews, resetCounts, sortedEntries]);
+
+  // Every section shares one slot count, so cells line up down the page.
+  const slots = Math.min(
+    MAX_TABLE_SLOTS,
+    Math.max(1, ...groups.map((group) => group.columns.length + (group.showResets ? 1 : 0)))
   );
 
   // Polling targets in a stable order, so a live re-sort never restarts the refresh loop.
   const pollItems = useMemo(
-    () => [...pageItems].sort((a, b) => (entryKey(a) < entryKey(b) ? -1 : 1)),
-    [pageItems]
+    () => [...entries].sort((a, b) => (entryKey(a) < entryKey(b) ? -1 : 1)),
+    [entries]
   );
 
-  const groups = useMemo(() => {
-    const byType = new Map<QuotaProviderType, QuotaFileEntry[]>();
-    for (const entry of pageItems) {
-      const list = byType.get(entry.type) ?? [];
-      list.push(entry);
-      byType.set(entry.type, list);
-    }
-    return QUOTA_TAB_ORDER.filter((type) => byType.has(type)).map((type) => ({
-      type,
-      entries: byType.get(type) ?? [],
-    }));
-  }, [pageItems]);
+  const handleSelectProvider = useCallback(
+    (type: QuotaProviderType) => {
+      const next: QuotaTabId = activeTab === type ? 'all' : type;
+      setTab(next);
+      writeQuotaUiState({ tab: next });
+    },
+    [activeTab]
+  );
 
-  const handleTabChange = useCallback((next: string) => {
-    setTab(next as QuotaTabId);
-    setPage(1);
-    writeQuotaUiState({ tab: next as QuotaTabId });
+  const handleFocalChange = useCallback((type: QuotaProviderType, windowId: string) => {
+    setFocalPins((previous) => {
+      const next = { ...previous, [type]: windowId };
+      writeQuotaUiState({ focal: next });
+      return next;
+    });
+  }, []);
+
+  const toggleName = useCallback((key: string) => {
+    setRevealed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   }, []);
 
   const handleSortModeChange = useCallback((next: string) => {
     setSortMode(next as QuotaSortMode);
-    setPage(1);
     writeQuotaUiState({ sortMode: next as QuotaSortMode });
   }, []);
 
@@ -355,7 +410,7 @@ export function QuotaPage() {
   const pendingRefreshRef = useRef<number | null>(null);
   const prevLoadingRef = useRef(loading);
 
-  // Reload credentials before refreshing the quotas on the current page.
+  // Reload credentials before refreshing every quota.
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
     pendingRefreshRef.current = sessionGeneration;
@@ -384,9 +439,9 @@ export function QuotaPage() {
         disableControls
       )
     ) {
-      void loadQuota(pageItems);
+      void loadQuota(pollItems);
     }
-  }, [disableControls, error, filesGeneration, loading, loadQuota, pageItems, sessionGeneration]);
+  }, [disableControls, error, filesGeneration, loading, loadQuota, pollItems, sessionGeneration]);
 
   const restoringQuota = useQuotaAutoRefresh(
     pollItems,
@@ -395,99 +450,80 @@ export function QuotaPage() {
   );
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
-  // Only a user-initiated reload spins the toolbar; first load shows skeletons instead.
+  // Only a user-initiated reload spins the header; first load shows skeletons instead.
   const refreshing = batchLoading || (loading && files.length > 0);
 
-  const isEmpty = !loading && filteredEntries.length === 0;
-  const hasPageData = pageItems.some((entry) => overviews.get(entryKey(entry)));
-  const showSkeleton = (loading && files.length === 0) || (restoringQuota && !hasPageData);
-  const searching = search.trim().length > 0;
+  const isEmpty = !loading && entries.length === 0;
+  const hasData = entries.some((entry) => overviews.get(entryKey(entry)));
+  const showSkeleton = (loading && files.length === 0) || (restoringQuota && !hasData);
+
+  // Mutually exclusive account states, in lamp order; zero counts stay out of the header.
+  const metaCounts: { key: string; value: number; lamp: LampState }[] = [
+    { key: 'meta_serving', value: poolSummary.available, lamp: 'ok' },
+    { key: 'meta_low', value: poolSummary.low, lamp: 'warn' },
+    { key: 'meta_exhausted', value: poolSummary.exhausted, lamp: 'warn' },
+    { key: 'meta_cooling', value: poolSummary.cooling, lamp: 'warn' },
+    { key: 'meta_failing', value: poolSummary.failing, lamp: 'fault' },
+  ];
 
   return (
     <div className={styles.page}>
       <PageHeader
         title={t('quota_management.page_title')}
-        meta={<span>{t('quota_management.accounts', { count: entries.length })}</span>}
+        meta={
+          <>
+            <span>{t('quota_management.accounts', { count: entries.length })}</span>
+            {poolSummary.observed &&
+              metaCounts
+                .filter((count) => count.value > 0)
+                .map((count) => (
+                  <Fragment key={count.key}>
+                    <MetaDot />
+                    <span className={styles.metaCount}>
+                      <StatusLamp state={count.lamp} size={6} />
+                      {t(`quota_management.${count.key}`, { count: count.value })}
+                    </span>
+                  </Fragment>
+                ))}
+          </>
+        }
         actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefreshAll}
-            className={styles.refreshAll}
-            disabled={disableControls || refreshing}
-          >
-            <IconRefreshCw
-              size={14}
-              className={refreshing ? styles.spinning : undefined}
-              aria-hidden="true"
+          <>
+            <ActionMenu
+              items={sortItems}
+              label={t('quota_management.sort_label')}
+              align="end"
+              minWidth={200}
+              triggerClassName={styles.sortTrigger}
+              trigger={
+                <>
+                  <IconArrowUpDown size={14} className={styles.sortIcon} aria-hidden="true" />
+                  <span className={styles.sortValue}>
+                    {t('quota_management.sort_by', {
+                      mode: t(`quota_management.sort_${sortMode}`),
+                    })}
+                  </span>
+                  <IconChevronDown size={14} className={styles.sortIcon} aria-hidden="true" />
+                </>
+              }
             />
-            {t('quota_management.refresh_all')}
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshAll}
+              className={styles.refreshAll}
+              disabled={disableControls || refreshing}
+            >
+              <IconRefreshCw
+                size={14}
+                className={refreshing ? styles.spinning : undefined}
+                aria-hidden="true"
+              />
+              {t('quota_management.refresh_all')}
+            </Button>
+          </>
         }
       />
-
-      <QuotaSummary summary={poolSummary} now={now} loading={loading && files.length === 0} />
-
-      <div className={showTabs ? `${styles.toolbar} ${styles.toolbarTabs}` : styles.toolbar}>
-        {showTabs && (
-          <div className={styles.filters}>
-            <ProviderTabs
-              types={tabTypes}
-              counts={tabCounts}
-              active={activeTab}
-              resolvedTheme={resolvedTheme}
-              onChange={handleTabChange}
-            />
-          </div>
-        )}
-        <div className={styles.search}>
-          <IconSearch size={14} className={styles.searchIcon} aria-hidden="true" />
-          <input
-            ref={searchInputRef}
-            className={styles.searchInput}
-            type="search"
-            value={search}
-            onChange={(event) => handleSearchChange(event.target.value)}
-            placeholder={t('quota_management.search_placeholder')}
-            title={t('quota_management.search_hint')}
-            aria-label={t('quota_management.search_label')}
-          />
-          {search && (
-            <button
-              type="button"
-              className={styles.clearSearch}
-              aria-label={t('quota_management.search_clear')}
-              title={t('quota_management.search_clear')}
-              onClick={() => {
-                handleSearchChange('');
-                searchInputRef.current?.focus();
-              }}
-            >
-              <IconX size={14} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        <div className={styles.sort}>
-          <ActionMenu
-            items={sortItems}
-            label={t('quota_management.sort_label')}
-            align="end"
-            minWidth={200}
-            triggerClassName={styles.sortTrigger}
-            trigger={
-              <>
-                <IconArrowUpDown size={14} className={styles.sortIcon} aria-hidden="true" />
-                <span className={styles.sortValue}>
-                  {t('quota_management.sort_by', {
-                    mode: t(`quota_management.sort_${sortMode}`),
-                  })}
-                </span>
-                <IconChevronDown size={14} className={styles.sortIcon} aria-hidden="true" />
-              </>
-            }
-          />
-        </div>
-      </div>
 
       {error && (
         <div className={`error-box ${styles.listError}`} role="alert">
@@ -499,94 +535,57 @@ export function QuotaPage() {
       )}
 
       {showSkeleton ? (
-        <div className={styles.grid} aria-hidden="true">
-          {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-            <Skeleton key={index} height={220} rounded={8} />
-          ))}
+        <div className={styles.skeleton} aria-hidden="true">
+          <Skeleton height={164} rounded={8} />
+          <Skeleton width={160} height={16} />
+          <div className={styles.skeletonRows}>
+            {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+              <Skeleton key={index} height={72} rounded={8} />
+            ))}
+          </div>
         </div>
       ) : isEmpty ? (
         <EmptyState
-          title={
-            searching
-              ? t('quota_management.search_empty_title')
-              : activeTab === 'all'
-                ? t('quota_management.empty_title')
-                : t(`${QUOTA_ADAPTERS[activeTab].i18nPrefix}.empty_title`)
-          }
-          description={
-            searching
-              ? t('quota_management.search_empty_desc')
-              : activeTab === 'all'
-                ? t('quota_management.empty_desc')
-                : t(`${QUOTA_ADAPTERS[activeTab].i18nPrefix}.empty_desc`)
-          }
-          action={
-            searching ? (
-              <Button variant="secondary" size="sm" onClick={() => handleSearchChange('')}>
-                {t('quota_management.search_clear')}
-              </Button>
-            ) : activeTab === 'all' ? undefined : (
-              <Button variant="secondary" size="sm" onClick={() => handleTabChange('all')}>
-                {t('auth_files.filter_all')}
-              </Button>
-            )
-          }
+          title={t('quota_management.empty_title')}
+          description={t('quota_management.empty_desc')}
         />
       ) : (
-        <div className={styles.groups}>
-          {groups.map((group) => {
-            const groupSnapshots = group.entries
-              .map((entry) => snapshots.get(entryKey(entry)))
-              .filter((snapshot): snapshot is AccountSnapshot => Boolean(snapshot));
-            const summary = buildGroupSummary(groupSnapshots, now);
-            const label = getTypeLabel(t, group.type);
-            const icon =
-              group.type === 'plugin' ? null : getAuthFileIcon(group.type, resolvedTheme);
-            const headingId = `quota-group-${group.type}`;
-            return (
-              <section key={group.type} className={styles.group} aria-labelledby={headingId}>
-                <header className={styles.groupHead}>
-                  <span
-                    className={styles.glyph}
-                    style={
-                      isThemeSurfaceIconProvider(group.type)
-                        ? { background: getThemeSurfaceIconBackground(resolvedTheme) }
-                        : undefined
-                    }
-                    aria-hidden="true"
-                  >
-                    {icon ? <img src={icon} alt="" /> : label.slice(0, 1).toUpperCase()}
-                  </span>
-                  <h2 id={headingId} className={styles.groupTitle}>
-                    {label}
-                  </h2>
-                  <p className={styles.groupMeta}>
-                    <span>{t('quota_management.accounts', { count: summary.count })}</span>
-                    <span>
-                      {t('quota_management.group_available', { count: summary.available })}
-                    </span>
-                    {summary.nextResetMs !== null && (
-                      <span>
-                        {t('quota_management.group_next_reset', {
-                          duration: formatCompactDuration(t, summary.nextResetMs - now),
-                        })}
-                      </span>
-                    )}
-                  </p>
-                </header>
-                <div className={styles.grid}>
+        <>
+          <ProviderOverview
+            summaries={providerSummaries}
+            selected={activeTab === 'all' ? null : activeTab}
+            filterable={filterable}
+            now={now}
+            onSelect={handleSelectProvider}
+            onFocalChange={handleFocalChange}
+          />
+
+          <div className={styles.groups}>
+            {groups.map((group) => {
+              const groupSnapshots = group.entries
+                .map((entry) => snapshots.get(entryKey(entry)))
+                .filter((snapshot): snapshot is AccountSnapshot => Boolean(snapshot));
+              return (
+                <QuotaSection
+                  key={group.type}
+                  type={group.type}
+                  summary={buildGroupSummary(groupSnapshots, now)}
+                  slots={slots}
+                  now={now}
+                >
                   {group.entries.map((entry) => {
                     const key = entryKey(entry);
-                    const snapshot = snapshots.get(key);
-                    if (!snapshot) return null;
                     return (
-                      <QuotaCard
+                      <QuotaRow
                         key={key}
                         entry={entry}
                         quota={getQuota(entry)}
                         overview={overviews.get(key) ?? null}
-                        snapshot={snapshot}
+                        columns={group.columns}
+                        showResets={group.showResets}
                         cooldown={cooldowns.get(key) ?? null}
+                        revealed={revealed.has(key)}
+                        onToggleName={() => toggleName(key)}
                         canRefresh={canUseActions && !entry.file.disabled}
                         resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
                         onRefresh={() => refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
@@ -595,38 +594,11 @@ export function QuotaPage() {
                       />
                     );
                   })}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
-
-      {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (
-        <nav className={styles.pagination} aria-label={t('quota_management.pagination_label')}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage <= 1}
-          >
-            {t('auth_files.pagination_prev')}
-          </Button>
-          <span className={styles.pageInfo}>
-            {t('quota_management.pagination_info', {
-              current: currentPage,
-              total: totalPages,
+                </QuotaSection>
+              );
             })}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage >= totalPages}
-          >
-            {t('auth_files.pagination_next')}
-          </Button>
-        </nav>
+          </div>
+        </>
       )}
     </div>
   );

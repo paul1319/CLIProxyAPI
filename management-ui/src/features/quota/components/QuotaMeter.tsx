@@ -2,8 +2,8 @@
  * Remaining-capacity bar for the provider bodies in the credential sheet.
  *
  * The host supplies the track geometry (`quotaBar` / `quotaBarFill`); the fill
- * color follows the console-wide meter rule (`toneForRemaining`): healthy
- * capacity stays neutral, low is warn, exhausted is fault. `percent === null`
+ * color follows the console-wide meter rule (`toneForRemaining`): green with
+ * plenty left, yellow half-spent, red when low. `percent === null`
  * renders an empty track — unknown is never colored. The fill keeps an inline
  * width so the rendered markup states the remaining direction.
  */

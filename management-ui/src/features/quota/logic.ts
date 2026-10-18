@@ -1,6 +1,6 @@
 /**
- * Quota page pure logic: file classification, tab filtering, counts, sorting
- * and pagination. React-free, consumed directly by tests/quotaPageLogic.test.ts.
+ * Quota page pure logic: file classification, provider filtering, counts and
+ * sorting. React-free, consumed directly by tests/quotaPageLogic.test.ts.
  */
 
 import type { AuthFileItem } from '@/types';
@@ -72,22 +72,11 @@ export function filterEntriesByTab(entries: QuotaFileEntry[], tab: QuotaTabId): 
   return entries.filter((entry) => entry.type === tab);
 }
 
-/** Search public account identifiers only; account may contain an API key. */
-export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string): QuotaFileEntry[] {
-  const query = search.trim().toLowerCase();
-  if (!query) return entries;
-  return entries.filter(({ file }) =>
-    [file.name, file.email].some(
-      (value) => typeof value === 'string' && value.toLowerCase().includes(query)
-    )
-  );
-}
-
 /**
- * Order the cards.
+ * Order the rows.
  *
- * - `name`: provider order, then the card title, so pages stay contiguous runs
- *   of one provider and the default never reshuffles on a refresh.
+ * - `name`: provider order, then the account title, so provider sections stay
+ *   contiguous and the default never reshuffles on a refresh.
  * - `remaining` / `soonest`: ascending by the injected key (least remaining
  *   capacity, or soonest capacity return). The key is injected rather than
  *   read here because quota lives in the store and arrives asynchronously;
@@ -144,21 +133,3 @@ export const isQuotaRefreshDisabled = (
   loading: boolean,
   resetting: boolean
 ): boolean => !canRefresh || loading || resetting;
-
-export interface QuotaPagination<T> {
-  pageItems: T[];
-  currentPage: number;
-  totalPages: number;
-}
-
-/** Clamp an out-of-range page (a shortened list stays on its last page, not an empty one). */
-export function paginate<T>(items: T[], page: number, pageSize: number): QuotaPagination<T> {
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const currentPage = Math.min(Math.max(1, page), totalPages);
-  const start = (currentPage - 1) * pageSize;
-  return {
-    pageItems: items.slice(start, start + pageSize),
-    currentPage,
-    totalPages,
-  };
-}

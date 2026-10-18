@@ -311,18 +311,19 @@ describe('pool summary', () => {
 });
 
 describe('card labels', () => {
-  test('rows: gating first, neutral color until capacity runs low', () => {
+  test('rows: gating first; green with plenty left, yellow half-spent, red when low', () => {
     const rows = orderWindowRows([
       limit('spend', 50, { scope: 'spend' }),
       limit('scoped', 50, { scope: 'scoped' }),
       limit('gating', 50),
     ]);
     expect(rows.map((row) => row.id)).toEqual(['gating', 'scoped', 'spend']);
-    expect([95, 40, 25, 24, 0, null].map(toneForPercent)).toEqual([
-      'neutral',
-      'neutral',
-      'neutral',
+    expect([100, 60, 59, 25, 24, 0, null].map(toneForPercent)).toEqual([
+      'ok',
+      'ok',
       'warn',
+      'warn',
+      'fault',
       'fault',
       'idle',
     ]);
@@ -339,11 +340,11 @@ describe('card labels', () => {
     );
     const render = (percent: number | null) =>
       renderToStaticMarkup(createElement(QuotaMeter, { percent, classes }));
-    expect(render(84)).toContain('width:84%;background:var(--ink-3)');
-    expect(render(10)).toContain('width:10%;background:var(--signal-warn)');
+    expect(render(84)).toContain('width:84%;background:var(--signal-ok)');
+    expect(render(40)).toContain('width:40%;background:var(--signal-warn)');
+    expect(render(10)).toContain('width:10%;background:var(--signal-fault)');
     expect(render(0)).toContain('width:0%;background:var(--signal-fault)');
     expect(render(null)).toContain('data-tone="idle"');
-    expect(render(84)).not.toContain('--signal-ok');
   });
 
   test('friendly errors keep the status code and countdowns stay compact', () => {

@@ -1,4 +1,4 @@
-/** Window rows of a quota card: one line per limit, gating windows first. */
+/** Window rows of a credential's quota: one line per limit, gating windows first. */
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ import {
   percentToFraction,
   toneForPercent,
 } from '../windowRows';
-import styles from './QuotaCard.module.scss';
+import styles from './QuotaWindows.module.scss';
 
 interface QuotaWindowsProps {
   limits: readonly AccountLimit[];

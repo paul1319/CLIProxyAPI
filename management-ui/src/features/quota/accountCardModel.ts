@@ -58,7 +58,7 @@ export interface AccountOverview {
 const CODEX_GATING_IDS = new Set(['five-hour', 'weekly', 'monthly']);
 /** Claude windows that stop the whole account; per-model 7-day windows are scoped. */
 const CLAUDE_GATING_IDS = new Set(['five-hour', 'seven-day']);
-const POOLED_PROVIDERS = new Set<QuotaProviderType>(['antigravity', 'plugin']);
+export const POOLED_PROVIDERS: ReadonlySet<QuotaProviderType> = new Set(['antigravity', 'plugin']);
 
 /**
  * Pick the window that best answers "how much can this account still do".

@@ -614,11 +614,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-// One capacity rule (toneForRemaining) everywhere: neutral, warn <25%, fault at 0.
-.quotaCell[data-tone='warn'] .quotaValue {
-  color: var(--signal-warn-ink);
-}
-
+// One capacity rule (toneForRemaining) everywhere: the meter carries the color, the figure turns red below 25%.
 .quotaCell[data-tone='fault'] {
   .quotaValue {
     color: var(--signal-fault-ink);

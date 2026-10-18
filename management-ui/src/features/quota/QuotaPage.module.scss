@@ -23,109 +23,11 @@
   }
 }
 
-/* Toolbar: provider filter · search · sort */
-
-.toolbar {
-  display: flex;
+.metaCount {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  min-width: 0;
-  margin-top: 8px;
-}
-
-/* With provider tabs the whole row sits on one hairline; the active underline covers it. */
-.toolbarTabs {
-  box-shadow: inset 0 -1px 0 var(--rule);
-}
-
-.filters {
-  display: flex;
-  flex: 1 1 auto;
-  align-self: stretch;
-  min-width: 0;
-}
-
-.search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 1 280px;
-  min-width: 0;
-  height: $control-md;
-  border: 1px solid var(--rule-strong);
-  border-radius: $radius-md;
-  background: var(--well);
-  color: var(--ink-3);
-  transition:
-    border-color $transition-fast,
-    background-color $transition-fast;
-
-  &:focus-within {
-    border-color: var(--focus);
-    background: var(--panel);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
-  }
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  pointer-events: none;
-}
-
-.searchInput {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  padding: 0 34px 0 30px;
-  border: 0;
-  border-radius: inherit;
-  outline: none;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: $text-md;
-  appearance: none;
-
-  &::placeholder {
-    color: var(--ink-4);
-  }
-
-  &::-webkit-search-cancel-button,
-  &::-webkit-search-decoration {
-    appearance: none;
-  }
-}
-
-.clearSearch {
-  @include button-reset;
-  position: absolute;
-  right: 2px;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: $radius-sm;
-  color: var(--ink-3);
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-  }
-
-  &:active {
-    transform: scale(0.97);
-  }
-}
-
-.sort {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  margin-left: auto;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 /* "Sort: Name ▾" in one quiet button, like the credentials toolbar. */
@@ -134,7 +36,7 @@
   align-items: center;
   gap: 6px;
   max-width: 280px;
-  height: $control-md;
+  height: $control-sm;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: $radius-md;
@@ -184,6 +86,18 @@
   overflow-wrap: anywhere;
 }
 
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Provider sections */
 
 .groups {
@@ -191,104 +105,10 @@
   flex-direction: column;
   gap: 24px;
   min-width: 0;
-}
-
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-
-.groupHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.glyph {
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: $radius-sm;
-  color: var(--ink-2);
-  font-size: $text-xs;
-  font-weight: 600;
-
-  img {
-    display: block;
-    width: 16px;
-    height: 16px;
-    object-fit: contain;
-  }
-}
-
-.groupTitle {
-  flex: 0 0 auto;
-  margin: 0;
-  color: var(--ink);
-  font-size: $text-md;
-  font-weight: 600;
-}
-
-.groupMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  min-width: 0;
-  margin: 0;
-  color: var(--ink-3);
-  font-size: $text-sm;
-  font-variant-numeric: tabular-nums;
-
-  > span::before {
-    content: '·';
-    margin-right: 6px;
-    color: var(--ink-4);
-  }
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  /* Cards span four subgrid rows; their own bottom margin separates card rows,
-     so no parent row gap leaks into a card's inner tracks. */
-  column-gap: 16px;
-  row-gap: 0;
-  align-items: stretch;
-  margin-bottom: -16px;
-}
-
-/* Pagination */
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.pageInfo {
-  color: var(--ink-3);
-  font-size: $text-sm;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  margin-top: 8px;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .search:hover:not(:focus-within) {
-    border-color: var(--rule-ink);
-  }
-
-  .clearSearch:hover {
-    background: var(--panel-hover);
-    color: var(--ink);
-  }
-
   .sortTrigger:hover:not(:disabled) {
     background: var(--panel-hover);
     color: var(--ink);
@@ -300,55 +120,18 @@
     animation: none;
   }
 
-  .clearSearch:active {
-    transform: none;
-  }
-
   .sortTrigger {
     transition: none;
   }
 }
 
 @include mobile {
-  .refreshAll {
-    min-height: 40px;
-  }
-
-  .toolbar {
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  /* Tabs take their own row on mobile, so the hairline moves under the tabs. */
-  .toolbarTabs {
-    box-shadow: none;
-  }
-
-  .filters {
-    flex-basis: 100%;
-    box-shadow: inset 0 -1px 0 var(--rule);
-  }
-
-  .search {
-    flex: 1 1 200px;
-    height: 40px;
-  }
-
-  .clearSearch {
-    width: 36px;
-    height: 36px;
-  }
-
+  .refreshAll,
   .sortTrigger {
-    height: 40px;
+    min-height: 40px;
   }
 
   .groups {
     gap: 20px;
-  }
-
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-    margin-bottom: -12px;
   }
 }

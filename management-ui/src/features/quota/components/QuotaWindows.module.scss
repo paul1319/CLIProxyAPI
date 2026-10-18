@@ -1,0 +1,122 @@
+@use '../../../styles/mixins' as *;
+
+/* Window rows: label · meter · percent · countdown */
+
+.rows {
+  /* One column grid per card; rows subgrid into it so percent and countdown
+     columns size to the widest entry instead of a fixed guess per locale.
+     The meter column is fixed so long (translated) labels get the slack. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rowItem {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-width: 0;
+}
+
+.pool {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  color: var(--ink-3);
+  font-size: $text-xs;
+  font-weight: 500;
+  @include text-ellipsis;
+
+  .rowItem:first-child > & {
+    margin-top: 0;
+  }
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 0;
+  font-size: $text-sm;
+}
+
+.rowLabel {
+  /* Long labels wrap to a second line before truncating; the title keeps the full text. */
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  [data-hero='true'] > & {
+    color: var(--ink);
+    font-weight: 500;
+  }
+}
+
+.bar {
+  min-width: 0;
+}
+
+.rowValue {
+  min-width: 32px;
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+
+  /* The meter carries the color; only an empty or nearly empty window tints the figure. */
+  &[data-tone='fault'] {
+    color: var(--signal-fault-ink);
+  }
+
+  &[data-tone='idle'] {
+    color: var(--ink-4);
+  }
+}
+
+.rowReset {
+  min-width: 0;
+  max-width: 96px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  @include text-ellipsis;
+}
+
+.moreToggle {
+  @include button-reset;
+  align-self: flex-start;
+  min-height: 24px;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: $text-sm;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    border-radius: $radius-sm;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .moreToggle:hover {
+    color: var(--ink);
+  }
+}
+
+@include mobile {
+  .moreToggle {
+    min-height: 40px;
+  }
+}

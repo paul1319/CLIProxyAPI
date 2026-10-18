@@ -261,11 +261,7 @@ $cols: 36px 20px 36px minmax(0, 1fr) 184px 168px 112px 56px 40px;
   font-weight: 500;
 }
 
-// Same capacity rule as the Quota page rows: warn <25%, fault at 0.
-.quota[data-tone='warn'] .quotaPercent {
-  color: var(--signal-warn-ink);
-}
-
+// Same capacity rule as the Quota page: the meter carries the color, the figure turns red below 25%.
 .quota[data-tone='fault'] {
   .quotaPercent {
     color: var(--signal-fault-ink);

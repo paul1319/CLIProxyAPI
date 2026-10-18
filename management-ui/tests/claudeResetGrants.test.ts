@@ -341,8 +341,8 @@ test('card selection prefers usable recommendation and has deterministic fallbac
   }
 });
 
-test('Claude cards retain the shared reset confirmation and retry flow', async () => {
-  const card = await Bun.file('src/features/quota/components/QuotaCard.tsx').text();
+test('Claude quota rows retain the shared reset confirmation and retry flow', async () => {
+  const card = await Bun.file('src/features/quota/components/QuotaRow.tsx').text();
   const hook = await Bun.file('src/features/quota/providers/claude/ClaudeResetGrants.tsx').text();
   expect(card).toContain('claudeReset.confirm');
   expect(card).toContain('claudeReset.blocked');
