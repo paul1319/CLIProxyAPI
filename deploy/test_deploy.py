@@ -1,5 +1,9 @@
 """Exercise deployment failure boundaries without a Docker daemon or real secrets."""
 
+import contextlib
+import copy
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import io
 import json
 import os
 from pathlib import Path
@@ -7,7 +11,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+
+import configure
 
 
 SOURCE = Path(__file__).resolve().parent
@@ -178,6 +185,120 @@ class DeployTest(unittest.TestCase):
         login = next(call for call in self.calls if call[1][0] == "login")
         self.assertFalse(Path(login[3]).exists())
         self.assertFalse((self.runtime / ".deploy.lock").exists())
+
+
+class ConfigurationTest(unittest.TestCase):
+    """The CI client must preserve unrelated settings and reject stale writes."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.runtime = Path(self.temp.name)
+        self.key = "local-management-secret"
+        (self.runtime / "initial-credentials.json").write_text(json.dumps({"management_key": self.key}))
+        self.config = {"routing": {"strategy": "round-robin"}, "access": {"api-keys": ["client-secret"]}}
+        self.before = copy.deepcopy(self.config)
+        self.settings = {"routing": {"session-affinity": True}}
+        self.revision = 1
+        self.calls = []
+        self.scenario = ""
+        case = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def handle_request(self):
+                case.calls.append((self.command, self.path, self.headers.get("If-Match")))
+                if self.headers.get("Authorization") != "Bearer " + case.key:
+                    self.send_error(401)
+                    return
+                etag = f'"{case.revision}"'
+                if self.command != "GET" and self.headers.get("If-Match") != etag:
+                    self.send_error(412, "client-secret must not appear in logs")
+                    return
+                if self.command == "PATCH" and case.scenario == "stale":
+                    self.send_error(412)
+                    return
+                if self.command in ("PATCH", "PUT"):
+                    body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                    if self.command == "PUT":
+                        case.config = body
+                    elif case.scenario != "ignored":
+                        case.config["routing"].update(body["routing"])
+                    case.revision += 1
+                    etag = f'"{case.revision}"'
+                if self.command == "GET" and case.revision > 1 and case.scenario == "concurrent":
+                    case.config["routing"]["session-affinity"] = False
+                    case.config["access"]["api-keys"].append("concurrent-client")
+                    case.revision += 1
+                    etag = f'"{case.revision}"'
+                response = json.dumps(case.config).encode()
+                self.send_response(200)
+                if case.scenario != "no-etag":
+                    self.send_header("ETag", etag)
+                self.send_header("Content-Length", str(len(response)))
+                self.end_headers()
+                self.wfile.write(response)
+
+            do_GET = do_PATCH = do_PUT = handle_request
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01})
+        thread.start()
+
+        def stop():
+            self.server.shutdown()
+            thread.join()
+            self.server.server_close()
+
+        self.addCleanup(stop)
+
+    def apply(self):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            configure.apply_config(self.runtime, self.settings, f"http://127.0.0.1:{self.server.server_port}")
+        self.assertNotIn(self.key, output.getvalue())
+        self.assertNotIn("client-secret", output.getvalue())
+
+    def test_applies_only_versioned_fields_and_verifies_without_restarting(self):
+        self.apply()
+        expected = copy.deepcopy(self.before)
+        expected["routing"].update(self.settings["routing"])
+        self.assertEqual(self.config, expected)
+        self.assertEqual([call[0] for call in self.calls], ["GET", "GET", "PATCH", "GET"])
+        self.assertEqual(self.calls[2][2], '"1"')
+
+    def test_matching_configuration_does_not_write_again(self):
+        self.config["routing"]["session-affinity"] = True
+        self.apply()
+        self.assertEqual([call[0] for call in self.calls], ["GET"])
+
+    def test_missing_etag_refuses_to_write(self):
+        self.scenario = "no-etag"
+        with self.assertRaisesRegex(configure.ConfigurationError, "refusing to write"):
+            self.apply()
+        self.assertEqual(self.config, self.before)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_concurrent_change_rejects_patch_without_unconditional_rollback(self):
+        self.scenario = "stale"
+        with self.assertRaisesRegex(configure.ConfigurationError, "HTTP 412"):
+            self.apply()
+        self.assertEqual(self.config, self.before)
+        self.assertFalse(any(call[0] == "PUT" for call in self.calls))
+
+    def test_failed_verification_restores_previous_configuration(self):
+        self.scenario = "ignored"
+        with self.assertRaisesRegex(configure.ConfigurationError, "previous configuration restored"):
+            self.apply()
+        self.assertEqual(self.config, self.before)
+        self.assertEqual(self.calls[-1], ("PUT", "/v8/management/config.yaml", '"2"'))
+
+    def test_rollback_does_not_overwrite_a_concurrent_change(self):
+        self.scenario = "concurrent"
+        with self.assertRaisesRegex(configure.ConfigurationError, "rollback was not confirmed"):
+            self.apply()
+        self.assertIn("concurrent-client", self.config["access"]["api-keys"])
 
 
 class SSHConfirmationTest(unittest.TestCase):

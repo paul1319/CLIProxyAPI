@@ -1,0 +1,5 @@
+{
+  "routing": {
+    "session-affinity": true
+  }
+}

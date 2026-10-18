@@ -1,0 +1,80 @@
+name: configure-mac
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/configure-mac.yml
+      - deploy/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/configure-mac.yml
+      - deploy/configure.py
+      - deploy/runtime-config.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Validate deployment and configuration scripts
+        run: |
+          bash -n deploy/deploy.sh
+          bash -n deploy/ssh-confirm.sh
+          python3 -m unittest discover -s deploy -p 'test_*.py' -v
+
+  configure:
+    needs: validate
+    if: github.repository == 'paul1319/CLIProxyAPI' && github.ref == 'refs/heads/main' && vars.CLI_PROXY_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Serialize writes with image deployments, without locking for PR validation.
+    concurrency:
+      group: deploy-mac
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_HOST: ${{ vars.CLI_PROXY_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.CLI_PROXY_DEPLOY_USER }}
+      RELEASE: config-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Validate deployment settings
+        env:
+          TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
+          TS_AUDIENCE: ${{ vars.TS_AUDIENCE }}
+        run: |
+          [[ -n "$TS_CLIENT_ID" && -n "$TS_AUDIENCE" ]] || { echo 'Configure TS_CLIENT_ID and TS_AUDIENCE'; exit 1; }
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Invalid CLI_PROXY_DEPLOY_HOST'; exit 1; }
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Invalid CLI_PROXY_DEPLOY_USER'; exit 1; }
+      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:cliproxy-ci
+          hostname: cliproxy-config-${{ github.run_id }}-${{ github.run_attempt }}
+          ping: ${{ vars.CLI_PROXY_DEPLOY_HOST }}
+      - name: Install versioned configuration bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -C deploy -czf - configure.py runtime-config.json | bash deploy/ssh-confirm.sh \
+            "Installed configuration bundle $RELEASE" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "umask 077; mkdir \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && tar -xzf - -C \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && printf '%s\\n' 'Installed configuration bundle $RELEASE'"
+      - name: Apply and verify runtime configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash deploy/ssh-confirm.sh \
+            "Configured bundle $RELEASE; verification passed." "$DEPLOY_USER@$DEPLOY_HOST" \
+            "PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin python3 \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE/configure.py\" && printf '%s\\n' 'Configured bundle $RELEASE; verification passed.'"

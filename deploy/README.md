@@ -12,6 +12,32 @@ CI runs the Go suite except `TestAdvertiserAndBrowser_Integration`, which requir
 live LAN multicast and fails on this Mac even before deployment changes. The
 application's LAN discovery is disabled in the generated runtime configuration.
 
+## Change runtime configuration through CI
+
+All changes to the deployed service go through CI/CD. Change non-secret runtime
+settings in `deploy/runtime-config.json`; the `configure-mac` workflow validates
+the deployment suite and applies this partial JSON document on pushes to `main`.
+It can also be dispatched manually on `main`. PRs run validation only.
+
+The configuration job uses the same Tailscale identity, deployment variables,
+and concurrency group as `deploy-mac`. It calls the local v8 management API,
+preserving unrelated settings and credentials. It neither rebuilds the image nor
+restarts the container. Session affinity is enabled in the versioned settings;
+the routing strategy and affinity TTL retain their configured values or defaults.
+
+The management key is read on the Mac from `initial-credentials.json` and never
+sent to GitHub or printed. If it has been rotated, the local credential handoff
+must contain the current key before configuration jobs can authenticate. Keep
+secrets out of `runtime-config.json`.
+
+Updates use `If-Match` to reject concurrent changes and read back the saved
+settings before reporting success. A failed verification attempts to restore the
+previous configuration, also with `If-Match`; a concurrent writer is never
+overwritten by rollback. A lost write response or failed rollback leaves CI
+failed and requires inspection. To change or revert settings, update the JSON
+document and deliver it through the same workflow. Avoid manual writes to live
+files, management API/UI settings, or containers.
+
 ## Initialize the Mac once
 
 Build and start the checked-out version:
@@ -23,7 +49,7 @@ python3 deploy/bootstrap.py --image cliproxyapi:bootstrap
 
 Runtime state is under `~/.local/share/cliproxyapi`, independently of Git checkouts:
 
-- `config/config.yaml`: editable v8 configuration, mounted as a directory so
+- `config/config.yaml`: v8 configuration managed through CI, mounted as a directory so
   management API atomic writes remain visible to the container.
 - `auths`, `plugins`, `logs`, and `static`: persistent credentials and runtime data.
 - `state/quota-snapshots.json`: persisted, sanitized account quota observations;
@@ -168,11 +194,9 @@ docker compose --project-name cliproxyapi --project-directory "$runtime" \
   --env-file "$runtime/.env" -f "$runtime/releases/$release/compose.yaml" ps
 ```
 
-For a manual rollback, run a retained bundle with the previous image's digest:
-
-```bash
-bash "$runtime/releases/PREVIOUS_RELEASE/deploy.sh" ghcr.io/paul1319/cliproxyapi@sha256:PREVIOUS_DIGEST
-```
+For a code rollback, revert the corresponding repository change and deliver it
+through `deploy-mac`. Configuration changes use `configure-mac` as described
+above. Do not run a retained deployment bundle manually against the service.
 
 If a process was forcibly killed and left `.deploy.lock`, confirm no deploy is
 running before removing that empty directory. Keep the previous image cached for
