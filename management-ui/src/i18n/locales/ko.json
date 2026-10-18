@@ -685,6 +685,8 @@
     "reset_confirm_message": "수동 초기화 1회를 소모하여 \"{{name}}\"의 Codex 할당량을 초기화합니다. 계속하시겠습니까?",
     "reset_confirm_button": "할당량 초기화",
     "reset_not_confirmed": "할당량 초기화가 확인되지 않았습니다. 할당량을 새로 고친 후 다시 시도하세요.",
+    "reset_nothing_to_reset": "지금은 초기화할 사용량이 없습니다. 수동 초기화는 사용되지 않았습니다.",
+    "reset_no_credit": "사용 가능한 수동 초기화가 없습니다. 할당량을 새로 고쳐 현재 개수를 확인하세요.",
     "reset_cooldown_failed": "할당량은 초기화되었지만 게이트웨이 쿨다운을 해제하지 못했습니다. 기존 연결의 자격 증명 페이지에서 '쿨다운 해제'를 사용하고, 추가로 초기화를 사용하지 마세요.",
     "reset_success": "\"{{name}}\"의 Codex 할당량을 초기화했습니다.",
     "reset_failed": "\"{{name}}\"의 Codex 할당량 초기화 실패: {{message}}",

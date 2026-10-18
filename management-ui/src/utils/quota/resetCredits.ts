@@ -7,7 +7,6 @@ export interface CodexResetCredit {
 
 export interface CodexResetCreditsSummary {
   availableCount: number | null;
-  applicableAvailableCount: number | null;
   credits: CodexResetCredit[];
   invalidPayload: boolean;
 }
@@ -67,7 +66,6 @@ export const normalizeCodexResetCreditsPayload = (payload: unknown): CodexResetC
     if (!trimmed) {
       return {
         availableCount: null,
-        applicableAvailableCount: null,
         credits: [],
         invalidPayload: true,
       };
@@ -77,7 +75,6 @@ export const normalizeCodexResetCreditsPayload = (payload: unknown): CodexResetC
     } catch {
       return {
         availableCount: null,
-        applicableAvailableCount: null,
         credits: [],
         invalidPayload: true,
       };
@@ -88,18 +85,13 @@ export const normalizeCodexResetCreditsPayload = (payload: unknown): CodexResetC
   if (!record) {
     return {
       availableCount: null,
-      applicableAvailableCount: null,
       credits: [],
       invalidPayload: true,
     };
   }
 
   const hasExpectedShape =
-    'credits' in record ||
-    'available_count' in record ||
-    'availableCount' in record ||
-    'applicable_available_count' in record ||
-    'applicableAvailableCount' in record;
+    'credits' in record || 'available_count' in record || 'availableCount' in record;
   const credits = Array.isArray(record.credits)
     ? record.credits
         .map((item) => normalizeCredit(item))
@@ -108,9 +100,6 @@ export const normalizeCodexResetCreditsPayload = (payload: unknown): CodexResetC
 
   return {
     availableCount: normalizeNumberValue(record.available_count ?? record.availableCount),
-    applicableAvailableCount: normalizeNumberValue(
-      record.applicable_available_count ?? record.applicableAvailableCount
-    ),
     credits,
     invalidPayload: !hasExpectedShape,
   };

@@ -40,7 +40,6 @@ import type { QuotaProviderData } from '../types';
 
 type CodexResetCreditsData = {
   availableCount: number | null;
-  applicableAvailableCount: number | null;
   credits: CodexRateLimitResetCredit[];
   error: string;
 };
@@ -51,7 +50,6 @@ export type CodexQuotaData = {
   creditBalance: string | null;
   creditsUnlimited: boolean;
   rateLimitResetCreditsAvailableCount: number | null;
-  rateLimitResetCreditsApplicableAvailableCount: number | null;
   rateLimitResetCredits: CodexRateLimitResetCredit[];
   rateLimitResetCreditsError: string;
   windows: CodexQuotaWindow[];
@@ -357,7 +355,6 @@ const fetchCodexResetCredits = async (
     if (result.statusCode < 200 || result.statusCode >= 300) {
       return {
         availableCount: null,
-        applicableAvailableCount: null,
         credits: [],
         error: getApiCallErrorMessage(result),
       };
@@ -367,7 +364,6 @@ const fetchCodexResetCredits = async (
     if (summary.invalidPayload) {
       return {
         availableCount: null,
-        applicableAvailableCount: null,
         credits: [],
         error: t('codex_quota.reset_credits_invalid_payload'),
       };
@@ -375,14 +371,12 @@ const fetchCodexResetCredits = async (
 
     return {
       availableCount: summary.availableCount,
-      applicableAvailableCount: summary.applicableAvailableCount,
       credits: summary.credits,
       error: '',
     };
   } catch (err: unknown) {
     return {
       availableCount: null,
-      applicableAvailableCount: null,
       credits: [],
       error: err instanceof Error ? err.message : t('common.unknown_error'),
     };
@@ -428,10 +422,6 @@ const fetchCodexQuota = async (
     resetCreditsData.availableCount ??
     resetCreditsCountFromDetails ??
     usageResetCreditsData.availableCount;
-  const rateLimitResetCreditsApplicableAvailableCount =
-    usageResetCreditsData.applicableAvailableCount ??
-    resetCreditsData.applicableAvailableCount ??
-    rateLimitResetCreditsAvailableCount;
   const planType = planTypeFromUsage ?? planTypeFromFile;
   const subscriptionActiveUntil = liveSubscriptionActiveUntil ?? subscriptionActiveUntilFromFile;
   const windows = buildCodexQuotaWindows(
@@ -445,7 +435,6 @@ const fetchCodexQuota = async (
     creditBalance: accountCredits.balance,
     creditsUnlimited: accountCredits.unlimited,
     rateLimitResetCreditsAvailableCount,
-    rateLimitResetCreditsApplicableAvailableCount,
     rateLimitResetCredits: resetCreditsData.credits,
     rateLimitResetCreditsError: resetCreditsData.error,
     windows,
@@ -490,6 +479,13 @@ const consumeCodexRateLimitResetCredit = async (
     throw createStatusError(getApiCallErrorMessage(result), result.statusCode);
   }
   const code = isRecord(result.body) ? result.body.code : undefined;
+  // As in the Codex CLI, the backend decides whether anything needs a reset.
+  if (code === 'nothing_to_reset') {
+    throw new Error(t('codex_quota.reset_nothing_to_reset'));
+  }
+  if (code === 'no_credit') {
+    throw new Error(t('codex_quota.reset_no_credit'));
+  }
   if (code !== 'reset' && code !== 'already_redeemed') {
     throw new Error(t('codex_quota.reset_not_confirmed'));
   }
@@ -537,8 +533,6 @@ export const CODEX_CONFIG: QuotaProviderData<CodexQuotaState, CodexQuotaData> = 
     creditBalance: data.creditBalance,
     creditsUnlimited: data.creditsUnlimited,
     rateLimitResetCreditsAvailableCount: data.rateLimitResetCreditsAvailableCount,
-    rateLimitResetCreditsApplicableAvailableCount:
-      data.rateLimitResetCreditsApplicableAvailableCount,
     rateLimitResetCredits: data.rateLimitResetCredits,
     rateLimitResetCreditsError: data.rateLimitResetCreditsError,
   }),

@@ -137,8 +137,7 @@ export function QuotaRow({
         resetting ||
         status !== 'success' ||
         !quota ||
-        !adapter.canResetQuota?.(quota) ||
-        codex?.rateLimitResetCreditsApplicableAvailableCount === 0;
+        !adapter.canResetQuota?.(quota);
   const resetBusy = resetting || claudeReset.busy;
   const claudeRetry = entry.type === 'claude' && claudeReset.buttonLabel === 'retry';
   const showResetAction = supportsReset && ((resetCount ?? 0) > 0 || claudeRetry);
