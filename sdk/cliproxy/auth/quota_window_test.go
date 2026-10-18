@@ -341,3 +341,77 @@ func TestManagerUpdateCarriesQuotaWindowsOnlyForTheSameAccount(t *testing.T) {
 		t.Fatalf("another account inherited quota windows: %+v", stored.QuotaWindows)
 	}
 }
+
+func TestCodexHeaderResetUsesTheNewestResetForm(t *testing.T) {
+	earlier, later := quotaTestNow.Add(-2*time.Hour), quotaTestNow
+	headers := http.Header{
+		"X-Codex-Primary-Used-Percent":        []string{"30"},
+		"X-Codex-Primary-Window-Minutes":      []string{"10080"},
+		"X-Codex-Primary-Reset-At":            []string{unixText(earlier.Add(time.Hour))},
+		"X-Codex-Primary-Reset-After-Seconds": []string{"7200"},
+	}
+	// The absolute reset came from an earlier event and has already passed;
+	// the relative one arrived later and wins.
+	windows := quotaWindowsFromHeaders("codex", headers, map[string]time.Time{
+		"X-Codex-Primary-Used-Percent":        later,
+		"X-Codex-Primary-Window-Minutes":      later,
+		"X-Codex-Primary-Reset-At":            earlier,
+		"X-Codex-Primary-Reset-After-Seconds": later,
+	}, quotaTestNow)
+	if !windows.Weekly.ResetAt.Equal(later.Add(2 * time.Hour)) {
+		t.Fatalf("reset = %v, want the newer relative reset", windows.Weekly.ResetAt)
+	}
+
+	// Only usage was refreshed; the relative reset stays anchored to the
+	// event that carried it.
+	delete(headers, "X-Codex-Primary-Reset-At")
+	windows = quotaWindowsFromHeaders("codex", headers, map[string]time.Time{
+		"X-Codex-Primary-Used-Percent":        later,
+		"X-Codex-Primary-Window-Minutes":      earlier,
+		"X-Codex-Primary-Reset-After-Seconds": earlier,
+	}, quotaTestNow)
+	if !windows.Weekly.ResetAt.Equal(earlier.Add(2*time.Hour)) || !windows.Weekly.ObservedAt.Equal(later) {
+		t.Fatalf("Weekly = %+v", windows.Weekly)
+	}
+}
+
+func TestQuotaAccountFingerprintTracksChatGPTAccountID(t *testing.T) {
+	auth := &Auth{Provider: "codex", Metadata: map[string]any{"email": "shared@example.invalid", "chatgpt_account_id": "workspace-a", "access_token": "one"}}
+	first := QuotaAccountFingerprint(auth)
+	auth.Metadata["access_token"] = "two"
+	if QuotaAccountFingerprint(auth) != first {
+		t.Fatal("token rotation changed the account fingerprint")
+	}
+	auth.Metadata["chatgpt_account_id"] = "workspace-b"
+	if QuotaAccountFingerprint(auth) == first {
+		t.Fatal("switching the ChatGPT workspace kept the account fingerprint")
+	}
+}
+
+func TestMarkResultFromPreviousAccountDoesNotWriteQuotaWindows(t *testing.T) {
+	manager := NewManager(nil, nil, nil)
+	ctx := context.Background()
+	codex := func(accountID string) *Auth {
+		return &Auth{ID: "codex-switch", Provider: "codex", Metadata: map[string]any{"email": "shared@example.invalid", "account_id": accountID, "access_token": "same"}}
+	}
+	registered, errRegister := manager.Register(ctx, codex("acct-1"))
+	if errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	// A request is sent for acct-1, then the file switches to acct-2 with the
+	// same tokens before the response arrives.
+	inFlightVersion := registered.CredentialVersion
+	if _, errUpdate := manager.Update(ctx, codex("acct-2")); errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	responseCtx := internallogging.WithResponseHeadersHolder(context.Background())
+	internallogging.SetResponseHeaders(responseCtx, http.Header{
+		"X-Codex-Primary-Used-Percent":   []string{"60"},
+		"X-Codex-Primary-Window-Minutes": []string{"10080"},
+		"X-Codex-Primary-Reset-At":       []string{unixText(time.Now().Add(24 * time.Hour))},
+	})
+	manager.MarkResult(responseCtx, Result{AuthID: "codex-switch", Provider: "codex", Model: "gpt-5.3-codex", Success: true, CredentialVersion: inFlightVersion})
+	if stored, _ := manager.GetByID("codex-switch"); !stored.QuotaWindows.IsZero() {
+		t.Fatalf("the previous account's response wrote quota windows: %+v", stored.QuotaWindows)
+	}
+}

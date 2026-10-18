@@ -127,11 +127,8 @@ func finishQuotaWindow(w QuotaWindow) QuotaWindow {
 // carryQuotaWindows keeps observed windows across ordinary updates such as
 // token refreshes, and drops them when the credential now belongs to another
 // account, so one account's quota can never rank another.
-func carryQuotaWindows(existing, updated *Auth) QuotaWindows {
-	if existing == nil || updated == nil || (existing.QuotaWindows.IsZero() && updated.QuotaWindows.IsZero()) {
-		return QuotaWindows{}
-	}
-	if QuotaAccountFingerprint(existing) != QuotaAccountFingerprint(updated) {
+func carryQuotaWindows(existing, updated *Auth, accountChanged bool) QuotaWindows {
+	if existing == nil || updated == nil || accountChanged {
 		return QuotaWindows{}
 	}
 	return existing.QuotaWindows.Merge(updated.QuotaWindows)
@@ -220,10 +217,15 @@ func codexHeaderSlot(headers http.Header, name string, clock quotaHeaderClock) c
 	observedAt := clock(prefix+"Used-Percent", prefix+"Window-Minutes", prefix+"Reset-At", prefix+"Reset-After-Seconds")
 	window := QuotaWindow{ObservedAt: observedAt}
 	window.UsedPercent, window.UsedKnown = quotaNumberValue(quotaHeader(headers, prefix+"Used-Percent"))
-	window.ResetAt = quotaInstantValue(quotaHeader(headers, prefix+"Reset-At"))
-	if window.ResetAt.IsZero() {
-		if seconds, ok := quotaNumberValue(quotaHeader(headers, prefix+"Reset-After-Seconds")); ok {
-			window.ResetAt = observedAt.Add(time.Duration(seconds * float64(time.Second))).UTC()
+	// Websocket events may refresh either reset form while the other is kept
+	// from an earlier event, so the newer one wins and a relative reset is
+	// anchored to its own arrival.
+	absolute := quotaInstantValue(quotaHeader(headers, prefix+"Reset-At"))
+	window.ResetAt = absolute
+	if seconds, ok := quotaNumberValue(quotaHeader(headers, prefix+"Reset-After-Seconds")); ok {
+		relativeAt := clock(prefix + "Reset-After-Seconds")
+		if absolute.IsZero() || relativeAt.After(clock(prefix+"Reset-At")) {
+			window.ResetAt = relativeAt.Add(time.Duration(seconds * float64(time.Second))).UTC()
 		}
 	}
 	slot := codexQuotaSlot{window: finishQuotaWindow(window)}

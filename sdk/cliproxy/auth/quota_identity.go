@@ -20,11 +20,14 @@ func QuotaAccountFingerprint(auth *Auth) string {
 	kind, account := auth.AccountInfo()
 	seed["kind"], seed["account"] = kind, account
 	stableIdentity := account != ""
-	for _, name := range []string{"account_id", "email", "sub", "subject", "user_id", "device_id", "project_id", "domain", "base_url"} {
+	// chatgpt_account_id selects the Codex workspace when the ID token has no
+	// account claim. It joins the seed only when present, so fingerprints of
+	// credentials without it are unchanged.
+	for _, name := range []string{"account_id", "email", "sub", "subject", "user_id", "device_id", "project_id", "domain", "base_url", "chatgpt_account_id"} {
 		if value, ok := metadata[name].(string); ok && strings.TrimSpace(value) != "" {
 			seed[name] = value
 			switch name {
-			case "account_id", "email", "sub", "subject", "user_id", "device_id":
+			case "account_id", "email", "sub", "subject", "user_id", "device_id", "chatgpt_account_id":
 				stableIdentity = true
 			}
 		}
