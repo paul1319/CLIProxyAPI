@@ -29,7 +29,7 @@ func TestQuotaWindowsFromClaudeHeadersIgnoresOverageWindow(t *testing.T) {
 		"Anthropic-Ratelimit-Unified-7d_oi-Status":         []string{"rejected"},
 		"Anthropic-Ratelimit-Unified-7d_oi-Utilization":    []string{"1.02"},
 		"Anthropic-Ratelimit-Unified-Representative-Claim": []string{"seven_day_overage_included"},
-	}, quotaTestNow)
+	}, nil, quotaTestNow)
 
 	if windows.Short.State != QuotaWindowActive || !windows.Short.UsedKnown || windows.Short.UsedPercent != 42 || !windows.Short.ResetAt.Equal(reset5h) {
 		t.Fatalf("Short = %+v", windows.Short)
@@ -48,7 +48,7 @@ func TestQuotaWindowsFromClaudeHeadersMarksRejectedWindowExhausted(t *testing.T)
 		"Anthropic-Ratelimit-Unified-5h-Reset":  []string{unixText(quotaTestNow.Add(time.Hour))},
 		// A status without usage or reset carries nothing to rank by.
 		"Anthropic-Ratelimit-Unified-7d-Status": []string{"allowed"},
-	}, quotaTestNow)
+	}, nil, quotaTestNow)
 	if !windows.Short.Exhausted || windows.Short.State != QuotaWindowActive {
 		t.Fatalf("Short = %+v", windows.Short)
 	}
@@ -64,7 +64,7 @@ func TestQuotaWindowsFromCodexHeadersClassifiesByLength(t *testing.T) {
 		"X-Codex-Primary-Used-Percent":   []string{"51"},
 		"X-Codex-Primary-Window-Minutes": []string{"10080"},
 		"X-Codex-Primary-Reset-At":       []string{unixText(weeklyReset)},
-	}, quotaTestNow)
+	}, nil, quotaTestNow)
 	if !windows.Short.IsZero() {
 		t.Fatalf("weekly primary was classified as short: %+v", windows.Short)
 	}
@@ -79,7 +79,7 @@ func TestQuotaWindowsFromCodexHeadersClassifiesByLength(t *testing.T) {
 		"X-Codex-Secondary-Used-Percent":        []string{"30"},
 		"X-Codex-Secondary-Window-Minutes":      []string{"10080"},
 		"X-Codex-Secondary-Reset-After-Seconds": []string{"86400"},
-	}, quotaTestNow)
+	}, nil, quotaTestNow)
 	if !windows.Short.ResetAt.Equal(quotaTestNow.Add(10*time.Minute)) || windows.Short.UsedPercent != 12 {
 		t.Fatalf("relative reset must anchor to the observation time: %+v", windows.Short)
 	}
@@ -92,7 +92,7 @@ func TestQuotaWindowsFromLegacyCodexHeadersFallsBackToOrder(t *testing.T) {
 	windows := quotaWindowsFromHeaders("codex", http.Header{
 		"X-Codex-Primary-Used-Percent":   []string{"5"},
 		"X-Codex-Secondary-Used-Percent": []string{"7"},
-	}, quotaTestNow)
+	}, nil, quotaTestNow)
 	if windows.Short.UsedPercent != 5 || windows.Weekly.UsedPercent != 7 {
 		t.Fatalf("legacy windows = %+v", windows)
 	}
@@ -158,9 +158,55 @@ func TestParseCodexUsageWindows(t *testing.T) {
 		t.Fatalf("monthly-only plans use the monthly window as the long window: %+v", monthly.Weekly)
 	}
 
-	reached := ParseQuotaUsageWindows("codex", []byte(`{"rate_limit": {"limit_reached": true, "primary_window": {"limit_window_seconds": 18000, "reset_at": "2026-10-18T13:00:00Z"}}}`), quotaTestNow)
-	if !reached.Short.Exhausted || reached.Short.State != QuotaWindowActive {
-		t.Fatalf("a reached limit without usage must mark its window exhausted: %+v", reached.Short)
+	weeklyAfterMonthly := ParseQuotaUsageWindows("codex", []byte(`{"rate_limit": {
+		"primary_window": {"used_percent": 40, "limit_window_seconds": 2592000},
+		"secondary_window": {"used_percent": 3, "limit_window_seconds": 604800}
+	}}`), quotaTestNow)
+	if weeklyAfterMonthly.Weekly.UsedPercent != 3 {
+		t.Fatalf("a monthly primary window displaced the weekly one: %+v", weeklyAfterMonthly.Weekly)
+	}
+
+	// limit_reached is credential-wide: it must not mark a window whose
+	// usage is unknown as exhausted.
+	reached := ParseQuotaUsageWindows("codex", []byte(`{"rate_limit": {"limit_reached": true,
+		"primary_window": {"used_percent": 100, "limit_window_seconds": 18000, "reset_at": "2026-10-18T13:00:00Z"},
+		"secondary_window": {"limit_window_seconds": 604800, "reset_at": "2026-10-21T13:00:00Z"}
+	}}`), quotaTestNow)
+	if !reached.Short.Exhausted || reached.Weekly.Exhausted {
+		t.Fatalf("limit_reached attribution: short=%+v weekly=%+v", reached.Short, reached.Weekly)
+	}
+}
+
+func TestQuotaWindowsFromHeadersUseEachWindowArrivalTime(t *testing.T) {
+	weeklyAt, creditsAt := quotaTestNow.Add(-10*time.Minute), quotaTestNow
+	headers := http.Header{
+		"X-Codex-Primary-Used-Percent":        []string{"20"},
+		"X-Codex-Primary-Window-Minutes":      []string{"10080"},
+		"X-Codex-Primary-Reset-After-Seconds": []string{"3600"},
+		"X-Codex-Credits-Balance":             []string{"5"},
+	}
+	// A later websocket event carried only credits; the weekly window keeps
+	// the time its own headers arrived.
+	received := map[string]time.Time{
+		"X-Codex-Primary-Used-Percent":        weeklyAt,
+		"X-Codex-Primary-Window-Minutes":      weeklyAt,
+		"X-Codex-Primary-Reset-After-Seconds": weeklyAt,
+		"X-Codex-Credits-Balance":             creditsAt,
+	}
+	windows := quotaWindowsFromHeaders("codex", headers, received, quotaTestNow)
+	if !windows.Weekly.ObservedAt.Equal(weeklyAt) || !windows.Weekly.ResetAt.Equal(weeklyAt.Add(time.Hour)) {
+		t.Fatalf("Weekly = %+v", windows.Weekly)
+	}
+}
+
+func TestMergeResponseHeadersKeepsArrivalTimeOfUnchangedHeaders(t *testing.T) {
+	ctx := internallogging.WithResponseHeadersHolder(context.Background())
+	internallogging.SetResponseHeaders(ctx, http.Header{"X-Codex-Primary-Used-Percent": []string{"20"}})
+	before := internallogging.GetResponseHeaderTimes(ctx)["X-Codex-Primary-Used-Percent"]
+	internallogging.MergeResponseHeaders(ctx, http.Header{"X-Codex-Credits-Balance": []string{"5"}})
+	times := internallogging.GetResponseHeaderTimes(ctx)
+	if !times["X-Codex-Primary-Used-Percent"].Equal(before) || times["X-Codex-Credits-Balance"].IsZero() {
+		t.Fatalf("header times = %v", times)
 	}
 }
 
@@ -205,7 +251,7 @@ func TestManagerMarkResultMergesQuotaWindowsAtHeaderTime(t *testing.T) {
 		"Anthropic-Ratelimit-Unified-7d-Utilization": []string{"0.5"},
 		"Anthropic-Ratelimit-Unified-7d-Reset":       []string{unixText(reset)},
 	})
-	receivedAt := internallogging.GetResponseHeadersReceivedAt(ctx)
+	receivedAt := internallogging.GetResponseHeaderTimes(ctx)["Anthropic-Ratelimit-Unified-7d-Reset"]
 	manager.MarkResult(ctx, Result{AuthID: auth.ID, Provider: "claude", Model: "claude-sonnet-5-5", Success: true})
 
 	stored, _ := manager.GetByID(auth.ID)
@@ -244,6 +290,30 @@ func TestManagerApplyQuotaWindowsChecksCurrentCredential(t *testing.T) {
 	}
 	if stored, _ := manager.GetByID("poll-auth"); stored.QuotaWindows.Weekly.UsedPercent != 10 {
 		t.Fatalf("Weekly = %+v", stored.QuotaWindows.Weekly)
+	}
+}
+
+func TestManagerUpdateDropsQuotaWindowsWhenCodexAccountChangesUnderSameEmail(t *testing.T) {
+	manager := NewManager(nil, nil, nil)
+	ctx := context.Background()
+	codex := func(accountID, token string) *Auth {
+		return &Auth{ID: "codex-carry", Provider: "codex", Metadata: map[string]any{"email": "shared@example.invalid", "account_id": accountID, "access_token": token}}
+	}
+	if _, errRegister := manager.Register(ctx, codex("acct-1", "one")); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	manager.ApplyQuotaWindows("codex-carry", QuotaWindows{Weekly: QuotaWindow{State: QuotaWindowActive, UsedPercent: 10, UsedKnown: true, ObservedAt: quotaTestNow}}, nil)
+	if _, errUpdate := manager.Update(ctx, codex("acct-1", "two")); errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	if stored, _ := manager.GetByID("codex-carry"); stored.QuotaWindows.IsZero() {
+		t.Fatal("token rotation dropped quota windows")
+	}
+	if _, errUpdate := manager.Update(ctx, codex("acct-2", "three")); errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	if stored, _ := manager.GetByID("codex-carry"); !stored.QuotaWindows.IsZero() {
+		t.Fatalf("another workspace account inherited quota windows: %+v", stored.QuotaWindows)
 	}
 }
 

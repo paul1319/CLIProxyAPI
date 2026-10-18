@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -31,9 +32,11 @@ type responseStatusHolder struct {
 }
 
 type responseHeadersHolder struct {
-	mu         sync.RWMutex
-	headers    http.Header
-	receivedAt time.Time
+	mu      sync.RWMutex
+	headers http.Header
+	// receivedAt records per canonical header when it last arrived, so a later
+	// websocket event does not make headers it did not carry look fresh.
+	receivedAt map[string]time.Time
 }
 
 func WithEndpoint(ctx context.Context, endpoint string) context.Context {
@@ -125,7 +128,11 @@ func SetResponseHeaders(ctx context.Context, headers http.Header) {
 	holder.mu.Lock()
 	defer holder.mu.Unlock()
 	holder.headers = cloneHTTPHeader(headers)
-	holder.receivedAt = time.Now()
+	now := time.Now()
+	holder.receivedAt = make(map[string]time.Time, len(headers))
+	for key := range headers {
+		holder.receivedAt[http.CanonicalHeaderKey(key)] = now
+	}
 }
 
 // MergeResponseHeaders adds headers observed after the initial HTTP response,
@@ -143,14 +150,18 @@ func MergeResponseHeaders(ctx context.Context, headers http.Header) {
 	if holder.headers == nil {
 		holder.headers = make(http.Header, len(headers))
 	}
+	if holder.receivedAt == nil {
+		holder.receivedAt = make(map[string]time.Time, len(headers))
+	}
+	now := time.Now()
 	for key, values := range headers {
 		canonicalKey := http.CanonicalHeaderKey(key)
 		if canonicalKey == "" {
 			continue
 		}
 		holder.headers[canonicalKey] = append([]string(nil), values...)
+		holder.receivedAt[canonicalKey] = now
 	}
-	holder.receivedAt = time.Now()
 }
 
 func GetResponseStatus(ctx context.Context) int {
@@ -177,20 +188,21 @@ func GetResponseHeaders(ctx context.Context) http.Header {
 	return cloneHTTPHeader(holder.headers)
 }
 
-// GetResponseHeadersReceivedAt returns when the headers returned by
-// GetResponseHeaders were last set or merged. A long stream completes well
-// after its headers arrived, so quota readers anchor observations here.
-func GetResponseHeadersReceivedAt(ctx context.Context) time.Time {
+// GetResponseHeaderTimes returns when each header returned by
+// GetResponseHeaders arrived, keyed by canonical header name. A long stream
+// completes well after its headers arrived, so quota readers anchor
+// observations here.
+func GetResponseHeaderTimes(ctx context.Context) map[string]time.Time {
 	if ctx == nil {
-		return time.Time{}
+		return nil
 	}
 	holder, ok := ctx.Value(responseHeadersKey{}).(*responseHeadersHolder)
 	if !ok || holder == nil {
-		return time.Time{}
+		return nil
 	}
 	holder.mu.RLock()
 	defer holder.mu.RUnlock()
-	return holder.receivedAt
+	return maps.Clone(holder.receivedAt)
 }
 
 func cloneHTTPHeader(src http.Header) http.Header {

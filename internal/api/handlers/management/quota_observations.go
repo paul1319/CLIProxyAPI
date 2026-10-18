@@ -2,12 +2,8 @@ package management
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -57,12 +53,15 @@ func (h *Handler) CloseQuotaObservations() {
 }
 
 func (h *Handler) reconcileQuotaObservations() {
-	if h.authManager == nil {
+	h.mu.Lock()
+	manager := h.authManager
+	h.mu.Unlock()
+	if manager == nil {
 		return
 	}
 	service := h.quotaService()
 	current := make(map[string]bool)
-	for _, auth := range h.authManager.List() {
+	for _, auth := range manager.List() {
 		if auth != nil {
 			current[auth.ID] = true
 		}
@@ -71,78 +70,11 @@ func (h *Handler) reconcileQuotaObservations() {
 }
 
 func quotaCredentialIdentity(auth *coreauth.Auth) quota.Identity {
-	metadata := quotaCredentialMetadata(auth)
-	seed := map[string]any{"provider": auth.Provider}
-	kind, account := auth.AccountInfo()
-	seed["kind"], seed["account"] = kind, account
-	stableIdentity := account != ""
-	for _, name := range []string{"account_id", "email", "sub", "subject", "user_id", "device_id", "project_id", "domain", "base_url"} {
-		if value, ok := metadata[name].(string); ok && strings.TrimSpace(value) != "" {
-			seed[name] = value
-			switch name {
-			case "account_id", "email", "sub", "subject", "user_id", "device_id":
-				stableIdentity = true
-			}
-		}
-	}
-	// JWT subject/account claims survive access-token rotation and distinguish
-	// replacement credentials even when a provider omitted top-level account fields.
-	for _, name := range []string{"id_token", "access_token"} {
-		if token, ok := metadata[name].(string); ok {
-			parts := strings.Split(token, ".")
-			if len(parts) == 3 {
-				payload, errDecode := base64.RawURLEncoding.DecodeString(parts[1])
-				var claims map[string]any
-				if errDecode == nil && json.Unmarshal(payload, &claims) == nil {
-					for _, claim := range []string{"sub", "email", "https://api.openai.com/auth"} {
-						if value := claims[claim]; value != nil {
-							if claim == "https://api.openai.com/auth" {
-								if info, okInfo := value.(map[string]any); okInfo {
-									seed["chatgpt_account_id"] = info["chatgpt_account_id"]
-									if id, okID := info["chatgpt_account_id"].(string); okID && id != "" {
-										stableIdentity = true
-									}
-								}
-							} else {
-								seed[claim] = value
-								if id, okID := value.(string); okID && id != "" {
-									stableIdentity = true
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	if !stableIdentity {
-		// Opaque credentials without a stable account identifier cannot safely reuse
-		// another token's observations at the same filename.
-		for _, name := range []string{"dca_token", "api_key", "token", "refresh_token", "access_token"} {
-			if value, ok := metadata[name].(string); ok && value != "" {
-				seed["opaque_identity"] = value
-				break
-			}
-		}
-	}
-	data, _ := json.Marshal(seed)
-	digest := sha256.Sum256(data)
-	return quota.Identity{AuthID: auth.ID, Fingerprint: hex.EncodeToString(digest[:])}
-}
-
-func quotaCredentialMetadata(auth *coreauth.Auth) map[string]any {
-	metadata := make(map[string]any)
-	if auth.Storage != nil {
-		if data, errMarshal := json.Marshal(auth.Storage); errMarshal == nil {
-			_ = json.Unmarshal(data, &metadata)
-		}
-	}
-	maps.Copy(metadata, auth.Metadata)
-	return metadata
+	return quota.Identity{AuthID: auth.ID, Fingerprint: coreauth.QuotaAccountFingerprint(auth)}
 }
 
 func (h *Handler) quotaCredential(auth *coreauth.Auth, pluginID string) quota.Credential {
-	metadata := quotaCredentialMetadata(auth)
+	metadata := coreauth.QuotaCredentialMetadata(auth)
 	h.mu.Lock()
 	transport, host := h.apiCallTransport(auth, ""), h.pluginHost
 	h.mu.Unlock()

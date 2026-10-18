@@ -131,3 +131,65 @@ func TestQuotaPollingStopsWithQuotaObservations(t *testing.T) {
 		t.Fatal("closing quota observations did not stop the poller")
 	}
 }
+
+func TestQuotaPollingToleratesAuthManagerSwap(t *testing.T) {
+	h, manager, _ := newQuotaPollFixture(t, "reset-first")
+	other := coreauth.NewManager(nil, nil, nil)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 50 {
+			h.SetAuthManager(other)
+			h.SetAuthManager(manager)
+		}
+	}()
+	for range 50 {
+		pollOnce(t, h)
+	}
+	<-done
+}
+
+func TestQuotaPollingStopsWhileUsageRequestIsInFlight(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	// The proxy accepts the usage request and never answers, so only
+	// cancellation can end it.
+	proxy := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer proxy.Close()
+	defer close(release)
+
+	manager := coreauth.NewManager(nil, nil, nil)
+	auth := &coreauth.Auth{ID: "stuck-claude", Provider: "claude", ProxyURL: proxy.URL, Metadata: map[string]any{"email": "stuck@example.invalid", "access_token": "secret"}}
+	if _, errRegister := manager.Register(t.Context(), auth); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	service, _ := quota.New(nil, nil)
+	h := &Handler{cfg: &config.Config{Routing: config.RoutingConfig{Strategy: "reset-first"}}, authManager: manager, quotaObservations: service}
+	h.StartQuotaPolling()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		h.CloseQuotaObservations()
+		t.Fatal("the poller never requested usage")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		h.CloseQuotaObservations()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("closing quota observations hung on an in-flight usage request")
+	}
+}

@@ -127,13 +127,11 @@ func finishQuotaWindow(w QuotaWindow) QuotaWindow {
 // carryQuotaWindows keeps observed windows across ordinary updates such as
 // token refreshes, and drops them when the credential now belongs to another
 // account, so one account's quota can never rank another.
-func carryQuotaWindows(existing, updated *Auth, credentialsChanged bool) QuotaWindows {
-	if existing == nil || updated == nil || !strings.EqualFold(strings.TrimSpace(existing.Provider), strings.TrimSpace(updated.Provider)) {
+func carryQuotaWindows(existing, updated *Auth) QuotaWindows {
+	if existing == nil || updated == nil || (existing.QuotaWindows.IsZero() && updated.QuotaWindows.IsZero()) {
 		return QuotaWindows{}
 	}
-	_, existingAccount := existing.AccountInfo()
-	_, updatedAccount := updated.AccountInfo()
-	if existingAccount != updatedAccount || (existingAccount == "" && credentialsChanged) {
+	if QuotaAccountFingerprint(existing) != QuotaAccountFingerprint(updated) {
 		return QuotaWindows{}
 	}
 	return existing.QuotaWindows.Merge(updated.QuotaWindows)
@@ -157,32 +155,50 @@ func (m *Manager) ApplyQuotaWindows(authID string, windows QuotaWindows, current
 	return true
 }
 
-// quotaWindowsFromHeaders normalizes the quota windows carried by one upstream response.
-func quotaWindowsFromHeaders(provider string, headers http.Header, observedAt time.Time) QuotaWindows {
-	if len(headers) == 0 || observedAt.IsZero() {
+// quotaHeaderClock reports when the newest of the named headers arrived.
+type quotaHeaderClock func(names ...string) time.Time
+
+// quotaWindowsFromHeaders normalizes the quota windows carried by one upstream
+// response. receivedAt maps canonical header names to their arrival time;
+// headers without one are treated as observed at fallback.
+func quotaWindowsFromHeaders(provider string, headers http.Header, receivedAt map[string]time.Time, fallback time.Time) QuotaWindows {
+	if len(headers) == 0 || fallback.IsZero() {
 		return QuotaWindows{}
+	}
+	clock := func(names ...string) time.Time {
+		var latest time.Time
+		for _, name := range names {
+			if at := receivedAt[http.CanonicalHeaderKey(name)]; at.After(latest) {
+				latest = at
+			}
+		}
+		if latest.IsZero() {
+			return fallback
+		}
+		return latest
 	}
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "claude":
 		// The 7d_oi family is deliberately not read: it reports the
 		// overage-included claim, not the Fable weekly limit.
 		return QuotaWindows{
-			Short:  claudeHeaderWindow(headers, "5h", observedAt),
-			Weekly: claudeHeaderWindow(headers, "7d", observedAt),
+			Short:  claudeHeaderWindow(headers, "5h", clock),
+			Weekly: claudeHeaderWindow(headers, "7d", clock),
 		}
 	case "codex":
 		return classifyCodexWindows(
-			codexHeaderSlot(headers, "Primary", observedAt),
-			codexHeaderSlot(headers, "Secondary", observedAt),
+			codexHeaderSlot(headers, "Primary", clock),
+			codexHeaderSlot(headers, "Secondary", clock),
 		)
 	default:
 		return QuotaWindows{}
 	}
 }
 
-func claudeHeaderWindow(headers http.Header, name string, observedAt time.Time) QuotaWindow {
+func claudeHeaderWindow(headers http.Header, name string, clock quotaHeaderClock) QuotaWindow {
 	prefix := "Anthropic-Ratelimit-Unified-" + name + "-"
 	status := strings.ToLower(quotaHeader(headers, prefix+"Status"))
+	observedAt := clock(prefix+"Status", prefix+"Utilization", prefix+"Reset")
 	window := QuotaWindow{ObservedAt: observedAt, Exhausted: status == "rejected", Warning: status == "allowed_warning"}
 	// Claude reports utilization as a 0-1 fraction in headers.
 	if used, ok := quotaNumberValue(quotaHeader(headers, prefix+"Utilization")); ok {
@@ -199,8 +215,9 @@ type codexQuotaSlot struct {
 	seconds int64
 }
 
-func codexHeaderSlot(headers http.Header, name string, observedAt time.Time) codexQuotaSlot {
+func codexHeaderSlot(headers http.Header, name string, clock quotaHeaderClock) codexQuotaSlot {
 	prefix := "X-Codex-" + name + "-"
+	observedAt := clock(prefix+"Used-Percent", prefix+"Window-Minutes", prefix+"Reset-At", prefix+"Reset-After-Seconds")
 	window := QuotaWindow{ObservedAt: observedAt}
 	window.UsedPercent, window.UsedKnown = quotaNumberValue(quotaHeader(headers, prefix+"Used-Percent"))
 	window.ResetAt = quotaInstantValue(quotaHeader(headers, prefix+"Reset-At"))
@@ -217,18 +234,25 @@ func codexHeaderSlot(headers http.Header, name string, observedAt time.Time) cod
 }
 
 // classifyCodexWindows assigns windows by their length, because Codex reports
-// the weekly window as primary on plans without a five-hour limit. Order is
-// only used for legacy payloads that omit the length.
+// the weekly window as primary on plans without a five-hour limit. A monthly
+// window stands in for the weekly one only when no weekly window exists.
+// Order is only used for legacy payloads that omit the length.
 func classifyCodexWindows(primary, secondary codexQuotaSlot) QuotaWindows {
-	var result QuotaWindows
-	for _, slot := range []codexQuotaSlot{primary, secondary} {
-		switch {
-		case slot.window.IsZero():
-		case slot.seconds == quotaFiveHourSeconds && result.Short.IsZero():
-			result.Short = slot.window
-		case isCodexLongWindow(slot.seconds) && result.Weekly.IsZero():
-			result.Weekly = slot.window
+	slots := []codexQuotaSlot{primary, secondary}
+	find := func(matches func(seconds int64) bool) QuotaWindow {
+		for _, slot := range slots {
+			if !slot.window.IsZero() && matches(slot.seconds) {
+				return slot.window
+			}
 		}
+		return QuotaWindow{}
+	}
+	result := QuotaWindows{
+		Short:  find(func(seconds int64) bool { return seconds == quotaFiveHourSeconds }),
+		Weekly: find(func(seconds int64) bool { return seconds == quotaWeekSeconds }),
+	}
+	if result.Weekly.IsZero() {
+		result.Weekly = find(func(seconds int64) bool { return seconds >= quotaMinMonthSeconds && seconds <= quotaMaxMonthSeconds })
 	}
 	if primary.seconds == 0 && !primary.window.IsZero() && result.Short.IsZero() {
 		result.Short = primary.window
@@ -237,12 +261,6 @@ func classifyCodexWindows(primary, secondary codexQuotaSlot) QuotaWindows {
 		result.Weekly = secondary.window
 	}
 	return result
-}
-
-// isCodexLongWindow reports a weekly window, or the monthly window that
-// replaces it on some plans.
-func isCodexLongWindow(seconds int64) bool {
-	return seconds == quotaWeekSeconds || (seconds >= quotaMinMonthSeconds && seconds <= quotaMaxMonthSeconds)
 }
 
 // ParseQuotaUsageWindows normalizes a sanitized provider usage response, as
@@ -265,14 +283,15 @@ func ParseQuotaUsageWindows(provider string, body []byte, observedAt time.Time) 
 			FableWeekly: claudeFableUsageWindow(payload, observedAt),
 		}
 	case "codex":
+		// limit_reached is credential-wide and does not say which window is
+		// full; a rejected request puts the credential into cooldown instead.
 		limit, _ := firstQuotaValue(payload, "rate_limit", "rateLimit").(map[string]any)
 		if limit == nil {
 			return QuotaWindows{}
 		}
-		reached := quotaTrue(firstQuotaValue(limit, "limit_reached", "limitReached")) || quotaFalse(limit["allowed"])
 		return classifyCodexWindows(
-			codexUsageSlot(firstQuotaValue(limit, "primary_window", "primaryWindow"), reached, observedAt),
-			codexUsageSlot(firstQuotaValue(limit, "secondary_window", "secondaryWindow"), reached, observedAt),
+			codexUsageSlot(firstQuotaValue(limit, "primary_window", "primaryWindow"), observedAt),
+			codexUsageSlot(firstQuotaValue(limit, "secondary_window", "secondaryWindow"), observedAt),
 		)
 	default:
 		return QuotaWindows{}
@@ -342,7 +361,7 @@ func isDollarQuotaWindow(window map[string]any) bool {
 	return false
 }
 
-func codexUsageSlot(value any, limitReached bool, observedAt time.Time) codexQuotaSlot {
+func codexUsageSlot(value any, observedAt time.Time) codexQuotaSlot {
 	object, ok := value.(map[string]any)
 	if !ok {
 		return codexQuotaSlot{}
@@ -354,10 +373,6 @@ func codexUsageSlot(value any, limitReached bool, observedAt time.Time) codexQuo
 		if seconds, okSeconds := quotaNumberValue(firstQuotaValue(object, "reset_after_seconds", "resetAfterSeconds")); okSeconds {
 			window.ResetAt = observedAt.Add(time.Duration(seconds * float64(time.Second))).UTC()
 		}
-	}
-	// A reached limit without a usage figure means this window is full.
-	if limitReached && !window.UsedKnown {
-		window.Exhausted = true
 	}
 	slot := codexQuotaSlot{window: finishQuotaWindow(window)}
 	if seconds, okSeconds := quotaNumberValue(firstQuotaValue(object, "limit_window_seconds", "limitWindowSeconds")); okSeconds {
@@ -456,18 +471,6 @@ func quotaTrue(value any) bool {
 	case string:
 		parsed, errParse := strconv.ParseBool(strings.TrimSpace(typed))
 		return errParse == nil && parsed
-	default:
-		return false
-	}
-}
-
-func quotaFalse(value any) bool {
-	switch typed := value.(type) {
-	case bool:
-		return !typed
-	case string:
-		parsed, errParse := strconv.ParseBool(strings.TrimSpace(typed))
-		return errParse == nil && !parsed
 	default:
 		return false
 	}
