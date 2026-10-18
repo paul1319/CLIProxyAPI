@@ -26,7 +26,7 @@ import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { formatDateTimeValue } from '@/utils/format';
 import { classifyModels } from '@/utils/models';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
-import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import { INLINE_LOGO_PNG } from '@/assets/logoInline';
 import iconGemini from '@/assets/icons/gemini.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconMeta from '@/assets/icons/meta.svg';
@@ -342,7 +342,7 @@ export function SystemPage() {
       <section className={styles.panel} aria-labelledby="about-server-title">
         <header className={styles.panelHeader}>
           <div className={styles.serverHeading}>
-            <img src={INLINE_LOGO_JPEG} alt="" className={styles.logo} />
+            <img src={INLINE_LOGO_PNG} alt="" className={styles.logo} />
             <h2 id="about-server-title" className={styles.panelTitle}>
               {t('system_info.server_title')}
             </h2>
