@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import path from 'path';
 import { execSync } from 'child_process';
 import fs from 'fs';
+import { INLINE_LOGO_PNG } from './src/assets/logoInline';
 
 // Get version from environment, git tag, or package.json
 function getVersion(): string {
@@ -35,10 +36,22 @@ function getVersion(): string {
   return 'dev';
 }
 
+// Bake the logo into the static favicon link so browsers that ignore
+// runtime favicon changes (e.g. Safari) still show it.
+function inlineFavicon(): Plugin {
+  return {
+    name: 'inline-favicon',
+    transformIndexHtml: () => [
+      { tag: 'link', attrs: { rel: 'icon', type: 'image/png', href: INLINE_LOGO_PNG }, injectTo: 'head' }
+    ]
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    inlineFavicon(),
     viteSingleFile({
       removeViteModuleLoader: true
     })
