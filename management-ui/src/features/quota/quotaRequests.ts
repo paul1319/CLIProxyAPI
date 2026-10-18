@@ -43,7 +43,13 @@ export function loadQuotaEntry(
     if (options.mode !== 'cached')
       setQuota((previous) => ({ ...previous, [cacheKey]: adapter.buildLoadingState() }));
     try {
-      const data = await adapter.fetchQuota(file, t, options);
+      const fetched = await adapter.fetchQuota(file, t, options);
+      // A visible observation stays on screen meanwhile, so commit primary and optional
+      // metadata together instead of flashing the card through the un-enriched state.
+      const enrich = adapter.storeSelector(useQuotaStore.getState())[cacheKey]?.hasData
+        ? adapter.enrichQuota
+        : undefined;
+      const data = enrich ? await enrich(file, fetched, t, options).catch(() => fetched) : fetched;
       commitIfQuotaCacheCurrent(generation, () => {
         const state: QuotaCardState = {
           ...adapter.buildSuccessState(data),
@@ -66,7 +72,7 @@ export function loadQuotaEntry(
             return previous;
           return { ...previous, [cacheKey]: state };
         });
-        void enrichQuotaInBackground(adapter, file, data, state, t, options);
+        if (!enrich) void enrichQuotaInBackground(adapter, file, data, state, t, options);
       });
       observed = true;
       if (options.errorStatus && options.mode !== 'cached') {
