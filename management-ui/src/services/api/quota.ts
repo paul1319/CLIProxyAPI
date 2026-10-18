@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import type { ApiCallResult } from './apiCall';
 
-export const QUOTA_REFRESH_INTERVAL_MS = 15_000;
+export const QUOTA_REFRESH_INTERVAL_MS = 300_000;
 
 export interface QuotaReadOptions {
   mode?: 'cached' | 'refresh' | 'force';

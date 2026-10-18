@@ -134,12 +134,12 @@ the last successful body and observation time. GET and expired freshness interva
 never delete successful data. A changed credential identity cannot restore the
 previous account's observations.
 
-Usage resources are refreshed at most once per 15 seconds across all callers;
+Usage resources are refreshed at most once per 300 seconds across all callers;
 subscription/profile resources use one hour, and reset-grant/credit resources use
 10 minutes. `force` bypasses freshness, but never retry backoff or `Retry-After`.
 Concurrent reads of the same resource share one request; at most three resource
 refreshes run concurrently. The UI restores snapshots on entry and refreshes while
-visible, scheduling the next poll 15 seconds after completion. Plugin quota is
+visible, scheduling the next poll 300 seconds after completion. Plugin quota is
 restored automatically but requires explicit refresh because plugins do not declare
 whether their quota operation is safe for automatic polling.
 
