@@ -392,6 +392,10 @@ func TestCodexQuotaAccountIDFollowsTheExecutor(t *testing.T) {
 	if got := CodexQuotaAccountID(auth); got != "file-acct" {
 		t.Fatalf("account = %q, want the account_id the executor sends", got)
 	}
+	auth.Metadata["account_id"] = ""
+	if got := CodexQuotaAccountID(auth); got != "claim-acct" {
+		t.Fatalf("account = %q, want the ID token claim for an empty account_id", got)
+	}
 	delete(auth.Metadata, "account_id")
 	if got := CodexQuotaAccountID(auth); got != "claim-acct" {
 		t.Fatalf("account = %q, want the ID token claim", got)

@@ -83,9 +83,10 @@ func QuotaAccountFingerprint(auth *Auth) string {
 }
 
 // CodexQuotaAccountID returns the ChatGPT account a Codex credential acts for.
-// It follows the executor, which sends metadata account_id as
-// Chatgpt-Account-Id, and falls back to the ID token's account claim and then
-// metadata chatgpt_account_id for credentials without one.
+// A non-empty metadata account_id wins, as it is what the executor sends as
+// Chatgpt-Account-Id. Without one the executor names no workspace, so this
+// falls back to the ID token's account claim and then metadata
+// chatgpt_account_id, as quota reads always did.
 func CodexQuotaAccountID(auth *Auth) string {
 	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
 		return ""

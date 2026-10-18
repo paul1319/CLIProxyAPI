@@ -200,7 +200,7 @@ func TestQuotaPollingAsksForTheWorkspaceTheExecutorUses(t *testing.T) {
 	payload, _ := json.Marshal(map[string]any{"https://api.openai.com/auth": map[string]any{"chatgpt_account_id": "acct-a"}})
 	idToken := "e30." + base64.RawURLEncoding.EncodeToString(payload) + ".sig"
 	codex := func(accountID string) *coreauth.Auth {
-		return &coreauth.Auth{ID: "codex-poll", Provider: "codex", Metadata: map[string]any{"email": "shared@example.invalid", "account_id": accountID, "id_token": idToken, "access_token": "same"}}
+		return &coreauth.Auth{ID: "codex-poll", Provider: "codex", Attributes: map[string]string{"runtime_only": "true"}, Metadata: map[string]any{"email": "shared@example.invalid", "account_id": accountID, "id_token": idToken, "access_token": "same"}}
 	}
 	auth := codex("acct-a")
 	if _, errRegister := manager.Register(t.Context(), auth); errRegister != nil {
@@ -208,6 +208,9 @@ func TestQuotaPollingAsksForTheWorkspaceTheExecutorUses(t *testing.T) {
 	}
 	h := &Handler{cfg: &config.Config{}, authManager: manager}
 	oldIdentity := quotaCredentialIdentity(auth)
+	if entry := h.buildAuthFileEntry(auth, authFileQuotaContext{v8: true}); entry["chatgpt_account_id"] != "acct-a" {
+		t.Fatalf("credential entry workspace = %v, want acct-a", entry["chatgpt_account_id"])
+	}
 
 	// Switch the workspace without touching the tokens: the ID token still
 	// names acct-a, but requests now go to acct-b.
@@ -217,6 +220,11 @@ func TestQuotaPollingAsksForTheWorkspaceTheExecutorUses(t *testing.T) {
 	current, _ := manager.GetByID("codex-poll")
 	if got := h.quotaCredential(current, "").AccountID; got != "acct-b" {
 		t.Fatalf("usage request account = %q, want acct-b", got)
+	}
+	// The UI redeems reset credits for the workspace the entry names, so it
+	// must match the workspace the quota reads used.
+	if entry := h.buildAuthFileEntry(current, authFileQuotaContext{v8: true}); entry["chatgpt_account_id"] != "acct-b" {
+		t.Fatalf("credential entry workspace = %v, want acct-b", entry["chatgpt_account_id"])
 	}
 	if quotaCredentialIdentity(current) == oldIdentity {
 		t.Fatal("the workspace switch kept the quota identity")
