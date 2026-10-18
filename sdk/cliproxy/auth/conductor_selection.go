@@ -665,15 +665,40 @@ func selectionArgForSelector(selector Selector, routeModel string) string {
 
 func selectorContextForAvailableAuths(ctx context.Context, selector Selector, routeModel string) context.Context {
 	ctx = withWeightedSelectorStateModel(ctx, selector, routeModel)
-	if !isBuiltInSelector(selector) {
-		if _, sessionAffinity := selector.(*SessionAffinitySelector); !sessionAffinity {
-			return ctx
-		}
+	if !selectorReceivesPrevalidatedAuths(selector) {
+		return ctx
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	return context.WithValue(ctx, prevalidatedAuthCandidatesKey{}, true)
+}
+
+// selectorReceivesPrevalidatedAuths reports selectors that trust the manager's
+// per-credential availability check. Reset-first is not a built-in selector,
+// so it keeps the route model and stays off the scheduler fast path, whose
+// cached order cannot follow changing quota windows.
+func selectorReceivesPrevalidatedAuths(selector Selector) bool {
+	switch selector.(type) {
+	case *SessionAffinitySelector, *ResetFirstSelector:
+		return true
+	default:
+		return isBuiltInSelector(selector)
+	}
+}
+
+// resetFirstUpstreamModels resolves each candidate's upstream model while the
+// manager lock is held, so reset-first reads the right quota window (Fable has
+// its own weekly limit) when clients route through an alias.
+func (m *Manager) resetFirstUpstreamModels(selector Selector, auths []*Auth, routeModel string) map[string]string {
+	if ResetFirstSelectorOf(selector) == nil || len(auths) == 0 {
+		return nil
+	}
+	models := make(map[string]string, len(auths))
+	for _, auth := range auths {
+		models[auth.ID] = m.selectionModelForAuth(auth, routeModel)
+	}
+	return models
 }
 
 func (m *Manager) transientlyUnavailableSessionAffinityAuthIDs(selector Selector, affinityCandidates []*Auth, routeModel string, now time.Time) map[string]struct{} {
@@ -1881,6 +1906,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 		return nil, nil, errAvailable
 	}
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(selector, affinityCandidates, model, now)
+	upstreamModels := m.resetFirstUpstreamModels(selector, selectorAuths, model)
 	m.mu.RUnlock()
 
 	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, provider, []string{provider}, model, opts, tried, available)
@@ -1891,6 +1917,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 	if !handled {
 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
+		selectorCtx = withResetFirstUpstreamModels(selectorCtx, upstreamModels)
 		selected, errPick = selector.Pick(selectorCtx, provider, selectionArgForSelector(selector, model), opts, selectorAuths)
 		if errPick != nil {
 			if isBuiltInSelector(selector) {
@@ -2227,6 +2254,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		return nil, nil, "", errAvailable
 	}
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(selector, affinityCandidates, model, now)
+	upstreamModels := m.resetFirstUpstreamModels(selector, selectorAuths, model)
 	m.mu.RUnlock()
 
 	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, "mixed", providers, model, opts, tried, available)
@@ -2237,6 +2265,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	if !handled {
 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
+		selectorCtx = withResetFirstUpstreamModels(selectorCtx, upstreamModels)
 		selected, errPick = selector.Pick(selectorCtx, "mixed", selectionArgForSelector(selector, model), opts, selectorAuths)
 		if errPick != nil {
 			if isBuiltInSelector(selector) {

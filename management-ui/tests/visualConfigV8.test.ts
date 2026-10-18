@@ -174,6 +174,7 @@ describe('v8 scalar read/write path parity', () => {
     'logsMaxTotalSizeMb',
     'redisUsageQueueRetentionSeconds',
     'requestRetry',
+    'routingResetFirstMaxFiveHour',
     'maxRetryCredentials',
     'maxRetryInterval',
     'authAutoRefreshWorkers',

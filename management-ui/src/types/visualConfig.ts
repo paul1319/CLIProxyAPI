@@ -1,6 +1,6 @@
 export type PayloadParamValueType = 'string' | 'number' | 'boolean' | 'json';
 export type DisableImageGenerationMode = 'false' | 'true' | 'chat' | 'passthrough';
-export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-first';
+export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-first' | 'reset-first';
 export type PluginStoreAuthType = 'none' | 'bearer' | 'basic' | 'header' | 'github-token';
 export type PluginStoreAuthApplyTo = 'registry' | 'metadata' | 'artifact';
 export type PayloadParamValidationErrorCode =
@@ -32,6 +32,7 @@ export type VisualConfigFieldPath =
   | 'logsMaxTotalSizeMb'
   | 'redisUsageQueueRetentionSeconds'
   | 'requestRetry'
+  | 'routingResetFirstMaxFiveHour'
   | 'maxRetryCredentials'
   | 'maxRetryInterval'
   | 'authAutoRefreshWorkers'
@@ -53,7 +54,8 @@ export type VisualConfigValidationErrorCode =
   | 'port_range'
   | 'integer'
   | 'non_negative_integer'
-  | 'integer_range_1_3600';
+  | 'integer_range_1_3600'
+  | 'integer_range_1_100';
 
 export type VisualConfigValidationErrors = Partial<
   Record<VisualConfigFieldPath, VisualConfigValidationErrorCode>
@@ -192,6 +194,7 @@ export type VisualConfigValues = {
   routingStrategy: RoutingStrategy;
   routingSessionAffinity: boolean;
   routingSessionAffinityTTL: string;
+  routingResetFirstMaxFiveHour: string;
   wsAuth: boolean;
   antigravitySensitiveWords: string[];
   devinSensitiveWords: string[];
@@ -293,6 +296,7 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   routingStrategy: 'round-robin',
   routingSessionAffinity: false,
   routingSessionAffinityTTL: '',
+  routingResetFirstMaxFiveHour: '',
   wsAuth: true,
   antigravitySensitiveWords: [],
   devinSensitiveWords: [],

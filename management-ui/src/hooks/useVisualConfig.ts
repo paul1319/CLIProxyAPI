@@ -175,6 +175,14 @@ function getPortError(value: string): 'port_range' | undefined {
   return parsed >= 1 && parsed <= 65535 ? undefined : 'port_range';
 }
 
+function getPercentError(value: string): 'integer_range_1_100' | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) return 'integer_range_1_100';
+  const parsed = Number(trimmed);
+  return parsed >= 1 && parsed <= 100 ? undefined : 'integer_range_1_100';
+}
+
 function getRedisRetentionError(value: string): 'integer_range_1_3600' | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
@@ -195,6 +203,7 @@ export function getVisualConfigValidationErrors(
     logsMaxTotalSizeMb: getNonNegativeIntegerError(values.logsMaxTotalSizeMb),
     redisUsageQueueRetentionSeconds: getRedisRetentionError(values.redisUsageQueueRetentionSeconds),
     requestRetry: getNonNegativeIntegerError(values.requestRetry),
+    routingResetFirstMaxFiveHour: getPercentError(values.routingResetFirstMaxFiveHour),
     maxRetryCredentials: getIntegerError(values.maxRetryCredentials),
     maxRetryInterval: getIntegerError(values.maxRetryInterval),
     authAutoRefreshWorkers: getIntegerError(values.authAutoRefreshWorkers),
@@ -434,6 +443,7 @@ export function parseRoutingStrategy(raw: unknown): RoutingStrategy {
     return 'weighted-round-robin';
   }
   if (['fill-first', 'fillfirst', 'ff'].includes(normalized)) return 'fill-first';
+  if (['reset-first', 'resetfirst', 'rf'].includes(normalized)) return 'reset-first';
   return 'round-robin';
 }
 
@@ -1254,6 +1264,7 @@ function getNextDirtyFields(
       'routingStrategy',
       'routingSessionAffinity',
       'routingSessionAffinityTTL',
+      'routingResetFirstMaxFiveHour',
     ] as Array<keyof VisualConfigValues>
   ).forEach(updateScalarDirty);
 
@@ -1527,6 +1538,9 @@ function parseVisualValuesFromYaml(yamlContent: string): VisualConfigValues {
     routingSessionAffinity: Boolean(routing?.['session-affinity']),
     routingSessionAffinityTTL:
       typeof routing?.['session-affinity-ttl'] === 'string' ? routing['session-affinity-ttl'] : '',
+    routingResetFirstMaxFiveHour: String(
+      asRecord(routing?.['reset-first'])?.['max-five-hour-utilization'] ?? ''
+    ),
 
     payloadDefaultRules: parsePayloadRules(payload?.default),
     payloadDefaultRawRules: parseRawPayloadRules(payload?.['default-raw']),
@@ -1669,6 +1683,7 @@ export function useVisualConfig() {
             'routingStrategy',
             'routingSessionAffinity',
             'routingSessionAffinityTTL',
+            'routingResetFirstMaxFiveHour',
           ].some((field) => dirtyFields.has(field as keyof VisualConfigValues))
         ) {
           ensureMapInDoc(doc, ['routing']);
@@ -1981,7 +1996,8 @@ export function useVisualConfig() {
         const routingDirty =
           dirtyFields.has('routingStrategy') ||
           dirtyFields.has('routingSessionAffinity') ||
-          dirtyFields.has('routingSessionAffinityTTL');
+          dirtyFields.has('routingSessionAffinityTTL') ||
+          dirtyFields.has('routingResetFirstMaxFiveHour');
         if (routingDirty) {
           ensureMapInDoc(doc, ['routing']);
           if (dirtyFields.has('routingStrategy')) {
@@ -1996,6 +2012,14 @@ export function useVisualConfig() {
               ['routing', 'session-affinity-ttl'],
               values.routingSessionAffinityTTL
             );
+          }
+          if (dirtyFields.has('routingResetFirstMaxFiveHour')) {
+            setIntFromStringInDoc(
+              doc,
+              ['routing', 'reset-first', 'max-five-hour-utilization'],
+              values.routingResetFirstMaxFiveHour
+            );
+            deleteIfMapEmpty(doc, ['routing', 'reset-first']);
           }
           deleteIfMapEmpty(doc, ['routing']);
         }

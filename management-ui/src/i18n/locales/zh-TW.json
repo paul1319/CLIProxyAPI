@@ -229,7 +229,8 @@
     "ws_auth_enable": "啟用 /ws/* 驗證",
     "routing_strategy_round_robin": "round-robin（輪詢）",
     "routing_strategy_weighted_round_robin": "weighted-round-robin（加權輪詢）",
-    "routing_strategy_fill_first": "fill-first（優先填充）"
+    "routing_strategy_fill_first": "fill-first（優先填充）",
+    "routing_strategy_reset_first": "reset-first（最早重置）"
   },
   "credentials": {
     "title": "憑證",
@@ -1651,6 +1652,9 @@
           "strategy_round_robin": "輪詢（Round Robin）",
           "strategy_weighted_round_robin": "加權輪詢（Weighted Round Robin）",
           "strategy_fill_first": "填充優先（Fill First）",
+          "strategy_reset_first": "最早額度重置",
+          "reset_first_max_five_hour": "新工作階段 5 小時上限（%）",
+          "reset_first_max_five_hour_hint": "新工作階段會分配給每週額度最早重置的 Claude/Codex 帳號。當某帳號的 5 小時用量達到此百分比且其他帳號仍有餘量時，便不再接收新工作階段；已綁定的工作階段維持不變。預設 85。",
           "session_affinity_ttl": "工作階段親和性 TTL",
           "force_model_prefix": "強制模型前綴",
           "force_model_prefix_desc": "未帶前綴的模型請求只使用無前綴憑證",
@@ -1782,6 +1786,7 @@
         "integer": "請輸入整數",
         "non_negative_integer": "請輸入非負整數",
         "integer_range_1_3600": "請輸入 1 到 3600 之間的整數",
+        "integer_range_1_100": "請輸入 1 到 100 之間的整數",
         "payload_invalid_number": "請輸入有效數字",
         "payload_invalid_boolean": "請選擇 true 或 false",
         "payload_invalid_json": "請輸入有效的 JSON"

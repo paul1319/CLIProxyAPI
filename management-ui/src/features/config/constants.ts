@@ -33,6 +33,7 @@ export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualC
     connectivity: ['port', 'trustedProxies', 'discoveryServiceType'],
     network: [
       'requestRetry',
+      'routingResetFirstMaxFiveHour',
       'maxRetryCredentials',
       'maxRetryInterval',
       'authAutoRefreshWorkers',
@@ -122,6 +123,7 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   maxRetryInterval: ['maxRetryInterval'],
   authAutoRefreshWorkers: ['authAutoRefreshWorkers'],
   routingStrategy: ['routingStrategy'],
+  routingResetFirstMaxFiveHour: ['routingResetFirstMaxFiveHour'],
   disableImageGeneration: ['disableImageGeneration'],
   gptImage2BaseModel: ['gptImage2BaseModel'],
   routingSessionAffinityTTL: ['routingSessionAffinityTTL'],
