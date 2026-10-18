@@ -782,7 +782,7 @@ func TestHandleAuthUpdates_ModelRegistrationDoesNotHoldAuthUpdateLock(t *testing
 	started := make(chan struct{})
 	block := make(chan struct{})
 	var first atomic.Bool
-	modelRegistrationTaskHook = func() {
+	modelRegistrationTaskHook = func(string) {
 		if first.CompareAndSwap(false, true) {
 			close(started)
 			<-block
@@ -948,7 +948,7 @@ func TestHandleAuthUpdates_StaleDisableRegistrationDoesNotDropNewerEnable(t *tes
 	started := make(chan struct{})
 	block := make(chan struct{})
 	var first atomic.Bool
-	modelRegistrationTaskHook = func() {
+	modelRegistrationTaskHook = func(string) {
 		if first.CompareAndSwap(false, true) {
 			close(started)
 			<-block
@@ -1047,9 +1047,10 @@ func TestHandleAuthUpdates_SameRevisionWaitDoesNotWaitForOtherAuthInBatch(t *tes
 
 	bStarted := make(chan struct{})
 	bBlock := make(chan struct{})
-	var started atomic.Int32
-	modelRegistrationTaskHook = func() {
-		if started.Add(1) == 2 {
+	// The batch registers A and B on parallel workers, so block B by ID rather
+	// than by start order.
+	modelRegistrationTaskHook = func(authID string) {
+		if authID == authBID {
 			close(bStarted)
 			<-bBlock
 		}
