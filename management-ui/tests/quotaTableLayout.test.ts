@@ -66,6 +66,9 @@ const renderRow = (props: Partial<QuotaRowProps>) => {
 };
 
 describe('provider overview strip', () => {
+  // One instant for the summary and the render, so "back in 1d 2h" cannot
+  // truncate to "1d 1h" when a millisecond passes between the two.
+  const now = Date.now();
   const summary: ProviderSummary = {
     type: 'claude',
     count: 5,
@@ -84,7 +87,7 @@ describe('provider overview strip', () => {
       { key: 'c', remaining: 10 },
       { key: 'd', remaining: null },
     ],
-    nextReturnAtMs: Date.now() + 26 * HOUR,
+    nextReturnAtMs: now + 26 * HOUR,
   };
   const render = (overrides: Partial<ProviderSummary> = {}, filterable = true) =>
     renderToStaticMarkup(
@@ -92,7 +95,7 @@ describe('provider overview strip', () => {
         summaries: [{ ...summary, ...overrides }],
         selected: null,
         filterable,
-        now: Date.now(),
+        now,
         onSelect: () => {},
         onFocalChange: () => {},
       })

@@ -175,7 +175,7 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 			if update.Auth == nil || update.Auth.ID == "" {
 				continue
 			}
-			auth := s.prepareCoreAuthForModelRegistration(registrationCtx, update.Auth)
+			auth := s.prepareRevisionedCoreAuth(registrationCtx, update)
 			if auth == nil {
 				continue
 			}
@@ -186,6 +186,7 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 			authID := authForRegistration.ID
 			wait := startedWaitByID[authID]
 			tasks = append(tasks, modelRegistrationTask{
+				authID:   authID,
 				phase:    modelRegistrationPhase(authForRegistration),
 				category: modelRegistrationCategory(authForRegistration),
 				run: func(compatCache *openAICompatibilityRegistrationCache) {
@@ -234,6 +235,7 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 				}
 			}
 			s.applyCoreAuthRemoval(registrationCtx, id)
+			delete(s.authSnapshotWrites, id)
 			needsAliasRebuild = true
 		default:
 			log.Debugf("received unknown auth update action: %v", update.Action)
@@ -413,8 +415,67 @@ func (s *Service) applyCoreAuthAddOrUpdate(ctx context.Context, auth *coreauth.A
 }
 
 func (s *Service) prepareCoreAuthForModelRegistration(ctx context.Context, auth *coreauth.Auth) *coreauth.Auth {
+	prepared, _, _ := s.prepareCoreAuthUpdate(ctx, auth, nil)
+	return prepared
+}
+
+// authSnapshotWrite records an unversioned watcher snapshot (generation 0) that a
+// revisioned update committed over replacedGeneration, producing producedGeneration.
+type authSnapshotWrite struct {
+	replacedGeneration uint64
+	producedGeneration uint64
+}
+
+// prepareRevisionedCoreAuth commits a watcher update and tracks unversioned snapshots.
+//
+// A config-reload scan can read an auth file just before a Management API commit
+// persists it. Its older-revision snapshot then lands on top of that commit and
+// bumps the generation, so the commit's own persisted update would look stale and
+// the runtime would keep the snapshot while disk is already current. A newer
+// revision therefore supersedes such a snapshot when nothing else wrote since and
+// it is not older than the state the snapshot replaced, which includes any write
+// merged into the snapshot commit. Callers hold authUpdateMu; direct manager writes
+// are excluded by the generation check in UpdateIfGeneration.
+func (s *Service) prepareRevisionedCoreAuth(ctx context.Context, update watcher.AuthUpdate) *coreauth.Auth {
+	incoming := update.Auth
+	rev := update.Revision()
+	var snapshot *authSnapshotWrite
+	if rev > 0 && incoming.Generation > 0 {
+		if write, ok := s.authSnapshotWrites[incoming.ID]; ok {
+			snapshot = &write
+		}
+	}
+	prepared, replacedGeneration, committed := s.prepareCoreAuthUpdate(ctx, incoming, snapshot)
+	if !committed {
+		return prepared
+	}
+	if rev > 0 && incoming.Generation == 0 && replacedGeneration > 0 {
+		write := authSnapshotWrite{
+			replacedGeneration: replacedGeneration,
+			producedGeneration: prepared.Generation,
+		}
+		// A snapshot landing directly on another one keeps the first boundary, so
+		// consecutive stale scans cannot push the replaced commit out of reach.
+		if previous, ok := s.authSnapshotWrites[incoming.ID]; ok && previous.producedGeneration == replacedGeneration {
+			write.replacedGeneration = previous.replacedGeneration
+		}
+		if s.authSnapshotWrites == nil {
+			s.authSnapshotWrites = make(map[string]authSnapshotWrite)
+		}
+		s.authSnapshotWrites[incoming.ID] = write
+	} else {
+		delete(s.authSnapshotWrites, incoming.ID)
+	}
+	return prepared
+}
+
+// prepareCoreAuthUpdate commits auth to coreManager ahead of model registration.
+// It reports the generation of the state it replaced (0 for a new auth), including
+// writes the manager merged during persistence, and whether it committed.
+// A non-nil snapshot lets auth replace that snapshot despite an older generation.
+func (s *Service) prepareCoreAuthUpdate(ctx context.Context, auth *coreauth.Auth, snapshot *authSnapshotWrite) (prepared *coreauth.Auth, replacedGeneration uint64, committed bool) {
 	if s == nil || s.coreManager == nil || auth == nil || auth.ID == "" {
-		return nil
+		return nil, 0, false
 	}
 	auth = auth.Clone()
 	s.ensureExecutorsForAuthWithContext(ctx, auth, false)
@@ -423,11 +484,15 @@ func (s *Service) prepareCoreAuthForModelRegistration(ctx context.Context, auth 
 	// This ensures that configuration changes (proxy_url, prefix, etc.) take effect
 	// immediately for API calls, rather than waiting for model registration to complete.
 	op := "register"
+	var committedAuth *coreauth.Auth
 	var err error
 	if existing, ok := s.coreManager.GetByID(auth.ID); ok {
-		if isStaleCoreAuth(existing, auth) {
+		replacedGeneration = existing.Generation
+		supersedesSnapshot := snapshot != nil && existing.Generation == snapshot.producedGeneration &&
+			auth.Generation >= snapshot.replacedGeneration
+		if hasStaleRegistrationEpoch(existing, auth) || (!supersedesSnapshot && hasStaleGeneration(existing, auth)) {
 			log.Debugf("skipping stale auth update for %s: incoming gen=%d, existing gen=%d", auth.ID, auth.Generation, existing.Generation)
-			return existing
+			return existing, replacedGeneration, false
 		}
 		auth.CreatedAt = existing.CreatedAt
 		if existing.Metadata != nil {
@@ -446,21 +511,34 @@ func (s *Service) prepareCoreAuthForModelRegistration(ctx context.Context, auth 
 			}
 		}
 		op = "update"
-		_, err = s.coreManager.Update(ctx, auth)
+		// Superseding a snapshot is only safe while nothing else wrote since, so the
+		// manager rechecks the generation under its per-auth mutation gate.
+		var expectedGeneration uint64
+		if supersedesSnapshot {
+			expectedGeneration = snapshot.producedGeneration
+		}
+		committedAuth, replacedGeneration, err = s.coreManager.UpdateIfGeneration(ctx, auth, expectedGeneration)
+		if err == nil && committedAuth == nil && supersedesSnapshot {
+			log.Debugf("skipping auth update for %s: generation moved past snapshot gen=%d", auth.ID, snapshot.producedGeneration)
+			if current, okCurrent := s.coreManager.GetByID(auth.ID); okCurrent {
+				return current, replacedGeneration, false
+			}
+			return nil, replacedGeneration, false
+		}
 	} else {
-		_, err = s.coreManager.Register(ctx, auth)
+		committedAuth, err = s.coreManager.Register(ctx, auth)
 	}
 	if err != nil {
 		log.Errorf("failed to %s auth %s: %v", op, auth.ID, err)
 		current, ok := s.coreManager.GetByID(auth.ID)
 		if !ok || current.Disabled {
 			GlobalModelRegistry().UnregisterClient(auth.ID)
-			return nil
+			return nil, replacedGeneration, false
 		}
 		auth = current
 	}
 	s.cancelStaleAntigravityProbes(auth.ID)
-	return auth
+	return auth, replacedGeneration, err == nil && committedAuth != nil
 }
 
 type authRegistrationWait struct {
@@ -549,19 +627,26 @@ func (s *Service) shouldSkipModelRegistration(authID string, expectedGeneration 
 // isStaleCoreAuth reports whether an incoming auth update is older than the current
 // state in coreManager, based on registration epoch and generation.
 func isStaleCoreAuth(existing, incoming *coreauth.Auth) bool {
+	return hasStaleRegistrationEpoch(existing, incoming) || hasStaleGeneration(existing, incoming)
+}
+
+// hasStaleRegistrationEpoch reports whether incoming has an explicit registration
+// epoch older than existing.
+func hasStaleRegistrationEpoch(existing, incoming *coreauth.Auth) bool {
 	if existing == nil || incoming == nil {
 		return false
 	}
-	// If incoming has an explicit registration epoch that is older than existing, it's stale.
-	if incoming.RegistrationEpoch > 0 && incoming.RegistrationEpoch < existing.RegistrationEpoch {
-		return true
+	return incoming.RegistrationEpoch > 0 && incoming.RegistrationEpoch < existing.RegistrationEpoch
+}
+
+// hasStaleGeneration reports whether a versioned incoming snapshot is older than
+// existing; such a snapshot must not overwrite a newer persist. Generation 0 is
+// left unversioned (file-watcher synthesizer snapshots).
+func hasStaleGeneration(existing, incoming *coreauth.Auth) bool {
+	if existing == nil || incoming == nil {
+		return false
 	}
-	// Versioned snapshots with an older generation must not overwrite a newer persist.
-	// Generation 0 is left unversioned (file-watcher synthesizer snapshots).
-	if incoming.Generation > 0 && incoming.Generation < existing.Generation {
-		return true
-	}
-	return false
+	return incoming.Generation > 0 && incoming.Generation < existing.Generation
 }
 
 func (s *Service) completeModelRegistrationForAuth(ctx context.Context, auth *coreauth.Auth) {

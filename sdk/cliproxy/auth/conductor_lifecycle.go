@@ -188,6 +188,39 @@ func (m *Manager) Update(ctx context.Context, auth *Auth) (*Auth, error) {
 	return m.updateInternal(ctx, nil, auth, updateModeReplace)
 }
 
+// UpdateIfGeneration replaces an existing auth entry like Update. A non-zero
+// expectedGeneration must still match the current generation when the commit
+// reads it, in the same critical section as every other writer; otherwise
+// nothing is committed. It returns the committed auth (nil when nothing was
+// committed) and the generation of the state it replaced. Writes merged while
+// persistence released m.mu count as replaced, so that generation can exceed
+// the expected one.
+func (m *Manager) UpdateIfGeneration(ctx context.Context, auth *Auth, expectedGeneration uint64) (*Auth, uint64, error) {
+	if m == nil || auth == nil || auth.ID == "" {
+		return nil, 0, nil
+	}
+	releaseMutation, errMutation := m.lockAuthMutationContext(ctx, auth.ID)
+	if errMutation != nil {
+		return nil, 0, errMutation
+	}
+	guard := generationGuard{expected: expectedGeneration}
+	committedAuth, didCommit, persistCooldown, err := m.updateInternalLocked(ctx, nil, auth, updateModeReplace, &guard)
+	releaseMutation()
+	if err != nil || !didCommit || committedAuth == nil {
+		return nil, guard.replaced, err
+	}
+	m.finishAuthUpdate(ctx, committedAuth, persistCooldown)
+	return committedAuth, guard.replaced, nil
+}
+
+// generationGuard makes a replace conditional on the generation found when the
+// commit reads the existing auth. replaced reports that generation, advanced past
+// writes merged during persistence, even when nothing commits.
+type generationGuard struct {
+	expected uint64
+	replaced uint64
+}
+
 func (m *Manager) updateInternal(ctx context.Context, base, auth *Auth, mode updateAuthMode) (*Auth, error) {
 	if auth == nil || auth.ID == "" {
 		return nil, nil
@@ -196,7 +229,7 @@ func (m *Manager) updateInternal(ctx context.Context, base, auth *Auth, mode upd
 	if errMutation != nil {
 		return nil, errMutation
 	}
-	committedAuth, didCommit, persistCooldown, err := m.updateInternalLocked(ctx, base, auth, mode)
+	committedAuth, didCommit, persistCooldown, err := m.updateInternalLocked(ctx, base, auth, mode, nil)
 	releaseMutation()
 	if err == nil && didCommit && committedAuth != nil {
 		m.finishAuthUpdate(ctx, committedAuth, persistCooldown)
@@ -233,7 +266,7 @@ func (m *Manager) finishAuthUpdate(ctx context.Context, committed *Auth, persist
 // The second return value reports whether this call actually committed new
 // state (versus returning the current snapshot for a discarded stale
 // update); only real commits may run post-commit side effects.
-func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mode updateAuthMode) (committedAuth *Auth, committed bool, persistCooldown bool, err error) {
+func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mode updateAuthMode, guard *generationGuard) (committedAuth *Auth, committed bool, persistCooldown bool, err error) {
 	if auth == nil || auth.ID == "" {
 		return nil, false, false, nil
 	}
@@ -246,6 +279,13 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 	if !ok || existing == nil {
 		m.mu.Unlock()
 		return nil, false, false, nil
+	}
+	if guard != nil {
+		guard.replaced = existing.Generation
+		if guard.expected != 0 && existing.Generation != guard.expected {
+			m.mu.Unlock()
+			return nil, false, false, nil
+		}
 	}
 	if m.authEpochs == nil {
 		m.authEpochs = make(map[string]uint64)
@@ -384,6 +424,9 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 		return nil, false, false, fmt.Errorf("auth %s changed registration during persistence", auth.ID)
 	}
 	mergeAuthSaveDelta(auth, existingBeforeSave, existing, false)
+	if guard != nil {
+		guard.replaced = existing.Generation
+	}
 	if existing.Generation >= auth.Generation {
 		auth.Generation = existing.Generation + 1
 	}
