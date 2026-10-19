@@ -412,7 +412,15 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     labelKey: L('sections.network.routing_strategy'),
     hintKey: L('sections.network.routing_strategy_hint'),
     yamlKeys: ['routing', 'strategy'],
-    keywords: ['round-robin', 'weighted-round-robin', 'wrr', 'fill-first'],
+    keywords: ['round-robin', 'weighted-round-robin', 'wrr', 'fill-first', 'reset-first'],
+  },
+  {
+    fieldId: 'routingResetFirstMaxFiveHour',
+    sectionId: 'network',
+    labelKey: L('sections.network.reset_first_max_five_hour'),
+    hintKey: L('sections.network.reset_first_max_five_hour_hint'),
+    yamlKeys: ['routing', 'reset-first', 'max-five-hour-utilization'],
+    keywords: ['reset-first', 'quota', 'five-hour', '5h'],
   },
   {
     fieldId: 'disableImageGeneration',

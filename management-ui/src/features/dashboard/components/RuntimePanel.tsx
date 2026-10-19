@@ -23,6 +23,7 @@ export function RuntimePanel({ config, counts }: RuntimePanelProps) {
       return t('basic_settings.routing_strategy_weighted_round_robin');
     }
     if (raw === 'fill-first') return t('basic_settings.routing_strategy_fill_first');
+    if (raw === 'reset-first') return t('basic_settings.routing_strategy_reset_first');
     return raw;
   })();
 

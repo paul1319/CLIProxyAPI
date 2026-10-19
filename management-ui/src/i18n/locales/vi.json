@@ -229,7 +229,8 @@
     "ws_auth_enable": "Yêu cầu xác thực cho /ws/*",
     "routing_strategy_round_robin": "round-robin (luân phiên)",
     "routing_strategy_weighted_round_robin": "weighted-round-robin (luân phiên có trọng số)",
-    "routing_strategy_fill_first": "fill-first (ưu tiên lấp đầy)"
+    "routing_strategy_fill_first": "fill-first (ưu tiên lấp đầy)",
+    "routing_strategy_reset_first": "reset-first (reset sớm nhất)"
   },
   "credentials": {
     "title": "Thông tin xác thực",
@@ -1421,6 +1422,9 @@
           "strategy_round_robin": "Round Robin",
           "strategy_weighted_round_robin": "Weighted Round Robin",
           "strategy_fill_first": "Fill First",
+          "strategy_reset_first": "Reset hạn mức sớm nhất",
+          "reset_first_max_five_hour": "Ngưỡng 5h cho phiên mới, %",
+          "reset_first_max_five_hour_hint": "Phiên mới được chuyển đến tài khoản Claude/Codex có hạn mức tuần reset sớm nhất. Tài khoản có mức dùng 5 giờ đạt tỷ lệ này sẽ ngừng nhận phiên mới khi tài khoản khác còn dư; các phiên đã gắn vẫn giữ nguyên. Mặc định 85.",
           "session_affinity_ttl": "TTL Session Affinity",
           "force_model_prefix": "Bắt buộc tiền tố model",
           "force_model_prefix_desc": "Yêu cầu model không có tiền tố chỉ dùng credential không có tiền tố",
@@ -1542,6 +1546,7 @@
         "port_range": "Nhập cổng hợp lệ từ 1 đến 65535",
         "non_negative_integer": "Nhập số nguyên không âm",
         "integer_range_1_3600": "Nhập số nguyên từ 1 đến 3600",
+        "integer_range_1_100": "Nhập số nguyên từ 1 đến 100",
         "payload_invalid_number": "Nhập số hợp lệ",
         "payload_invalid_boolean": "Chọn true hoặc false",
         "payload_invalid_json": "Nhập JSON hợp lệ",

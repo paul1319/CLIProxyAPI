@@ -29,6 +29,10 @@ export function SectionNetwork({
       value: 'fill-first',
       label: t('config_management.visual.sections.network.strategy_fill_first'),
     },
+    {
+      value: 'reset-first',
+      label: t('config_management.visual.sections.network.strategy_reset_first'),
+    },
   ];
 
   const disableImageGenerationOptions: Array<{ value: DisableImageGeneration; label: string }> = [
@@ -81,6 +85,22 @@ export function SectionNetwork({
           options={routingStrategyOptions}
           disabled={disabled}
           onChange={(routingStrategy) => onChange({ routingStrategy })}
+        />
+        <TextSetting
+          fieldId="routingResetFirstMaxFiveHour"
+          size="sm"
+          label={t('config_management.visual.sections.network.reset_first_max_five_hour')}
+          description={t(
+            'config_management.visual.sections.network.reset_first_max_five_hour_hint'
+          )}
+          type="number"
+          min={1}
+          max={100}
+          placeholder="85"
+          value={values.routingResetFirstMaxFiveHour}
+          onChange={(routingResetFirstMaxFiveHour) => onChange({ routingResetFirstMaxFiveHour })}
+          disabled={disabled || values.routingStrategy !== 'reset-first'}
+          error={getValidationMessage(t, validationErrors?.routingResetFirstMaxFiveHour)}
         />
         <ToggleSetting
           fieldId="forceModelPrefix"
