@@ -79,6 +79,9 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 	case "fill-first", "fillfirst", "ff":
 		state.strategy = "fill-first"
 	}
+	if cfg.Routing.UsesResetFirst() {
+		state.strategy = "reset-first"
+	}
 	state.sessionAffinity = cfg.Routing.SessionAffinity
 	if ttl := strings.TrimSpace(cfg.Routing.SessionAffinityTTL); ttl != "" {
 		if parsed, errParse := time.ParseDuration(ttl); errParse == nil && parsed > 0 {
@@ -104,6 +107,8 @@ func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
 		selector = &coreauth.WeightedRoundRobinSelector{}
 	case "fill-first":
 		selector = &coreauth.FillFirstSelector{}
+	case "reset-first":
+		selector = coreauth.NewResetFirstSelector(coreauth.DefaultResetFirstMaxShortUtilization)
 	default:
 		selector = &coreauth.RoundRobinSelector{}
 	}
@@ -117,6 +122,16 @@ func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
 		})
 	}
 	return selector
+}
+
+// applyResetFirstConfig tunes reset-first in place. The threshold is not part
+// of the routing state, so changing it keeps existing session bindings.
+func applyResetFirstConfig(selector coreauth.Selector, cfg *config.Config) {
+	resetFirst := coreauth.ResetFirstSelectorOf(selector)
+	if resetFirst == nil || cfg == nil {
+		return
+	}
+	resetFirst.SetMaxShortUtilization(cfg.Routing.ResetFirst.MaxFiveHourUtilization)
 }
 
 func (s *Service) applyConfigUpdateWithAuthSynthesis(ctx context.Context, newCfg *config.Config, synthesizeConfigAuths bool) bool {
@@ -261,6 +276,7 @@ func (s *Service) applyManagerConfig(ctx context.Context, commit configCommit) b
 		s.coreManager.SetSelector(newRoutingSelector(routingState))
 		s.appliedRoutingState = &routingState
 	}
+	applyResetFirstConfig(s.coreManager.Selector(), commit.cfg)
 	s.applyRetryConfig(commit.cfg)
 	store := s.resolveCooldownStateStore(commit.cfg)
 	if !s.coreManager.ApplyConfigWithCooldownStateStore(ctx, commit.cfg, store) {

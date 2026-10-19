@@ -229,7 +229,8 @@
     "ws_auth_enable": "/ws/* 경로에 인증 요구",
     "routing_strategy_round_robin": "round-robin (순환)",
     "routing_strategy_weighted_round_robin": "weighted-round-robin (가중 순환)",
-    "routing_strategy_fill_first": "fill-first (우선 채우기)"
+    "routing_strategy_fill_first": "fill-first (우선 채우기)",
+    "routing_strategy_reset_first": "reset-first (가장 빠른 리셋)"
   },
   "credentials": {
     "title": "자격 증명",
@@ -1630,6 +1631,9 @@
           "strategy_round_robin": "라운드 로빈",
           "strategy_weighted_round_robin": "가중 라운드 로빈",
           "strategy_fill_first": "채우기 우선",
+          "strategy_reset_first": "가장 빠른 쿼터 리셋",
+          "reset_first_max_five_hour": "새 세션 5시간 한도(%)",
+          "reset_first_max_five_hour_hint": "새 세션은 주간 쿼터가 가장 먼저 리셋되는 Claude/Codex 계정으로 보내집니다. 5시간 사용량이 이 비율에 도달한 계정은 다른 계정에 여유가 있는 동안 새 세션을 받지 않으며, 바인딩된 세션은 그대로 유지됩니다. 기본값 85.",
           "session_affinity_ttl": "세션 어피니티 TTL",
           "force_model_prefix": "모델 접두사 강제",
           "force_model_prefix_desc": "접두사가 없는 모델 요청은 접두사가 없는 자격 증명만 사용합니다.",
@@ -1761,6 +1765,7 @@
         "integer": "정수를 입력하세요",
         "non_negative_integer": "0 이상의 정수를 입력하세요",
         "integer_range_1_3600": "1에서 3600 사이의 정수를 입력하세요",
+        "integer_range_1_100": "1에서 100 사이의 정수를 입력하세요",
         "payload_invalid_number": "유효한 숫자를 입력하세요",
         "payload_invalid_boolean": "true 또는 false를 선택하세요",
         "payload_invalid_json": "유효한 JSON을 입력하세요"
