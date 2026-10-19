@@ -19,6 +19,7 @@ import {
   normalizeProviderKey,
   parsePriorityValue,
   readAuthFileDisableCooling,
+  readAuthFileExcludedModels,
   readAuthFileWebsockets,
   readAuthFileUsingApi,
   supportsAuthFileWebsockets,
@@ -165,11 +166,6 @@ const normalizeExcludedModels = (value: unknown): string[] => {
 
 const parseExcludedModelsText = (value: string): string[] =>
   normalizeExcludedModels(value.split(/\r?\n/));
-
-const readExcludedModels = (value: Record<string, unknown>): string[] =>
-  normalizeExcludedModels(
-    value.excluded_models !== undefined ? value.excluded_models : value['excluded-models']
-  );
 
 const getExcludedModelsField = (
   value: Record<string, unknown>
@@ -351,7 +347,7 @@ export const buildAuthFileFieldsPatch = (
   }
 
   if (editor.excludedModelsTouched) {
-    const originalExcludedModels = readExcludedModels(original);
+    const originalExcludedModels = readAuthFileExcludedModels(original);
     const nextExcludedModels = parseExcludedModelsText(editor.excludedModelsText);
     if (JSON.stringify(nextExcludedModels) !== JSON.stringify(originalExcludedModels)) {
       patch[getExcludedModelsField(original)] = nextExcludedModels;
@@ -591,7 +587,7 @@ export function useAuthFilesPrefixProxyEditor(
         : false;
       const usingApi = supportsAuthFileUsingApi(providerKey) ? readAuthFileUsingApi(json) : false;
       const note = typeof json.note === 'string' ? json.note : '';
-      const excludedModelsText = readExcludedModels(json).join('\n');
+      const excludedModelsText = readAuthFileExcludedModels(json).join('\n');
       const headers = json.headers;
       let headersText = '';
       let headersError: string | null = null;

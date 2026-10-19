@@ -41,7 +41,7 @@ export type AuthFileOverviewProps = {
     loading: boolean;
     error: 'unsupported' | null;
     list: AuthFileModelItem[];
-    excluded: Record<string, string[]>;
+    excludedRules: readonly string[];
   };
   /** Scroll the models section into view once (row menu → "Models"). */
   focusModels: boolean;
@@ -253,11 +253,10 @@ export function AuthFileOverview(props: AuthFileOverviewProps) {
           }
         >
           <AuthFileModelsList
-            fileType={String(file.type ?? '')}
             loading={models.loading}
             error={models.error}
             models={models.list}
-            excluded={models.excluded}
+            excludedRules={models.excludedRules}
             onCopyText={onCopyText}
           />
         </Section>

@@ -1,25 +1,25 @@
 import { useTranslation } from 'react-i18next';
 import { IconCopy } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { isModelExcluded, type AuthFileModelItem } from '@/features/authFiles/constants';
+import { isModelExcluded } from '@/components/excludedModels/excludedModelRules';
+import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import styles from './AuthFileDetailsSheet.module.scss';
 
 export type AuthFileModelsListProps = {
-  fileType: string;
   loading: boolean;
   error: 'unsupported' | null;
   models: AuthFileModelItem[];
-  excluded: Record<string, string[]>;
+  /** Exclusion rules in effect for this credential (see resolveAuthFileExcludedRules). */
+  excludedRules: readonly string[];
   onCopyText: (text: string) => void;
 };
 
 /** Models served by one credential; each row is a real button that copies the model id. */
 export function AuthFileModelsList({
-  fileType,
   loading,
   error,
   models,
-  excluded,
+  excludedRules,
   onCopyText,
 }: AuthFileModelsListProps) {
   const { t } = useTranslation();
@@ -47,7 +47,7 @@ export function AuthFileModelsList({
   return (
     <ul className={styles.modelList}>
       {models.map((model) => {
-        const excludedModel = isModelExcluded(model.id, fileType, excluded);
+        const excludedModel = isModelExcluded(excludedRules, model.id);
         return (
           <li key={model.id}>
             <button

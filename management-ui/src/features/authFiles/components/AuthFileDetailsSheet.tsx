@@ -69,7 +69,7 @@ export type AuthFileDetailsSheetProps = {
     loading: boolean;
     error: 'unsupported' | null;
     list: AuthFileModelItem[];
-    excluded: Record<string, string[]>;
+    excludedRules: readonly string[];
   };
   onClose: () => void;
   onCopyText: (text: string) => void | Promise<void>;

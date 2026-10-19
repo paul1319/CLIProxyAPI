@@ -7,22 +7,43 @@ on:
       - synchronize
       - reopened
 
+permissions:
+  contents: read
+
 jobs:
   ensure-no-translator-changes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - name: Detect internal/translator changes
-        id: changed-files
-        uses: tj-actions/changed-files@v45
-        with:
-          files: |
-            internal/translator/**
+          persist-credentials: false
       - name: Fail when restricted paths change
-        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          UPSTREAM_REPO: router-for-me/CLIProxyAPI
         run: |
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- internal/translator)
+          if [ -z "$changed" ]; then
+            exit 0
+          fi
+
+          # In a fork, files that are identical to the upstream commit merged into the PR
+          # arrived with an upstream sync and are not changes made by the fork.
+          if [ "$GITHUB_REPOSITORY" != "$UPSTREAM_REPO" ]; then
+            git fetch --quiet --no-tags "https://github.com/$UPSTREAM_REPO.git" main
+            upstream_base=$(git merge-base "$HEAD_SHA" FETCH_HEAD)
+            changed=$(printf '%s\n' "$changed" | while IFS= read -r file; do
+              git diff --quiet "$upstream_base" "$HEAD_SHA" -- "$file" || printf '%s\n' "$file"
+            done)
+            if [ -z "$changed" ]; then
+              echo "Changes under internal/translator match upstream $UPSTREAM_REPO."
+              exit 0
+            fi
+          fi
+
+          printf '%s\n' "$changed"
           echo "Changes under internal/translator are not allowed in pull requests."
           echo "You need to create an issue for our maintenance team to make the necessary changes."
           exit 1
