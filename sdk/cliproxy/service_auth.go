@@ -518,12 +518,17 @@ func (s *Service) prepareCoreAuthUpdate(ctx context.Context, auth *coreauth.Auth
 			expectedGeneration = snapshot.producedGeneration
 		}
 		committedAuth, replacedGeneration, err = s.coreManager.UpdateIfGeneration(ctx, auth, expectedGeneration)
-		if err == nil && committedAuth == nil && supersedesSnapshot {
-			log.Debugf("skipping auth update for %s: generation moved past snapshot gen=%d", auth.ID, snapshot.producedGeneration)
-			if current, okCurrent := s.coreManager.GetByID(auth.ID); okCurrent {
+		if err == nil && committedAuth == nil {
+			// Nothing committed: the generation moved past the superseded snapshot, or
+			// a file snapshot no longer matches its backing file on disk.
+			current, okCurrent := s.coreManager.GetByID(auth.ID)
+			if okCurrent {
+				log.Debugf("skipping stale auth update for %s: incoming snapshot did not commit (gen=%d)", auth.ID, current.Generation)
 				return current, replacedGeneration, false
 			}
-			return nil, replacedGeneration, false
+			if supersedesSnapshot {
+				return nil, replacedGeneration, false
+			}
 		}
 	} else {
 		committedAuth, err = s.coreManager.Register(ctx, auth)
@@ -536,6 +541,8 @@ func (s *Service) prepareCoreAuthUpdate(ctx context.Context, auth *coreauth.Auth
 			return nil, replacedGeneration, false
 		}
 		auth = current
+	} else if committedAuth != nil {
+		auth = committedAuth
 	}
 	s.cancelStaleAntigravityProbes(auth.ID)
 	return auth, replacedGeneration, err == nil && committedAuth != nil
@@ -664,9 +671,35 @@ func (s *Service) completeModelRegistrationForAuthWithCache(ctx context.Context,
 	if latest, ok := s.latestAuthForModelRegistration(auth.ID); ok && latest != nil {
 		targetAuth = latest
 	}
-	s.registerModelsForAuthWithCache(ctx, targetAuth, compatCache)
+	published := s.registerModelsForAuthWithCache(ctx, targetAuth, compatCache)
 	if ctx != nil && ctx.Err() != nil {
 		return 0
+	}
+	if !published {
+		// The registration was fenced out because its registration inputs
+		// or the registry epoch changed mid-computation (e.g. a plugin
+		// persisting its model snapshot through host.auth.save during
+		// ModelsForAuth, issue #6718). The intervening change may not have
+		// left this client's models behind, so reconcile the latest auth
+		// once instead of risking an empty model list. The retry
+		// recomputes from the latest snapshot;
+		// it never republishes the superseded computation's models. A
+		// removed auth stays unregistered (removal owns cleanup), while
+		// a newly disabled auth gets a fenced unregistration so its old
+		// models do not linger.
+		if latest, ok := s.latestAuthForModelRegistration(auth.ID); ok && latest != nil {
+			targetAuth = latest
+			if latest.Disabled {
+				accepted := s.unregisterModelsForAuthFenced(latest, newModelRegistrationFence(latest, s.currentConfig()))
+				log.WithFields(log.Fields{"auth_id": latest.ID, "provider": latest.Provider, "superseded": !accepted}).Debugf("model registration reconciliation attempted for disabled auth %s", latest.ID)
+			} else {
+				accepted := s.registerModelsForAuthWithCache(ctx, targetAuth, compatCache)
+				if ctx != nil && ctx.Err() != nil {
+					return 0
+				}
+				log.WithFields(log.Fields{"auth_id": latest.ID, "provider": latest.Provider, "superseded": !accepted}).Debugf("model registration reconciliation attempted for auth %s", latest.ID)
+			}
+		}
 	}
 	s.reconcileRegisteredModelStates(ctx, targetAuth)
 
