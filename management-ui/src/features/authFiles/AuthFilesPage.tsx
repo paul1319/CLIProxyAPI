@@ -29,6 +29,8 @@ import { statusBarDataFromRecentRequests, type StatusBarData } from '@/utils/rec
 import {
   isRuntimeOnlyAuthFile,
   normalizeProviderKey,
+  readAuthFileExcludedModels,
+  resolveAuthFileExcludedRules,
   type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
@@ -465,6 +467,18 @@ export function AuthFilesPage() {
       null
     );
   }, [details, files]);
+
+  // Wait for the credential JSON: its own rules may replace the provider rules.
+  const editorFileName = prefixProxyEditor?.fileName;
+  const editorJson = prefixProxyEditor?.json;
+  const detailsExcludedRules = useMemo(() => {
+    if (!detailsFile || !editorJson || editorFileName !== detailsFile.name) return [];
+    return resolveAuthFileExcludedRules(
+      readAuthFileExcludedModels(editorJson),
+      String(detailsFile.type ?? ''),
+      excluded
+    );
+  }, [detailsFile, editorFileName, editorJson, excluded]);
 
   const copyTextWithNotification = useCallback(
     async (text: string) => {
@@ -954,7 +968,7 @@ export function AuthFilesPage() {
           loading: modelsLoading,
           error: modelsError,
           list: details && modelsFileName === details.name ? modelsList : [],
-          excluded,
+          excludedRules: detailsExcludedRules,
         }}
         onClose={handleCloseDetails}
         onCopyText={copyTextWithNotification}

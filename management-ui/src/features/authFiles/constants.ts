@@ -13,6 +13,7 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
+import { normalizeExcludedRules } from '@/components/excludedModels/excludedModelRules';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
 import { parseTimestamp } from '@/utils/timestamp';
@@ -252,24 +253,21 @@ export const formatModified = (item: AuthFileItem): string => {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 };
 
-// Whether a model is excluded by the provider's OAuth exclusion rules
-export const isModelExcluded = (
-  modelId: string,
+// A credential's own rules, read from excluded_models or its legacy excluded-models alias.
+export const readAuthFileExcludedModels = (value: Record<string, unknown>): string[] => {
+  const raw =
+    value.excluded_models !== undefined ? value.excluded_models : value['excluded-models'];
+  if (!Array.isArray(raw)) return [];
+  return normalizeExcludedRules(raw.filter((item): item is string => typeof item === 'string'));
+};
+
+// The rules that apply to a credential: its own non-empty list replaces the provider's
+// OAuth exclusion rules instead of being merged with them, matching the backend.
+export const resolveAuthFileExcludedRules = (
+  credentialRules: readonly string[],
   providerType: string,
   excluded: Record<string, string[]>
-): boolean => {
-  const providerKey = normalizeProviderKey(providerType);
-  const excludedModels = excluded[providerKey] || excluded[providerType] || [];
-  return excludedModels.some((pattern) => {
-    if (pattern.includes('*')) {
-      // Wildcard support: escape regex metacharacters first, then treat * as a wildcard
-      const regexSafePattern = pattern
-        .split('*')
-        .map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('.*');
-      const regex = new RegExp(`^${regexSafePattern}$`, 'i');
-      return regex.test(modelId);
-    }
-    return pattern.toLowerCase() === modelId.toLowerCase();
-  });
+): readonly string[] => {
+  if (credentialRules.length > 0) return credentialRules;
+  return excluded[normalizeProviderKey(providerType)] || excluded[providerType] || [];
 };
