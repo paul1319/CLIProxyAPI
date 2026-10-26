@@ -28,6 +28,14 @@ type Record struct {
 	RetryAt    time.Time       `json:"retry_at,omitzero"`
 	Status     int             `json:"status,omitzero"`
 	Failures   int             `json:"failures,omitzero"`
+	// RejectedCredential is the Request.Credential a 401/403 backoff applies to.
+	RejectedCredential string `json:"rejected_credential,omitzero"`
+}
+
+// rotatedSince reports whether the credential changed after the provider
+// rejected it, so an auth backoff no longer applies.
+func (r Record) rotatedSince(credential string) bool {
+	return r.RejectedCredential != "" && credential != "" && credential != r.RejectedCredential
 }
 
 type Snapshot struct {
@@ -55,6 +63,9 @@ type Request struct {
 	Interval   time.Duration
 	CachedOnly bool
 	Force      bool
+	// Credential is a non-secret version of the token Fetch will send; it
+	// changes when the token is refreshed. Empty disables rotation checks.
+	Credential string
 	Current    func() bool
 	Fetch      func(context.Context) (json.RawMessage, error)
 }
@@ -133,7 +144,8 @@ func (s *Service) Observe(ctx context.Context, req Request) (Snapshot, error) {
 		}
 	}
 	result := s.snapshotLocked(key, req.Interval)
-	if req.CachedOnly || (!req.Force && !result.Stale) || s.now().Before(result.RetryAt) {
+	backoff := s.now().Before(result.RetryAt) && !result.rotatedSince(req.Credential)
+	if req.CachedOnly || (!req.Force && !result.Stale) || backoff {
 		s.mu.Unlock()
 		if changed {
 			s.save()
@@ -187,6 +199,7 @@ func (s *Service) refresh(key string, req Request, work *flight) {
 	}
 	r := s.records[key]
 	r.Identity, r.Resource, r.AttemptAt = req.Identity, req.Resource, s.now().UTC()
+	r.RejectedCredential = ""
 	if errFetch == nil {
 		r.Body, r.ObservedAt = append(json.RawMessage(nil), body...), r.AttemptAt
 		r.Failures, r.Status, r.RetryAt = 0, 0, time.Time{}
@@ -199,6 +212,7 @@ func (s *Service) refresh(key string, req Request, work *flight) {
 			r.Status = failure.Status
 			if failure.Status == 401 || failure.Status == 403 {
 				r.RetryAt = r.AttemptAt.Add(15 * time.Minute)
+				r.RejectedCredential = req.Credential
 			}
 			if failure.RetryAt.After(r.RetryAt) {
 				r.RetryAt = failure.RetryAt

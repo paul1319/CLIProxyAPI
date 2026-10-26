@@ -120,7 +120,7 @@ func (h *Handler) observeQuotaWindows(ctx context.Context, auth *coreauth.Auth) 
 	}
 	identity := quotaCredentialIdentity(auth)
 	snapshot, errObserve := h.quotaService().Observe(ctx, quota.Request{
-		Identity: identity, Resource: "usage", Interval: resource.Interval,
+		Identity: identity, Resource: "usage", Interval: resource.Interval, Credential: quotaCredentialVersion(auth),
 		Current: func() bool { return h.quotaCredentialCurrent(auth.ID, identity) },
 		Fetch:   resource.Fetch,
 	})

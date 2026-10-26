@@ -2,6 +2,8 @@ package management
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -73,6 +75,17 @@ func quotaCredentialIdentity(auth *coreauth.Auth) quota.Identity {
 	return quota.Identity{AuthID: auth.ID, Fingerprint: coreauth.QuotaAccountFingerprint(auth)}
 }
 
+// quotaCredentialVersion changes with the stored token, so a 401 earned by an
+// expired token does not delay the first poll after a refresh.
+func quotaCredentialVersion(auth *coreauth.Auth) string {
+	token := tokenValueForAuth(auth)
+	if token == "" {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(digest[:8])
+}
+
 func (h *Handler) quotaCredential(auth *coreauth.Auth, pluginID string) quota.Credential {
 	metadata := coreauth.QuotaCredentialMetadata(auth)
 	h.mu.Lock()
@@ -133,6 +146,7 @@ func (h *Handler) CredentialQuotaObservation(c *gin.Context) {
 	h.reconcileQuotaObservations()
 	snapshot, errObserve := service.Observe(c.Request.Context(), quota.Request{
 		Identity: identity, Resource: resourceKey, Interval: resource.Interval, CachedOnly: cachedOnly, Force: input.Force,
+		Credential: quotaCredentialVersion(auth),
 		Current: func() bool {
 			current := h.authByIndex(input.AuthIndex)
 			return current != nil && !current.Disabled && quotaCredentialIdentity(current) == identity

@@ -79,6 +79,56 @@ func TestServiceObservations(t *testing.T) {
 	}
 }
 
+func TestServiceAuthBackoffLiftsWhenTheTokenRotates(t *testing.T) {
+	now := time.Date(2026, 10, 26, 6, 44, 0, 0, time.UTC)
+	service, _ := New(nil, func() time.Time { return now })
+	t.Cleanup(service.Close)
+	calls, status := 0, 401
+	req := Request{Identity: Identity{AuthID: "a", Fingerprint: "account-a"}, Resource: "usage", Interval: UsageInterval, Credential: "expired",
+		Fetch: func(context.Context) (json.RawMessage, error) {
+			calls++
+			if status != 0 {
+				return nil, &FetchError{Status: status}
+			}
+			return json.RawMessage(`{"remaining":42}`), nil
+		},
+	}
+	observe := func(request Request) Snapshot {
+		t.Helper()
+		result, errObserve := service.Observe(t.Context(), request)
+		if errObserve != nil {
+			t.Fatal(errObserve)
+		}
+		return result
+	}
+	if rejected := observe(req); calls != 1 || rejected.Status != 401 {
+		t.Fatalf("rejected observation: %+v, calls %d", rejected, calls)
+	}
+	now = now.Add(time.Minute)
+	req.Force = true
+	observe(req)
+	unversioned := req
+	unversioned.Credential = ""
+	observe(unversioned)
+	if calls != 1 {
+		t.Fatal("the auth backoff did not hold for the rejected token")
+	}
+	// The poller does not force; a refreshed token alone must end the backoff.
+	req.Force, req.Credential, status = false, "refreshed", 0
+	if recovered := observe(req); calls != 2 || recovered.Status != 0 || recovered.Stale || recovered.RejectedCredential != "" {
+		t.Fatalf("refreshed token waited out the auth backoff: %+v, calls %d", recovered, calls)
+	}
+	// Rate limits belong to the account, so rotation must not bypass them.
+	now = now.Add(UsageInterval)
+	status = 429
+	observe(req)
+	req.Force, req.Credential = true, "rotated-again"
+	observe(req)
+	if calls != 3 {
+		t.Fatalf("token rotation bypassed a rate limit: calls %d", calls)
+	}
+}
+
 func TestServiceSharesConcurrentRefreshAndCancelsReplacedCredential(t *testing.T) {
 	service, _ := New(nil, nil)
 	t.Cleanup(service.Close)

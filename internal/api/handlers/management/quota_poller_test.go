@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -192,6 +193,48 @@ func TestQuotaPollingStopsWhileUsageRequestIsInFlight(t *testing.T) {
 	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatal("closing quota observations hung on an in-flight usage request")
+	}
+}
+
+func TestQuotaPollingRetriesARejectedCredentialOnceItsTokenRefreshes(t *testing.T) {
+	// The proxy refuses every tunnel, so a poll that goes out is counted and
+	// fails without reaching Claude.
+	var requests atomic.Int64
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer proxy.Close()
+
+	manager := coreauth.NewManager(nil, nil, nil)
+	auth := &coreauth.Auth{ID: "expired-claude", Provider: "claude", ProxyURL: proxy.URL, Metadata: map[string]any{"email": "expired@example.invalid", "access_token": "expired-token"}}
+	if _, errRegister := manager.Register(t.Context(), auth); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	service, _ := quota.New(nil, func() time.Time { return time.Date(2026, 10, 26, 6, 44, 0, 0, time.UTC) })
+	t.Cleanup(service.Close)
+	if _, errObserve := service.Observe(t.Context(), quota.Request{
+		Identity: quotaCredentialIdentity(auth), Resource: "usage", Interval: quota.UsageInterval, Credential: quotaCredentialVersion(auth),
+		Fetch: func(context.Context) (json.RawMessage, error) {
+			return nil, &quota.FetchError{Status: http.StatusUnauthorized}
+		},
+	}); errObserve != nil {
+		t.Fatal(errObserve)
+	}
+	h := &Handler{cfg: &config.Config{Routing: config.RoutingConfig{Strategy: "reset-first"}}, authManager: manager, quotaObservations: service}
+
+	pollOnce(t, h)
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("the poller retried the rejected token %d times during its backoff", got)
+	}
+	refreshed := auth.Clone()
+	refreshed.Metadata["access_token"] = "fresh-token"
+	if _, errUpdate := manager.Update(t.Context(), refreshed); errUpdate != nil {
+		t.Fatal(errUpdate)
+	}
+	pollOnce(t, h)
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("usage requests after the token refresh = %d, want 1", got)
 	}
 }
 
