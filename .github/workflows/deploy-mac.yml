@@ -91,6 +91,12 @@ jobs:
           [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Invalid CLI_PROXY_DEPLOY_HOST'; exit 1; }
           [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Invalid CLI_PROXY_DEPLOY_USER'; exit 1; }
           [[ "$IMAGE" =~ ^ghcr.io/paul1319/cliproxyapi@sha256:[a-f0-9]{64}$ ]] || exit 1
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build configuration utility for the Mac
+        run: GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o deploy/configure-proxy-bin ./deploy/configure-proxy
       - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4
         with:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
@@ -102,9 +108,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -C deploy -czf - compose.yaml deploy.sh | bash deploy/ssh-confirm.sh \
+          tar -C deploy -czf - compose.yaml deploy.sh configure-proxy-bin | bash deploy/ssh-confirm.sh \
             "Installed deployment bundle $RELEASE" "$DEPLOY_USER@$DEPLOY_HOST" \
             "umask 077; mkdir -p \"\$HOME/.local/share/cliproxyapi/releases\" && mkdir \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && tar -xzf - -C \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE\" && printf '%s\\n' 'Installed deployment bundle $RELEASE'"
+      - name: Save upstream proxy before starting the service
+        shell: bash
+        env:
+          UPSTREAM_PROXY_URL: ${{ secrets.CLI_PROXY_UPSTREAM_PROXY_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$UPSTREAM_PROXY_URL" ]]; then
+            echo 'No upstream proxy secret configured; preserving existing setting.'
+            exit 0
+          fi
+          printf '%s' "$UPSTREAM_PROXY_URL" | bash deploy/ssh-confirm.sh \
+            "Upstream proxy saved and verified; ready to start service." "$DEPLOY_USER@$DEPLOY_HOST" \
+            "\"\$HOME/.local/share/cliproxyapi/releases/$RELEASE/configure-proxy-bin\" -directory \"\$HOME/.local/share/cliproxyapi\""
       - name: Deploy and check HTTP health, rolling back on failure
         shell: bash
         env:

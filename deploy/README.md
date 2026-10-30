@@ -61,6 +61,22 @@ applies, and access is limited by loopback publishing and the tailnet policy.
 No extra OAuth callback ports are published. Use the control panel's callback
 handoff when a provider needs a localhost OAuth callback.
 
+## Upstream proxy
+
+Set the repository Actions secret `CLI_PROXY_UPSTREAM_PROXY_URL` to a supported
+proxy URL, such as `socks5://USER:PASSWORD@HOST:PORT`. Do not commit this value.
+The deployment workflow saves and validates `requests.proxy-url` before starting
+the service. The value travels over SSH stdin, stays out of command arguments
+and logs, and is saved in the owner-only runtime configuration. If the secret is
+absent, deployment preserves the existing proxy setting.
+
+The configuration utility rejects conflicting per-key or OAuth proxy overrides
+and invalid configuration before replacing the file. It preserves unrelated
+settings and comments, uses the deployment lock, and installs the validated file
+atomically. A failure stops deployment before service startup. This configures
+the global default; execution-scoped proxy overrides retain their existing
+precedence.
+
 ## Authorize CI in Tailscale
 
 Create a [federated workload identity](https://tailscale.com/docs/integrations/github/github-action)
