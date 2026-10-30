@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -56,11 +57,10 @@ func TestServiceObservations(t *testing.T) {
 	if calls != 2 || string(failed.Body) != `{"remaining":42}` || !failed.Stale || failed.Status != 429 || !failed.ObservedAt.Equal(first.ObservedAt) {
 		t.Fatalf("failure erased a successful observation: %+v, calls %d", failed, calls)
 	}
-	req.Force = true
 	now = now.Add(10*time.Minute - time.Second)
 	observe(req)
 	if calls != 2 {
-		t.Fatal("manual refresh bypassed Retry-After")
+		t.Fatal("automatic refresh bypassed Retry-After")
 	}
 	now = now.Add(time.Second)
 	failing = false
@@ -105,7 +105,6 @@ func TestServiceAuthBackoffLiftsWhenTheTokenRotates(t *testing.T) {
 		t.Fatalf("rejected observation: %+v, calls %d", rejected, calls)
 	}
 	now = now.Add(time.Minute)
-	req.Force = true
 	observe(req)
 	unversioned := req
 	unversioned.Credential = ""
@@ -122,10 +121,71 @@ func TestServiceAuthBackoffLiftsWhenTheTokenRotates(t *testing.T) {
 	now = now.Add(UsageInterval)
 	status = 429
 	observe(req)
-	req.Force, req.Credential = true, "rotated-again"
+	req.Credential = "rotated-again"
 	observe(req)
 	if calls != 3 {
 		t.Fatalf("token rotation bypassed a rate limit: calls %d", calls)
+	}
+}
+
+func TestServiceManualRefreshBypassesErrorBackoff(t *testing.T) {
+	now := time.Date(2026, 10, 30, 10, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name    string
+		failure error
+		status  int
+	}{
+		{name: "transport failure", failure: errors.New("connection reset"), status: http.StatusBadGateway},
+		{name: "upstream 502", failure: &FetchError{Status: http.StatusBadGateway}, status: http.StatusBadGateway},
+		{name: "rejected token", failure: &FetchError{Status: http.StatusUnauthorized}, status: http.StatusUnauthorized},
+		{name: "forbidden", failure: &FetchError{Status: http.StatusForbidden}, status: http.StatusForbidden},
+		{name: "provider Retry-After", failure: &FetchError{Status: http.StatusTooManyRequests, RetryAt: now.Add(time.Hour)}, status: http.StatusTooManyRequests},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service, errNew := New(nil, func() time.Time { return now })
+			if errNew != nil {
+				t.Fatal(errNew)
+			}
+			t.Cleanup(service.Close)
+			calls := 0
+			req := Request{
+				Identity: Identity{AuthID: "a", Fingerprint: "account-a"}, Resource: "usage", Interval: UsageInterval, Credential: "same-token",
+				Fetch: func(context.Context) (json.RawMessage, error) {
+					calls++
+					if calls == 1 {
+						return nil, test.failure
+					}
+					return json.RawMessage(`{"remaining":42}`), nil
+				},
+			}
+			observe := func(request Request) Snapshot {
+				t.Helper()
+				result, errObserve := service.Observe(t.Context(), request)
+				if errObserve != nil {
+					t.Fatal(errObserve)
+				}
+				return result
+			}
+			failed := observe(req)
+			if calls != 1 || failed.Status != test.status || !failed.RetryAt.After(now) {
+				t.Fatalf("failed observation did not enter backoff: %+v, calls %d", failed, calls)
+			}
+			observe(req)
+			if calls != 1 {
+				t.Fatal("automatic refresh bypassed backoff")
+			}
+			cached := req
+			cached.CachedOnly, cached.Force = true, true
+			observe(cached)
+			if calls != 1 {
+				t.Fatal("cached-only read contacted the provider")
+			}
+			req.Force = true
+			recovered := observe(req)
+			if calls != 2 || string(recovered.Body) != `{"remaining":42}` || recovered.Status != 0 || recovered.Stale || !recovered.RetryAt.IsZero() || recovered.RejectedCredential != "" {
+				t.Fatalf("manual refresh did not bypass backoff and recover: %+v, calls %d", recovered, calls)
+			}
+		})
 	}
 }
 
