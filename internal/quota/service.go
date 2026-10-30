@@ -62,7 +62,8 @@ type Request struct {
 	Resource   string
 	Interval   time.Duration
 	CachedOnly bool
-	Force      bool
+	// Force bypasses freshness and retry backoff for explicit manual refreshes.
+	Force bool
 	// Credential is a non-secret version of the token Fetch will send; it
 	// changes when the token is refreshed. Empty disables rotation checks.
 	Credential string
@@ -145,7 +146,7 @@ func (s *Service) Observe(ctx context.Context, req Request) (Snapshot, error) {
 	}
 	result := s.snapshotLocked(key, req.Interval)
 	backoff := s.now().Before(result.RetryAt) && !result.rotatedSince(req.Credential)
-	if req.CachedOnly || (!req.Force && !result.Stale) || backoff {
+	if req.CachedOnly || (!req.Force && (!result.Stale || backoff)) {
 		s.mu.Unlock()
 		if changed {
 			s.save()
