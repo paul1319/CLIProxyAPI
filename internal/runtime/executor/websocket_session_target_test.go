@@ -232,9 +232,10 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 			upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
 			var connections atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Number the connection before Upgrade writes the 101 response;
-				// otherwise the client can dial the next connection before this
-				// handler counts, and the numbers no longer follow dial order.
+				// Numbered before Upgrade: the client dials the next connection only
+				// after this handshake completed, so numbers follow dial order.
+				// Counted after Upgrade, a slow handler could be overtaken by the
+				// next connection's and the two would swap roles.
 				connection := connections.Add(1)
 				conn, errUpgrade := upgrader.Upgrade(w, r, nil)
 				if errUpgrade != nil {
