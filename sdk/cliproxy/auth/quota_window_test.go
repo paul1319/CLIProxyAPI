@@ -2,13 +2,13 @@ package auth
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/MoeForge/moego/base64"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 )
 

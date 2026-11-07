@@ -70,6 +70,7 @@ type Handler struct {
 	quotaPollInFlight       map[string]struct{}
 	siwcOAuthFactory        func(*config.Config) siwcOAuthService
 	siwcCommitMu            sync.Mutex
+	pluginLoginSaveMu       sync.Mutex
 }
 
 type configReloadSnapshot struct {
