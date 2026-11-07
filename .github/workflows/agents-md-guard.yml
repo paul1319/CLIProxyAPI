@@ -16,8 +16,41 @@ jobs:
   close-when-agents-md-changed:
     runs-on: ubuntu-latest
     steps:
+      # In a fork, an AGENTS.md that is identical to the upstream commit merged
+      # into the PR arrived with an upstream sync and is not a change made by the
+      # fork. pull_request_target runs this workflow from the base branch; these
+      # steps only read git objects of the PR head and never run its code.
+      - name: Check out base branch
+        if: github.repository != 'router-for-me/CLIProxyAPI'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: List AGENTS.md files that match upstream
+        id: upstream
+        if: github.repository != 'router-for-me/CLIProxyAPI'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          UPSTREAM_REPO: router-for-me/CLIProxyAPI
+        run: |
+          git fetch --quiet --no-tags origin "$HEAD_SHA"
+          git fetch --quiet --no-tags "https://github.com/$UPSTREAM_REPO.git" main
+          upstream_base=$(git merge-base "$HEAD_SHA" FETCH_HEAD)
+          matched=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" | { grep -E '(^|/)AGENTS\.md$' || true; } | while IFS= read -r file; do
+            if git diff --quiet "$upstream_base" "$HEAD_SHA" -- "$file"; then
+              printf '%s\n' "$file"
+            fi
+          done)
+          {
+            echo "matched<<MATCHED_EOF"
+            printf '%s\n' "$matched"
+            echo "MATCHED_EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Detect AGENTS.md changes and close PR
         uses: actions/github-script@v7
+        env:
+          UPSTREAM_MATCHED: ${{ steps.upstream.outputs.matched }}
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -34,9 +67,22 @@ jobs:
               typeof path === "string" &&
               (path === "AGENTS.md" || path.endsWith("/AGENTS.md"));
 
-            const touched = files.filter(
-              (f) => touchesAgentsMd(f.filename) || touchesAgentsMd(f.previous_filename),
+            const fromUpstream = new Set(
+              (process.env.UPSTREAM_MATCHED || "").split("\n").filter(Boolean),
             );
+            const isUpstreamSync = (f) =>
+              [f.filename, f.previous_filename]
+                .filter(touchesAgentsMd)
+                .every((path) => fromUpstream.has(path));
+
+            const touched = files.filter(
+              (f) =>
+                (touchesAgentsMd(f.filename) || touchesAgentsMd(f.previous_filename)) &&
+                !isUpstreamSync(f),
+            );
+            if (fromUpstream.size > 0) {
+              core.info(`AGENTS.md files matching upstream: ${[...fromUpstream].join(", ")}`);
+            }
 
             if (touched.length === 0) {
               core.info("No AGENTS.md changes detected.");
