@@ -655,6 +655,11 @@ func resolveAntigravityRequestBaseURL(auth *cliproxyauth.Auth) string {
 	return antigravityBaseURLDaily
 }
 
+// AntigravityRequestBaseURL returns the Cloud Code base URL used for requests made with auth.
+func AntigravityRequestBaseURL(auth *cliproxyauth.Auth) string {
+	return resolveAntigravityRequestBaseURL(auth)
+}
+
 func antigravityLoadCodeAssistBaseURL(auth *cliproxyauth.Auth) string {
 	return resolveAntigravityRequestBaseURL(auth)
 }
@@ -823,4 +828,10 @@ func generateStableSessionIDFromContents(contents ojson.Result) string {
 		return stableID
 	}
 	return generateSessionID()
+}
+
+// AntigravityStatusError classifies an upstream Cloud Code error response the same way
+// the executor does (retry delay, TOS violation), so callers can feed it to MarkResult.
+func AntigravityStatusError(statusCode int, body []byte) error {
+	return newAntigravityStatusErr(statusCode, body)
 }

@@ -54,6 +54,10 @@ type Server struct {
 	// muxHTTPListener receives HTTP connections selected by the multiplexer.
 	muxHTTPListener *muxListener
 
+	// antigravityCloudCodeCooldowns holds per-model credential cooldowns for the
+	// Antigravity Cloud Code passthrough.
+	antigravityCloudCodeCooldowns antigravityCloudCodeCooldowns
+
 	// handlers contains the API handlers for processing requests.
 	handlers         *handlers.BaseAPIHandler
 	codexLiveHandler *codexlive.Handler
@@ -198,6 +202,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 
 	// Add middleware
+	// Must precede logging: it masks the API key embedded in Antigravity Cloud Code paths.
+	engine.Use(antigravityCloudCodeKeyMiddleware())
 	engine.Use(logging.GinLogrusLogger())
 	engine.Use(logging.CPATraceIDMiddleware())
 	engine.Use(s.maxRequestBodyBytesMiddleware())
