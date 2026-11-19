@@ -54,6 +54,10 @@ type Server struct {
 	// muxHTTPListener receives HTTP connections selected by the multiplexer.
 	muxHTTPListener *muxListener
 
+	// antigravityCloudCodeCooldowns holds per-model credential cooldowns for the
+	// Antigravity Cloud Code passthrough.
+	antigravityCloudCodeCooldowns antigravityCloudCodeCooldowns
+
 	// handlers contains the API handlers for processing requests.
 	handlers         *handlers.BaseAPIHandler
 	codexLiveHandler *codexlive.Handler

@@ -230,3 +230,17 @@ rest of each `v1internal:*` call, including the client User-Agent, is forwarded
 unchanged. The key in the path is masked in proxy logs. Keep the provider
 signed in as usual; its own Google token is replaced by the proxy and never
 sent upstream.
+
+With several Antigravity accounts, a call that fails before any response byte
+is sent is retried on the next account (up to `routing.retry.max-retry-credentials`, if set):
+
+- `429` cools that account for the request's model only, for the upstream
+  retry delay (one minute if none is given); other models keep using it.
+- `401`/`402`/`403` are reported to the pool, which cools or disables the
+  whole account for every client, as for regular proxy traffic.
+- `503` and transport errors switch accounts without cooling.
+
+When every account fails, the client receives the last upstream error.
+Per-model cooldowns are held in memory and reset on restart. Add accounts as
+usual (`--antigravity-login` or the control panel); they join the rotation
+without a restart.

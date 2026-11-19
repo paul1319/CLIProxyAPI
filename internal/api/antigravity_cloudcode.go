@@ -2,10 +2,13 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
@@ -13,6 +16,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
 )
@@ -65,14 +69,18 @@ func (s *Server) antigravityCloudCodeEnabledMiddleware() gin.HandlerFunc {
 	}
 }
 
-// writeAntigravityCloudCodeError writes a Google API style error, which is what
+// antigravityCloudCodeErrorBody builds a Google API style error, which is what
 // Antigravity clients parse.
+func antigravityCloudCodeErrorBody(status int, message string) []byte {
+	doc := ojson.NewDoc([]byte(`{"error":{}}`))
+	_ = doc.Set("error.code", status)
+	_ = doc.Set("error.message", message)
+	_ = doc.Set("error.status", strings.ToUpper(strings.ReplaceAll(http.StatusText(status), " ", "_")))
+	return doc.Bytes()
+}
+
 func writeAntigravityCloudCodeError(c *gin.Context, status int, message string) {
-	c.JSON(status, gin.H{"error": gin.H{
-		"code":    status,
-		"message": message,
-		"status":  strings.ToUpper(strings.ReplaceAll(http.StatusText(status), " ", "_")),
-	}})
+	c.Data(status, "application/json", antigravityCloudCodeErrorBody(status, message))
 }
 
 // rewriteAntigravityCloudCodeProject points the request at the selected credential's
@@ -94,8 +102,112 @@ func rewriteAntigravityCloudCodeProject(body []byte, projectID string) []byte {
 	return doc.Bytes()
 }
 
-// handleAntigravityCloudCode forwards one Cloud Code v1internal call verbatim through
-// a pooled Antigravity credential and streams the upstream response back.
+// antigravityCloudCodeFailure is an upstream error response kept so it can be returned
+// to the client when every credential failed.
+type antigravityCloudCodeFailure struct {
+	status      int
+	contentType string
+	body        []byte
+}
+
+func (f *antigravityCloudCodeFailure) write(c *gin.Context) {
+	if f.contentType != "" {
+		c.Header("Content-Type", f.contentType)
+	}
+	c.Status(f.status)
+	if len(f.body) > 0 {
+		_, _ = c.Writer.Write(f.body)
+	}
+}
+
+// antigravityCloudCodeSwitchStatus reports upstream statuses that are specific to the
+// credential (auth, quota, capacity) and worth retrying with another account.
+func antigravityCloudCodeSwitchStatus(status int) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden,
+		http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return true
+	}
+	return false
+}
+
+// antigravityCloudCodeDefaultCooldown applies when a quota error carries no retry delay.
+const antigravityCloudCodeDefaultCooldown = time.Minute
+
+// antigravityCloudCodeCooldowns tracks which credentials are cooling down for which
+// client model. Cloud Code quotas are per model, and native clients use model names
+// (e.g. MODEL_PLACEHOLDER_M400) that the pool's registry does not know, so these
+// cooldowns are kept here instead of in the pool's model states, where an unknown
+// model's cooldown would block the credential for every other model.
+type antigravityCloudCodeCooldowns struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+func antigravityCloudCodeCooldownKey(authID, model string) string {
+	return authID + "\x00" + strings.ToLower(model)
+}
+
+func (c *antigravityCloudCodeCooldowns) set(authID, model string, until time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.until == nil {
+		c.until = make(map[string]time.Time)
+	}
+	c.until[antigravityCloudCodeCooldownKey(authID, model)] = until
+}
+
+func (c *antigravityCloudCodeCooldowns) active(authID, model string, now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := antigravityCloudCodeCooldownKey(authID, model)
+	until, ok := c.until[key]
+	if !ok {
+		return false
+	}
+	if !until.After(now) {
+		delete(c.until, key)
+		return false
+	}
+	return true
+}
+
+func (c *antigravityCloudCodeCooldowns) clear(authID, model string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.until, antigravityCloudCodeCooldownKey(authID, model))
+}
+
+// selectAntigravityCloudCodeAuth picks the next untried Antigravity credential that is
+// not cooling down for model. Skipped credentials are added to tried; when only cooling
+// credentials remain, the error is a 429 so the client backs off.
+func (s *Server) selectAntigravityCloudCodeAuth(ctx context.Context, model string, tried map[string]struct{}) (*auth.Auth, error) {
+	manager := s.handlers.AuthManager
+	skippedCooling := false
+	for {
+		selected, errSelect := manager.SelectAuthExcluding(ctx, "antigravity", "", coreexecutor.Options{}, tried)
+		if errSelect != nil {
+			if skippedCooling {
+				return nil, &auth.Error{
+					Code:       "model_cooldown",
+					Message:    "all Antigravity credentials are cooling down for model " + model,
+					HTTPStatus: http.StatusTooManyRequests,
+				}
+			}
+			return nil, errSelect
+		}
+		if !s.antigravityCloudCodeCooldowns.active(selected.ID, model, time.Now()) {
+			return selected, nil
+		}
+		skippedCooling = true
+		tried[selected.ID] = struct{}{}
+	}
+}
+
+// handleAntigravityCloudCode forwards one Cloud Code v1internal call through a pooled
+// Antigravity credential and streams the upstream response back. Credential-specific
+// failures (auth, quota, capacity) are retried with the next credential before any
+// byte reaches the client; the client only sees the last failure when all of them fail.
 func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 	method := strings.TrimPrefix(c.Param("method"), "/")
 	if !strings.HasPrefix(method, antigravityCloudCodeMethodPrefix) || strings.Contains(method, "/") {
@@ -108,13 +220,44 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 		writeAntigravityCloudCodeError(c, clienterror.HTTPStatusFromErrorOr(errRead, http.StatusBadRequest), "failed to read request body")
 		return
 	}
+	model := strings.TrimSpace(ojson.GetBytesNoCopy(body, "model").String())
 
 	manager := s.handlers.AuthManager
-	selected, errSelect := manager.SelectAuth(ctx, "antigravity", "", coreexecutor.Options{})
-	if errSelect != nil {
-		writeAntigravityCloudCodeError(c, clienterror.HTTPStatusFromErrorOr(errSelect, http.StatusServiceUnavailable), "no Antigravity credential available: "+errSelect.Error())
+	maxAttempts := manager.MaxRetryCredentials()
+	tried := make(map[string]struct{})
+	var lastFailure *antigravityCloudCodeFailure
+	for attempt := 0; maxAttempts <= 0 || attempt < maxAttempts; attempt++ {
+		selected, errSelect := s.selectAntigravityCloudCodeAuth(ctx, model, tried)
+		if errSelect != nil {
+			if lastFailure != nil {
+				lastFailure.write(c)
+				return
+			}
+			writeAntigravityCloudCodeError(c, clienterror.HTTPStatusFromErrorOr(errSelect, http.StatusServiceUnavailable), errSelect.Error())
+			return
+		}
+		tried[selected.ID] = struct{}{}
+		if s.forwardAntigravityCloudCode(c, selected, method, model, body, &lastFailure) {
+			return
+		}
+		if ctx.Err() != nil {
+			return
+		}
+	}
+	if lastFailure != nil {
+		lastFailure.write(c)
 		return
 	}
+	writeAntigravityCloudCodeError(c, http.StatusServiceUnavailable, "no Antigravity credential available")
+}
+
+// forwardAntigravityCloudCode sends the call with one credential. It returns true when
+// the response was written to the client, or false (recording lastFailure) when the
+// caller should retry with another credential.
+func (s *Server) forwardAntigravityCloudCode(c *gin.Context, selected *auth.Auth, method, model string, body []byte, lastFailure **antigravityCloudCodeFailure) bool {
+	ctx := c.Request.Context()
+	manager := s.handlers.AuthManager
+	cfg := s.getConfig()
 	logging.SetGinCPATraceID(c, selected.EnsureIndex())
 
 	projectID, _ := selected.Metadata["project_id"].(string)
@@ -127,7 +270,7 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 	req, errRequest := http.NewRequestWithContext(ctx, c.Request.Method, upstreamURL, bytes.NewReader(body))
 	if errRequest != nil {
 		writeAntigravityCloudCodeError(c, http.StatusBadRequest, "invalid request")
-		return
+		return true
 	}
 	for _, name := range []string{"Content-Type", "User-Agent"} {
 		if value := strings.TrimSpace(c.GetHeader(name)); value != "" {
@@ -135,7 +278,6 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 		}
 	}
 
-	cfg := s.getConfig()
 	authType, authValue := selected.AccountInfo()
 	helps.RecordAPIRequest(ctx, cfg, helps.UpstreamRequestLog{
 		URL:       upstreamURL,
@@ -151,8 +293,18 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 	resp, errDo := manager.HttpRequest(ctx, selected, req)
 	if errDo != nil {
 		helps.RecordAPIResponseError(ctx, cfg, errDo)
-		writeAntigravityCloudCodeError(c, clienterror.HTTPStatusFromErrorOr(errDo, http.StatusBadGateway), errDo.Error())
-		return
+		if ctx.Err() != nil {
+			return true
+		}
+		// Transport failures are not the credential's fault: try the next one without
+		// cooling this one down.
+		log.WithFields(log.Fields{"method": method, "auth": selected.ID}).Warnf("antigravity cloudcode: upstream request failed: %v", errDo)
+		*lastFailure = &antigravityCloudCodeFailure{
+			status:      clienterror.HTTPStatusFromErrorOr(errDo, http.StatusBadGateway),
+			contentType: "application/json",
+			body:        antigravityCloudCodeErrorBody(clienterror.HTTPStatusFromErrorOr(errDo, http.StatusBadGateway), errDo.Error()),
+		}
+		return false
 	}
 	defer func() {
 		if errClose := resp.Body.Close(); errClose != nil {
@@ -160,8 +312,23 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 		}
 	}()
 	helps.RecordAPIResponseMetadata(ctx, cfg, resp.StatusCode, resp.Header.Clone())
+
+	if antigravityCloudCodeSwitchStatus(resp.StatusCode) {
+		errBody, errReadBody := io.ReadAll(resp.Body)
+		helps.AppendAPIResponseChunk(ctx, cfg, errBody)
+		if errReadBody != nil {
+			helps.RecordAPIResponseError(ctx, cfg, errReadBody)
+		}
+		s.coolAntigravityCloudCodeAuth(ctx, selected, model, resp.StatusCode, errBody)
+		log.WithFields(log.Fields{"method": method, "model": model, "status": resp.StatusCode, "auth": selected.ID}).Warn("antigravity cloudcode: credential failed, switching account")
+		*lastFailure = &antigravityCloudCodeFailure{status: resp.StatusCode, contentType: resp.Header.Get("Content-Type"), body: errBody}
+		return false
+	}
+
 	if resp.StatusCode >= http.StatusBadRequest {
 		log.WithFields(log.Fields{"method": method, "status": resp.StatusCode, "auth": selected.ID}).Warn("antigravity cloudcode: upstream request failed")
+	} else if model != "" {
+		s.antigravityCloudCodeCooldowns.clear(selected.ID, model)
 	}
 
 	if contentType := resp.Header.Get("Content-Type"); contentType != "" {
@@ -169,6 +336,37 @@ func (s *Server) handleAntigravityCloudCode(c *gin.Context) {
 	}
 	c.Status(resp.StatusCode)
 	streamAntigravityCloudCodeBody(c, resp.Body, func(chunk []byte) { helps.AppendAPIResponseChunk(ctx, cfg, chunk) })
+	return true
+}
+
+// coolAntigravityCloudCodeAuth takes a failed credential out of rotation. Quota errors
+// cool only the client model, honoring the upstream retry delay; auth and permission
+// errors are reported to the pool, which cools or disables the whole credential for
+// every client. Capacity errors (503) are usually global, so they only switch.
+func (s *Server) coolAntigravityCloudCodeAuth(ctx context.Context, selected *auth.Auth, model string, status int, body []byte) {
+	if status == http.StatusServiceUnavailable {
+		return
+	}
+	upstreamErr := executor.AntigravityStatusError(status, body)
+	if status == http.StatusTooManyRequests {
+		cooldown := antigravityCloudCodeDefaultCooldown
+		var retryAfter interface{ RetryAfter() *time.Duration }
+		if errors.As(upstreamErr, &retryAfter) {
+			if delay := retryAfter.RetryAfter(); delay != nil && *delay > 0 {
+				cooldown = *delay
+			}
+		}
+		s.antigravityCloudCodeCooldowns.set(selected.ID, model, time.Now().Add(cooldown))
+		return
+	}
+	result := auth.Result{
+		AuthID:          selected.ID,
+		Provider:        "antigravity",
+		Success:         false,
+		CredentialScope: true,
+		Error:           auth.ResultErrorFromError(upstreamErr),
+	}
+	s.handlers.AuthManager.MarkResult(ctx, result)
 }
 
 // streamAntigravityCloudCodeBody copies the upstream body and flushes after every read

@@ -829,3 +829,9 @@ func generateStableSessionIDFromContents(contents ojson.Result) string {
 	}
 	return generateSessionID()
 }
+
+// AntigravityStatusError classifies an upstream Cloud Code error response the same way
+// the executor does (retry delay, TOS violation), so callers can feed it to MarkResult.
+func AntigravityStatusError(statusCode int, body []byte) error {
+	return newAntigravityStatusErr(statusCode, body)
+}
