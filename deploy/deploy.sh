@@ -19,7 +19,7 @@ release_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 release=${release_dir##*/}
 [[ "$release" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || die "Invalid release directory"
 [[ "$release_dir" == "$deploy_dir/releases/$release" ]] || die "Install the bundle under DEPLOY_DIR/releases/RELEASE first"
-[[ -f "$deploy_dir/config/config.yaml" ]] || die "Run deploy/bootstrap.py on the Mac first"
+[[ -f "$deploy_dir/config/config.yaml" ]] || die "Run deploy/bootstrap.py on the server first"
 # Existing releases predate the quota snapshot volume; add it without touching credentials.
 mkdir -p "$deploy_dir/state"
 chmod 700 "$deploy_dir/state"
@@ -126,7 +126,7 @@ elif [[ "$mode" != --local-image ]]; then
   docker pull "$image"
 fi
 architecture=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")
-[[ "$architecture" == linux/arm64 ]] || die "Expected linux/arm64, received $architecture"
+[[ "$architecture" == linux/amd64 ]] || die "Expected linux/amd64, received $architecture"
 expected_image=$(docker image inspect --format '{{.Id}}' "$image")
 
 # Pull and validate before replacing anything. Both update and rollback use cached images.

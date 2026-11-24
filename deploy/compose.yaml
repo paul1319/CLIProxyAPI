@@ -1,7 +1,7 @@
 services:
   proxy:
     image: ${CLI_PROXY_IMAGE:?Set CLI_PROXY_IMAGE to an immutable image reference}
-    platform: linux/arm64
+    platform: linux/amd64
     init: true
     restart: unless-stopped
     command: ["./CLIProxyAPI", "--config", "/config/config.yaml"]

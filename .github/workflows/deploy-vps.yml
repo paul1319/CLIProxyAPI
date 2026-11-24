@@ -1,4 +1,4 @@
-name: deploy-mac
+name: deploy-vps
 
 on:
   push:
@@ -9,13 +9,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-mac
+  group: deploy-vps
   cancel-in-progress: false
 
 jobs:
   publish:
     if: github.repository == 'paul1319/CLIProxyAPI' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -46,12 +46,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish ARM64 image
+      - name: Build and publish AMD64 image
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ghcr.io/paul1319/cliproxyapi:sha-${{ github.sha }}
           labels: |
@@ -95,8 +95,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build configuration utility for the Mac
-        run: GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o deploy/configure-proxy-bin ./deploy/configure-proxy
+      - name: Build configuration utility for Linux AMD64
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o deploy/configure-proxy-bin ./deploy/configure-proxy
       - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4
         with:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
@@ -133,4 +133,4 @@ jobs:
           set -euo pipefail
           printf '%s' "$GHCR_TOKEN" | bash deploy/ssh-confirm.sh \
             "Deployed $IMAGE (bundle $RELEASE); HTTP health check passed." "$DEPLOY_USER@$DEPLOY_HOST" \
-            "PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin /bin/bash \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE/deploy.sh\" '$IMAGE' --registry-token-stdin '$REGISTRY_USER'"
+            "PATH=/usr/local/bin:/usr/bin:/bin /bin/bash \"\$HOME/.local/share/cliproxyapi/releases/$RELEASE/deploy.sh\" '$IMAGE' --registry-token-stdin '$REGISTRY_USER'"
