@@ -38,7 +38,7 @@ if args[0] == "login":
     sys.exit(0)
 if args[0] == "pull": sys.exit(1 if scenario == "pull-fails" else 0)
 if args[:2] == ["image", "inspect"]:
-    print(("linux/amd64" if scenario == "wrong-arch" else "linux/arm64") if "Architecture" in args[3] else "sha256:new")
+    print(("linux/arm64" if scenario == "wrong-arch" else "linux/amd64") if "Architecture" in args[3] else "sha256:new")
     sys.exit(0)
 if args[0] == "inspect":
     print("true " + state["image"] if "State.Running" in args[2] else state["image"])

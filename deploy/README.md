@@ -1,23 +1,23 @@
-# Docker deployment on the Mac
+# Docker deployment on Linux VPS (AMD64)
 
-The `deploy-mac` workflow tests `main`, builds a native `linux/arm64` image in
+The `deploy-vps` workflow tests `main`, builds a native `linux/amd64` image in
 GitHub Actions, and publishes `ghcr.io/paul1319/cliproxyapi:sha-COMMIT`. Deployment
 uses the immutable registry digest. Pull requests never run deployment jobs.
 The upstream-only automatic PR retargeting to `dev` is disabled in forks; this
 fork deploys `main` and has no `dev` branch.
-Docker Desktop must remain running in the Mac's logged-in user session. Configure
-its login startup and the Mac's power settings separately.
+Docker Engine must be installed and accessible to the deploy user (member of the
+`docker` group).
 
 CI runs the Go suite except `TestAdvertiserAndBrowser_Integration`, which requires
-live LAN multicast and fails on this Mac even before deployment changes. The
-application's LAN discovery is disabled in the generated runtime configuration.
+live LAN multicast. The application's LAN discovery is disabled in the generated
+runtime configuration.
 
-## Initialize the Mac once
+## Initialize the VPS once
 
 Build and start the checked-out version:
 
 ```bash
-docker build --platform linux/arm64 -t cliproxyapi:bootstrap .
+docker build --platform linux/amd64 -t cliproxyapi:bootstrap .
 python3 deploy/bootstrap.py --image cliproxyapi:bootstrap
 ```
 
@@ -51,10 +51,10 @@ connect provider accounts. Initial startup has no upstream accounts.
 Publish to the tailnet on an unused HTTPS port, preserving existing Serve routes:
 
 ```bash
-/opt/homebrew/bin/tailscale serve --bg --https=8443 http://127.0.0.1:8317
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:8317
 ```
 
-The URL is `https://YOUR-MAC.YOUR-TAILNET.ts.net:8443/v1`. Funnel is not used.
+The URL is `https://YOUR-VPS.YOUR-TAILNET.ts.net:8443/v1`. Funnel is not used.
 The host port binds only to loopback. Management allows remote callers because
 Docker forwards host requests through its gateway; the management password still
 applies, and access is limited by loopback publishing and the tailnet policy.
@@ -101,39 +101,38 @@ Tailscale SSH requires a tagged destination when CI uses a tag identity. A
 tagged CI node cannot SSH to a user-owned destination by naming its owner or IP.
 See the [SSH destination constraints](https://tailscale.com/docs/reference/syntax/policy-file#dst-1).
 
-Review and back up the existing tailnet policy before moving the Mac to
-`tag:cliproxy-mac`. Tagging changes its identity for every service, including
-existing SSH and T3 access. First preserve the owner's required network and SSH
-permissions explicitly, then add the CI grant. Merge entries into the existing
-policy rather than replacing it. This example permits the owner and CI to SSH
-as `pavel`; retain any other already-required owner accounts as well:
+Review and back up the existing tailnet policy before moving the VPS to
+`tag:cliproxy-vps`. Tagging changes its identity for every service, including
+existing SSH and outbound Tailscale routing. First preserve the owner's required
+network and SSH permissions explicitly, then add the CI grant. Merge entries into
+the existing policy rather than replacing it:
 
 ```json
 {
   "tagOwners": {
     "tag:cliproxy-ci": ["autogroup:admin"],
-    "tag:cliproxy-mac": ["autogroup:admin"]
+    "tag:cliproxy-vps": ["autogroup:admin"]
   },
   "grants": [
-    {"src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "ip": ["*"]},
-    {"src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "ip": ["tcp:22"]}
+    {"src": ["autogroup:member", "tag:cliproxy-vps"], "dst": ["*"], "ip": ["*"]},
+    {"src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-vps"], "ip": ["tcp:22"]}
   ],
   "ssh": [
-    {"action": "check", "src": ["REPLACE_WITH_MAC_OWNER_IDENTITY"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]},
-    {"action": "accept", "src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-mac"], "users": ["pavel"]}
+    {"action": "accept", "src": ["REPLACE_WITH_OWNER_IDENTITY"], "dst": ["tag:cliproxy-vps"], "users": ["YOUR_DEPLOY_USER"]},
+    {"action": "accept", "src": ["tag:cliproxy-ci"], "dst": ["tag:cliproxy-vps"], "users": ["YOUR_DEPLOY_USER"]}
   ]
 }
 ```
 
 Check existing grants and SSH rules for broader access: a pre-existing wildcard
 source can grant CI additional network access. Preserve other devices' required
-permissions when narrowing such rules, including the server Mac's existing
-outbound tailnet access. Preserve existing owner SSH check-mode requirements.
-After policy validation, assign
-`tag:cliproxy-mac` only to the server Mac, preserving any existing tags. Verify
-the owner's SSH and T3 access from another device before enabling deployment.
-CI SSH runs as the Docker Desktop owner, `pavel`, so trusted `main` code has that
-user's machine access. Protect who can write to `main`.
+permissions when narrowing such rules, including the VPS's existing outbound
+tailnet access. After policy validation, assign `tag:cliproxy-vps` only to the
+deploy VPS, preserving any existing tags, and enable Tailscale SSH on it
+(`sudo tailscale set --ssh=true`). Verify owner SSH and service access from
+another device before enabling deployment. CI SSH runs as `YOUR_DEPLOY_USER`,
+so trusted `main` code has that user's machine access. Protect who can write to
+`main`.
 
 Configure repository **Actions variables** (not secrets; no long-lived Tailscale
 secret is needed):
@@ -142,24 +141,22 @@ secret is needed):
 | --- | --- |
 | `TS_CLIENT_ID` | Federated identity client ID |
 | `TS_AUDIENCE` | Federated identity audience |
-| `CLI_PROXY_DEPLOY_HOST` | Mac's MagicDNS name |
-| `CLI_PROXY_DEPLOY_USER` | `pavel` |
+| `CLI_PROXY_DEPLOY_HOST` | VPS's MagicDNS name |
+| `CLI_PROXY_DEPLOY_USER` | Linux deploy user (in `docker` group) |
 | `CLI_PROXY_DEPLOY_ENABLED` | `true`, after bootstrap and policy setup |
 
 The deploy job passes its temporary, read-only GitHub package token over SSH
-stdin. The Mac uses a disposable Docker credential directory, retains the
-Desktop socket, and deletes the credentials after the operation. Images can
+stdin. The VPS uses a disposable Docker credential directory, retains the host
+Docker socket, and deletes the credentials after the operation. Images can
 remain private in GHCR. The Docker image source label links the package to the
 repository for Actions package permissions.
 
-The temporary Docker configuration explicitly uses file credentials so headless
-SSH does not invoke the macOS Keychain helper. CI also requires an exact completion
-receipt from each remote operation: macOS `login` can return zero even when the
-child command fails. Deployment emits its receipt only after image and HTTP
-health verification, a successful deployment-state write, and credential cleanup.
+CI requires an exact completion receipt from each remote operation. Deployment
+emits its receipt only after image and HTTP health verification, a successful
+deployment-state write, and credential cleanup.
 
 Until `CLI_PROXY_DEPLOY_ENABLED=true`, CI tests and publishes images while the
-deploy job is explicitly skipped. Run `deploy-mac` manually on `main` to verify
+deploy job is explicitly skipped. Run `deploy-vps` manually on `main` to verify
 the full path after enabling it. Test access from another tailnet device too;
 local health alone does not prove that path.
 

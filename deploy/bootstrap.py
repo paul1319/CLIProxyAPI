@@ -14,7 +14,7 @@ import subprocess
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=Path.home() / ".local/share/cliproxyapi")
-    parser.add_argument("--image", help="Start an already-built local linux/arm64 image")
+    parser.add_argument("--image", help="Start an already-built local linux/amd64 image")
     args = parser.parse_args()
     os.umask(0o077)
     runtime = args.directory.expanduser().resolve()
