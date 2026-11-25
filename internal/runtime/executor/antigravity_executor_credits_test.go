@@ -767,11 +767,7 @@ func TestMaybeRefreshAntigravityCreditsHint_RefreshesExpiredHintAndRecoversCredi
 	})
 
 	exec.maybeRefreshAntigravityCreditsHint(ctx, auth, "token")
-	if value, ok := antigravityCreditsHintRefreshByID.Load(auth.ID); ok {
-		if state, ok := value.(*antigravityCreditsHintRefreshState); ok && state != nil {
-			waitForAntigravityCreditsRefresh(t, state)
-		}
-	}
+	waitForAntigravityCreditsRefreshByAuthID(t, auth.ID)
 
 	if loadCodeAssistCalls != 1 {
 		t.Fatalf("loadCodeAssist calls for expired hint = %d, want 1", loadCodeAssistCalls)
@@ -915,11 +911,7 @@ func TestAntigravityManagerExecuteAndStream_ToppedUpCreditsRecoverDuringQuotaCoo
 					t.Fatal("initial Execute() succeeded, want 429 after quota and credits exhaustion")
 				}
 			}
-			if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-				if state, ok := value.(*antigravityCreditsHintRefreshState); ok && state != nil {
-					waitForAntigravityCreditsRefresh(t, state)
-				}
-			}
+			waitForAntigravityCreditsRefreshByAuthID(t, authID)
 			if _, failed := antigravityCreditsFailureByAuth.Load(newAntigravityCreditsCacheKey(authID, cliproxyauth.AntigravityCreditsScope(registered))); !failed {
 				t.Fatal("expected auth to be marked permanently disabled after INSUFFICIENT_G1_CREDITS_BALANCE")
 			}
@@ -931,13 +923,11 @@ func TestAntigravityManagerExecuteAndStream_ToppedUpCreditsRecoverDuringQuotaCoo
 			// Step 2: Top up credits and expire the cached hint/throttle window while model remains in 1h quota cooldown.
 			toppedUp.Store(true)
 			callsBeforeTopUp := loadCodeAssistCalls.Load()
-			if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-				if state, ok := value.(*antigravityCreditsHintRefreshState); ok && state != nil {
-					state.mu.Lock()
-					state.lastAttempt = time.Now().Add(-antigravityCreditsHintRefreshInterval - time.Second)
-					state.mu.Unlock()
-				}
-			}
+			forEachAntigravityCreditsRefreshState(authID, func(state *antigravityCreditsHintRefreshState) {
+				state.mu.Lock()
+				state.lastAttempt = time.Now().Add(-antigravityCreditsHintRefreshInterval - time.Second)
+				state.mu.Unlock()
+			})
 			cliproxyauth.SetAntigravityCreditsHint(authID, cliproxyauth.AntigravityCreditsHint{
 				Known:           true,
 				Available:       false,
@@ -972,11 +962,7 @@ func TestAntigravityManagerExecuteAndStream_ToppedUpCreditsRecoverDuringQuotaCoo
 				}
 			}
 
-			if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-				if state, ok := value.(*antigravityCreditsHintRefreshState); ok && state != nil {
-					waitForAntigravityCreditsRefresh(t, state)
-				}
-			}
+			waitForAntigravityCreditsRefreshByAuthID(t, authID)
 			if loadCodeAssistCalls.Load() <= callsBeforeTopUp {
 				t.Fatalf("loadCodeAssist calls after top-up = %d, want > %d", loadCodeAssistCalls.Load(), callsBeforeTopUp)
 			}

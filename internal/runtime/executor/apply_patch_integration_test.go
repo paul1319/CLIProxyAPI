@@ -198,10 +198,35 @@ func TestApplyPatchActualProviderErrorAndEOF(t *testing.T) {
 					if errExecuteStream != nil {
 						t.Fatal(errExecuteStream)
 					}
+					if provider == "antigravity" && mode == "empty" {
+						// Antigravity rejects empty successful streams before tool parsing (#7990).
+						assertTask6ZeroOutputStream(t, stream.Chunks)
+						return
+					}
 					assertTask6FailedStream(t, stream.Chunks)
 				}
 			})
 		}
+	}
+}
+
+func assertTask6ZeroOutputStream(t *testing.T, chunks <-chan cliproxyexecutor.StreamChunk) {
+	t.Helper()
+	var output []byte
+	errors := 0
+	for chunk := range chunks {
+		output = append(output, chunk.Payload...)
+		if chunk.Err == nil {
+			continue
+		}
+		errors++
+		status, okStatus := chunk.Err.(interface{ StatusCode() int })
+		if !okStatus || status.StatusCode() != http.StatusBadGateway {
+			t.Fatalf("expected 502 zero-output error, got %T %v", chunk.Err, chunk.Err)
+		}
+	}
+	if errors != 1 || bytes.Contains(output, []byte(`"type":"response.completed"`)) || bytes.Contains(output, []byte("[DONE]")) {
+		t.Fatalf("zero-output contract: errors=%d output=%s", errors, output)
 	}
 }
 

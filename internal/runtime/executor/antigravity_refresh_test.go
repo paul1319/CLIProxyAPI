@@ -200,11 +200,31 @@ func TestAntigravityRefresh_DeduplicatesConcurrentRefresh(t *testing.T) {
 	}
 	// Finish optional background work before restoring the test-only transport.
 	for _, auth := range []*cliproxyauth.Auth{authA, authB} {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(auth.ID); ok {
-			state := value.(*antigravityCreditsHintRefreshState)
-			waitForAntigravityCreditsRefresh(t, state)
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, auth.ID)
 	}
+}
+
+// forEachAntigravityCreditsRefreshState visits every refresh state registered for
+// authID. Refresh states are keyed by "authID|scope" when the credential has a
+// scope, so a plain Load(authID) would silently miss them.
+func forEachAntigravityCreditsRefreshState(authID string, fn func(state *antigravityCreditsHintRefreshState)) {
+	antigravityCreditsHintRefreshByID.Range(func(key, value any) bool {
+		text, okKey := key.(string)
+		if !okKey || (text != authID && !strings.HasPrefix(text, authID+"|")) {
+			return true
+		}
+		if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
+			fn(state)
+		}
+		return true
+	})
+}
+
+func waitForAntigravityCreditsRefreshByAuthID(t *testing.T, authID string) {
+	t.Helper()
+	forEachAntigravityCreditsRefreshState(authID, func(state *antigravityCreditsHintRefreshState) {
+		waitForAntigravityCreditsRefresh(t, state)
+	})
 }
 
 func waitForAntigravityCreditsRefresh(t *testing.T, state *antigravityCreditsHintRefreshState) {

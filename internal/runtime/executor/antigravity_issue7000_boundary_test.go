@@ -74,7 +74,7 @@ func TestIssue7000AntigravityAliasesPreserveOtherFieldsAndToolChoice(t *testing.
 					assertIssue7000PromptSchema(t, request.Get(systemKey), issue7000LiteralSchema)
 					for path, want := range map[string]string{
 						"generationConfig.temperature": "0.25", "generation_config.stopSequences.0": "STOP",
-						systemKey + ".parts.0.text": "keep system", "contents.0.parts.0.text": "keep history",
+						"contents.0.parts.0.text":             "keep history",
 						"tools.0.functionDeclarations.0.name": "lookup",
 					} {
 						if got := request.Get(path).String(); got != want {
@@ -87,6 +87,11 @@ func TestIssue7000AntigravityAliasesPreserveOtherFieldsAndToolChoice(t *testing.
 								t.Errorf("native output trigger survived: %s.%s", configKey, key)
 							}
 						}
+					}
+					// System instructions are normalized into a single part, so the
+					// original text must lead the merged schema prompt.
+					if got := request.Get(systemKey + ".parts.0.text").String(); !strings.HasPrefix(got, "keep system") {
+						t.Errorf("%s.parts.0.text = %q, want prefix %q", systemKey, got, "keep system")
 					}
 					wantMode := mode
 					if mode == "ANY" || mode == "VALIDATED" {
