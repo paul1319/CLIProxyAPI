@@ -2128,6 +2128,62 @@ func TestClaudeModelListCloakingConfigHotReload(t *testing.T) {
 	assertModelID(modelID)
 }
 
+func TestClaudeOnlyModelListConfigHotReload(t *testing.T) {
+	modelRegistry := registry.GetGlobalRegistry()
+	clientID := "test-claude-only-model-list-hot-reload"
+	const claudeModelID = "claude-only-model-list-hot-reload"
+	const otherModelID = "gpt-only-model-list-hot-reload"
+	modelRegistry.RegisterClient(clientID, "claude", []*registry.ModelInfo{
+		{ID: claudeModelID, Object: "model", OwnedBy: "test", Type: "claude"},
+		{ID: otherModelID, Object: "model", OwnedBy: "test", Type: "openai"},
+	})
+	t.Cleanup(func() {
+		modelRegistry.UnregisterClient(clientID)
+	})
+
+	server := newTestServer(t)
+	listedIDs := func() map[string]bool {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer test-key")
+		req.Header.Set("Anthropic-Version", "2023-06-01")
+
+		recorder := httptest.NewRecorder()
+		server.engine.ServeHTTP(recorder, req)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+		}
+
+		var response struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if errUnmarshal := json.Unmarshal(recorder.Body.Bytes(), &response); errUnmarshal != nil {
+			t.Fatalf("decode response: %v", errUnmarshal)
+		}
+		ids := make(map[string]bool, len(response.Data))
+		for _, model := range response.Data {
+			ids[model.ID] = true
+		}
+		return ids
+	}
+
+	cloakedOther := claudemodels.EnsureClaudeModelIDPrefix(otherModelID)
+	if ids := listedIDs(); !ids[claudeModelID] || !ids[cloakedOther] {
+		t.Fatalf("default list = %v, want both %q and %q", ids, claudeModelID, cloakedOther)
+	}
+
+	updatedCfg := *server.cfg
+	updatedCfg.SDKConfig = server.cfg.SDKConfig
+	updatedCfg.ClaudeCode.ClaudeOnlyModelList = true
+	server.UpdateClients(&updatedCfg)
+
+	if ids := listedIDs(); !ids[claudeModelID] || ids[cloakedOther] {
+		t.Fatalf("claude-only list = %v, want %q without %q", ids, claudeModelID, cloakedOther)
+	}
+}
+
 func TestModelsWithClientVersionReturnsCodexCatalog(t *testing.T) {
 	modelRegistry := registry.GetGlobalRegistry()
 	clientID := "test-client-version-catalog"

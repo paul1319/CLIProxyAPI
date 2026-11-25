@@ -8,14 +8,27 @@ import (
 
 const claudeDDModelPrefix = "claude-fable-5-dd-"
 
+// Options controls how BuildResponse shapes an Anthropic model list.
+type Options struct {
+	// DisableCloaking keeps original model IDs instead of rewriting non-Claude IDs.
+	DisableCloaking bool
+	// ClaudeOnly drops every model whose ID is not a native Claude model ID.
+	ClaudeOnly bool
+}
+
 // BuildResponse builds an Anthropic model response from available models.
-func BuildResponse(availableModels []map[string]any, disableCloaking bool) map[string]any {
-	models := make([]map[string]any, len(availableModels))
-	for i, model := range availableModels {
-		models[i] = cloneModel(model)
-		if id, ok := models[i]["id"].(string); ok && !disableCloaking {
-			models[i]["id"] = EnsureClaudeModelIDPrefix(id)
+func BuildResponse(availableModels []map[string]any, opts Options) map[string]any {
+	models := make([]map[string]any, 0, len(availableModels))
+	for _, model := range availableModels {
+		id, _ := model["id"].(string)
+		if opts.ClaudeOnly && !IsClaudeModelID(id) {
+			continue
 		}
+		cloned := cloneModel(model)
+		if id != "" && !opts.DisableCloaking {
+			cloned["id"] = EnsureClaudeModelIDPrefix(id)
+		}
+		models = append(models, cloned)
 	}
 
 	sort.SliceStable(models, func(i, j int) bool {
@@ -42,6 +55,16 @@ func BuildResponse(availableModels []map[string]any, disableCloaking bool) map[s
 		"first_id": firstID,
 		"last_id":  lastID,
 	}
+}
+
+// IsClaudeModelID reports whether id names a native Claude model. A credential
+// prefix such as "team/claude-sonnet-4-6" is ignored; IDs encoded by
+// EnsureClaudeModelIDPrefix are not native Claude models.
+func IsClaudeModelID(id string) bool {
+	if idx := strings.LastIndex(id, "/"); idx >= 0 {
+		id = id[idx+1:]
+	}
+	return strings.HasPrefix(id, "claude-") && !strings.HasPrefix(id, claudeDDModelPrefix)
 }
 
 // EnsureClaudeModelIDPrefix rewrites model IDs for Anthropic model listings.

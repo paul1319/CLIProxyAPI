@@ -10,7 +10,7 @@ func TestBuildResponse(t *testing.T) {
 		{"id": "claude-b", "display_name": "Beta"},
 	}
 
-	response := BuildResponse(availableModels, false)
+	response := BuildResponse(availableModels, Options{})
 	models, ok := response["data"].([]map[string]any)
 	if !ok {
 		t.Fatalf("data type = %T, want []map[string]any", response["data"])
@@ -56,7 +56,7 @@ func TestBuildResponseWithCloakingDisabled(t *testing.T) {
 		{"id": "gpt-4o", "display_name": "GPT-4o"},
 	}
 
-	response := BuildResponse(availableModels, true)
+	response := BuildResponse(availableModels, Options{DisableCloaking: true})
 	models, ok := response["data"].([]map[string]any)
 	if !ok {
 		t.Fatalf("data type = %T, want []map[string]any", response["data"])
@@ -75,8 +75,61 @@ func TestBuildResponseWithCloakingDisabled(t *testing.T) {
 	}
 }
 
+func TestBuildResponseClaudeOnly(t *testing.T) {
+	availableModels := []map[string]any{
+		{"id": "gpt-4o", "display_name": "GPT-4o"},
+		{"id": "claude-sonnet-4-6", "display_name": "Claude Sonnet"},
+		{"id": "gemini-3-flash", "display_name": "Gemini Flash"},
+		{"id": "team/claude-opus-4-8", "display_name": "Team Opus"},
+		{"id": "my-claude-custom", "display_name": "Custom"},
+	}
+
+	for _, disableCloaking := range []bool{false, true} {
+		response := BuildResponse(availableModels, Options{DisableCloaking: disableCloaking, ClaudeOnly: true})
+		models, ok := response["data"].([]map[string]any)
+		if !ok {
+			t.Fatalf("data type = %T, want []map[string]any", response["data"])
+		}
+		wantIDs := []string{"claude-sonnet-4-6", "team/claude-opus-4-8"}
+		if !disableCloaking {
+			wantIDs[1] = EnsureClaudeModelIDPrefix("team/claude-opus-4-8")
+		}
+		if len(models) != len(wantIDs) {
+			t.Fatalf("disableCloaking=%t: len(data) = %d, want %d: %v", disableCloaking, len(models), len(wantIDs), models)
+		}
+		for i, want := range wantIDs {
+			if got, _ := models[i]["id"].(string); got != want {
+				t.Fatalf("disableCloaking=%t: data[%d].id = %q, want %q", disableCloaking, i, got, want)
+			}
+		}
+		if response["first_id"] != wantIDs[0] || response["last_id"] != wantIDs[1] {
+			t.Fatalf("disableCloaking=%t: IDs = (%v, %v), want (%q, %q)", disableCloaking, response["first_id"], response["last_id"], wantIDs[0], wantIDs[1])
+		}
+	}
+}
+
+func TestIsClaudeModelID(t *testing.T) {
+	tests := []struct {
+		id   string
+		want bool
+	}{
+		{"", false},
+		{"claude-sonnet-4-6", true},
+		{"team/claude-sonnet-4-6", true},
+		{"gpt-4o", false},
+		{"my-claude-custom", false},
+		{"claude-fable-5-dd-o4-tpg", false},
+		{"claude", false},
+	}
+	for _, tt := range tests {
+		if got := IsClaudeModelID(tt.id); got != tt.want {
+			t.Errorf("IsClaudeModelID(%q) = %t, want %t", tt.id, got, tt.want)
+		}
+	}
+}
+
 func TestBuildResponseEmpty(t *testing.T) {
-	response := BuildResponse(nil, false)
+	response := BuildResponse(nil, Options{})
 	models, ok := response["data"].([]map[string]any)
 	if !ok {
 		t.Fatalf("data type = %T, want []map[string]any", response["data"])

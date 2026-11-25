@@ -1094,9 +1094,14 @@ func (s *Server) handleHomeModels(c *gin.Context) {
 	isClaude := isAnthropicModelsRequest(c)
 
 	if isClaude {
-		cfg := s.getConfig()
-		disableCloaking := cfg != nil && cfg.ClaudeCode.DisableCloakingModelList
-		s.writeModelListResponse(c, "claude", claudemodels.BuildResponse(formatHomeClaudeModels(entries), disableCloaking))
+		var opts claudemodels.Options
+		if cfg := s.getConfig(); cfg != nil {
+			opts = claudemodels.Options{
+				DisableCloaking: cfg.ClaudeCode.DisableCloakingModelList,
+				ClaudeOnly:      cfg.ClaudeCode.ClaudeOnlyModelList,
+			}
+		}
+		s.writeModelListResponse(c, "claude", claudemodels.BuildResponse(formatHomeClaudeModels(entries), opts))
 		return
 	}
 

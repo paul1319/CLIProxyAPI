@@ -2,6 +2,7 @@ package claude
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/MoeForge/moego/json"
@@ -79,6 +80,48 @@ func TestClaudeModelsResponseDisablesModelListCloaking(t *testing.T) {
 		}
 	}
 	t.Fatalf("uncloaked model %q not found in response", modelID)
+}
+
+func TestClaudeModelsResponseClaudeOnlyModelList(t *testing.T) {
+	const clientID = "claude-only-model-list-test"
+	const claudeModelID = "claude-only-model-list-test"
+	const otherModelID = "gpt-only-model-list-test"
+	registryRef := registry.GetGlobalRegistry()
+	registryRef.RegisterClient(clientID, "claude", []*registry.ModelInfo{
+		{ID: claudeModelID, Object: "model", OwnedBy: "test"},
+		{ID: otherModelID, Object: "model", OwnedBy: "test"},
+	})
+	t.Cleanup(func() {
+		registryRef.UnregisterClient(clientID)
+	})
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	baseHandler := &handlers.BaseAPIHandler{Cfg: &sdkconfig.SDKConfig{
+		ClaudeCode: sdkconfig.ClaudeCodeConfig{ClaudeOnlyModelList: true},
+	}}
+	NewClaudeCodeAPIHandler(baseHandler).ClaudeModels(ctx)
+
+	var response struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if errUnmarshal := json.Unmarshal(recorder.Body.Bytes(), &response); errUnmarshal != nil {
+		t.Fatalf("decode response: %v", errUnmarshal)
+	}
+	foundClaude := false
+	for _, model := range response.Data {
+		if !strings.HasPrefix(model.ID, "claude-") || strings.HasPrefix(model.ID, "claude-fable-5-dd-") {
+			t.Fatalf("non-Claude model %q listed with claude-only-model-list", model.ID)
+		}
+		if model.ID == claudeModelID {
+			foundClaude = true
+		}
+	}
+	if !foundClaude {
+		t.Fatalf("model %q not found in response: %s", claudeModelID, recorder.Body.String())
+	}
 }
 
 func TestRewriteClaudeDDModelInBody(t *testing.T) {
