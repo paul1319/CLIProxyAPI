@@ -1450,7 +1450,9 @@ func TestServiceHeartbeatFailoverDoesNotDrainBlockingScope(t *testing.T) {
 	}
 	select {
 	case <-secondSubscribe:
-	case <-time.After(time.Second):
+	// Unplanned failover waits for the jittered retry backoff (up to homeSubscriberRetryInitial)
+	// after the heartbeat timeout, so a one-second budget races with the jitter.
+	case <-time.After(3 * homeSubscriberRetryInitial):
 		t.Fatal("new subscription did not start while the old scope remained active")
 	}
 	service.homeMu.Lock()

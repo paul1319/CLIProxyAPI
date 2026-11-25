@@ -204,11 +204,7 @@ func TestIssue7749AntigravityExpiringTokenPersistsOnceAcrossConsecutiveRequests(
 		{ID: claudeModelID},
 	})
 	t.Cleanup(func() {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-			if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
-				waitForAntigravityCreditsRefresh(t, state)
-			}
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, authID)
 		registry.GetGlobalRegistry().UnregisterClient(authID)
 	})
 
@@ -365,11 +361,7 @@ func TestIssue7749AntigravityFailedRequestRecordsRefreshedAccessTokenInMarkResul
 		{ID: modelID},
 	})
 	t.Cleanup(func() {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-			if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
-				waitForAntigravityCreditsRefresh(t, state)
-			}
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, authID)
 		registry.GetGlobalRegistry().UnregisterClient(authID)
 	})
 
@@ -1178,11 +1170,7 @@ func TestIssue7749TokenCrossingSafetyWindowAfterPrepareStillPersistsAndUpdatesMa
 	}
 	registry.GetGlobalRegistry().RegisterClient(authID, "antigravity", []*registry.ModelInfo{{ID: modelID}})
 	t.Cleanup(func() {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-			if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
-				waitForAntigravityCreditsRefresh(t, state)
-			}
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, authID)
 		registry.GetGlobalRegistry().UnregisterClient(authID)
 	})
 
@@ -1437,11 +1425,7 @@ func TestIssue7749ConcurrentRequestsRefreshOnceAndSharePersistedToken(t *testing
 	}
 	registry.GetGlobalRegistry().RegisterClient(authID, "antigravity", []*registry.ModelInfo{{ID: modelID}})
 	t.Cleanup(func() {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-			if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
-				waitForAntigravityCreditsRefresh(t, state)
-			}
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, authID)
 		registry.GetGlobalRegistry().UnregisterClient(authID)
 	})
 
@@ -1564,11 +1548,7 @@ func TestIssue7749PrepareHttpRequestPersistsRefreshedToken(t *testing.T) {
 		t.Fatalf("Register auth: %v", errReg)
 	}
 	t.Cleanup(func() {
-		if value, ok := antigravityCreditsHintRefreshByID.Load(authID); ok {
-			if state, okState := value.(*antigravityCreditsHintRefreshState); okState && state != nil {
-				waitForAntigravityCreditsRefresh(t, state)
-			}
-		}
+		waitForAntigravityCreditsRefreshByAuthID(t, authID)
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
