@@ -599,6 +599,11 @@ upstream:
     # When true, return original model IDs in Anthropic model list responses instead of cloaked IDs.
     disable-cloaking-model-list: false
 
+    # When true, Anthropic model list responses (e.g. Claude Code /v1/models) include only native
+    # Claude models (IDs starting with "claude-"); other providers' models are hidden from the list
+    # but can still be requested by name. Default false lists every available model.
+    claude-only-model-list: false
+
     # Anthropic-Beta is assembled per request rather than sent as a fixed list, matching
     # Claude Code: context-1m sits right after claude-code, mid-conversation-system
     # is added only for models that accept a role=system turn, advanced-tool-use only when
