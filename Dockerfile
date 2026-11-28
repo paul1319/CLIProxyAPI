@@ -30,9 +30,12 @@ RUN CGO_ENABLED=1 GOOS=linux go build -buildvcs=false -ldflags="-s -w -X 'main.V
 
 FROM debian:bookworm
 
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata ca-certificates && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir /CLIProxyAPI
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata ca-certificates && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1000 cliproxy \
+    && useradd --uid 1000 --gid 1000 --home-dir /CLIProxyAPI --shell /usr/sbin/nologin --no-create-home cliproxy \
+    && mkdir -p /CLIProxyAPI/logs /CLIProxyAPI/plugins /CLIProxyAPI/static /config /data/state /data/static /root/.cli-proxy-api \
+    && chmod 0755 /root \
+    && chown -R 1000:1000 /CLIProxyAPI/logs /CLIProxyAPI/plugins /config /data /root/.cli-proxy-api
 
 COPY --from=builder ./app/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
 COPY --from=panel-builder /panel/dist/index.html /CLIProxyAPI/static/management.html
@@ -48,5 +51,7 @@ ENV TZ=Asia/Shanghai
 ENV MANAGEMENT_STATIC_PATH=/CLIProxyAPI/static MANAGEMENT_DISABLE_AUTO_UPDATE=true
 
 RUN cp /usr/share/zoneinfo/${TZ} /etc/localtime && echo "${TZ}" > /etc/timezone
+
+USER 1000:1000
 
 CMD ["./CLIProxyAPI"]
